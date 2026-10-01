@@ -58,14 +58,11 @@
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2m2-10h4m-2-2v4"></path></svg>
                 <span>Контрагенты</span>
             </a>{% endif %}
-            {% if perms.imports.view_import %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:list' or request.resolver_match.view_name == 'imports:new' or request.resolver_match.view_name == 'imports:types' %}active{% endif %}" href="{% url 'imports:list' %}" title="Импорты">
+            {% if perms.imports.view_import %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:list' or request.resolver_match.view_name == 'imports:items' or request.resolver_match.view_name == 'imports:new' or request.resolver_match.view_name == 'imports:types' %}active{% endif %}" href="{% url 'imports:list' %}" title="Импорты">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8ZM14 3v6h5M8 13h8m-8 4h6"></path></svg>
                 <span>Импорты</span>
             </a>{% endif %}
         </nav>
-        <div class="sidebar-bottom">
-            <div class="sidebar-status"><span class="status-dot"></span>Система доступна</div>
-        </div>
     </aside>
     <button aria-label="Закрыть навигацию" class="sidebar-overlay" data-sidebar-close tabindex="-1"></button>
     <div class="shell-main">
@@ -109,11 +106,13 @@
             {% if messages %}{% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} mb-3">{{ message }}</div>{% endfor %}{% endif %}
             {% block content %}{% endblock %}
         </main>
-        <footer class="statusbar"><span class="flex items-center gap-2"><span class="status-dot text-success"></span>Система доступна</span><span>TEST APP / Компактный режим</span></footer>
+        <footer class="statusbar"><span>TEST APP / Компактный режим</span></footer>
     </div>
     <script defer src="{% static 'js/core.js' %}"></script>
     <script defer src="{% static 'js/sidebar.js' %}"></script>
     <script defer src="{% static 'js/dropdown.js' %}"></script>
+    <script defer src="{% static 'js/modal.js' %}"></script>
     <script defer src="{% static 'js/integration.js' %}"></script>
+    {% block scripts %}{% endblock %}
 </body>
 </html>

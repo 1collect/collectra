@@ -9,21 +9,25 @@
 <section class="panel">
     <div class="panel-header"><h2>Реестр договоров <span class="badge">{{ page_obj.paginator.count }}</span></h2><span class="badge badge-neutral">По 25 записей</span></div>
     <div class="p-0 table-container">
-        <table class="table table-striped">
-            <thead><tr><th>ДБЗ</th><th>ФИО</th><th>ИИН</th><th>Общая задолженность</th><th>Платежи</th><th>Актуальный остаток</th><th>Итоговый остаток</th><th>Статус</th></tr></thead>
+        <table class="table table-bordered table-compact">
+            <thead><tr><th>ДБЗ</th><th>ФИО</th><th>ИИН</th><th>Основной долг</th><th>Вознаграждение</th><th>Пеня/Штрафы</th><th>Дебиторская задолженность</th><th>Гос.пошлина</th><th>Представительские расходы</th><th>Нотариальные расходы</th><th>Почтовые расходы</th><th>Общая сумма задолженности</th></tr></thead>
             <tbody>
             {% for debt in page_obj %}
                 <tr>
                     <td><strong class="font-mono">{{ debt.contract_number }}</strong></td>
-                    <td>{% if debt.counterparty_id %}{% if perms.imports.change_counterparty %}<a href="{% url 'imports:counterparty_edit' debt.counterparty_id %}">{{ debt.counterparty.full_name }}</a>{% else %}{{ debt.counterparty.full_name }}{% endif %}{% else %}{{ debt.full_name }}{% endif %}</td>
-                    <td class="font-mono">{% if debt.counterparty_id %}{{ debt.counterparty.iin }}{% else %}{{ debt.iin }}{% endif %}</td>
-                    <td>{{ debt.total_debt|floatformat:2 }}</td>
-                    <td>{{ debt.payments_amount|floatformat:2 }}</td>
-                    <td>{{ debt.current_balance|floatformat:2 }}</td>
-                    <td><strong>{{ debt.final_debt_balance|floatformat:2 }}</strong></td>
-                    <td>{% if debt.repayment_date %}<span class="badge badge-success"><span class="status-dot"></span>Погашен</span><div class="text-xs text-muted">{{ debt.repayment_date|date:'d.m.Y' }}</div>{% else %}<span class="badge badge-warning"><span class="status-dot"></span>Активен</span>{% endif %}</td>
+                    <td>{{ debt.debtor.full_name }}</td>
+                    <td class="font-mono">{{ debt.debtor.iin }}</td>
+                    <td>{{ debt.purchase_principal|floatformat:2 }}</td>
+                    <td>{{ debt.purchase_interest|floatformat:2 }}</td>
+                    <td>{{ debt.purchase_penalties|floatformat:2 }}</td>
+                    <td>{{ debt.purchase_receivable|floatformat:2 }}</td>
+                    <td>{{ debt.purchase_state_duty|floatformat:2 }}</td>
+                    <td>{{ debt.purchase_representative_expenses|floatformat:2 }}</td>
+                    <td>{{ debt.purchase_notary_expenses|floatformat:2 }}</td>
+                    <td>{{ debt.purchase_postal_expenses|floatformat:2 }}</td>
+                    <td><strong>{{ debt.purchase_total_debt|floatformat:2 }}</strong></td>
                 </tr>
-            {% empty %}<tr><td colspan="8"><div class="empty-state"><h3>Договоры не найдены</h3></div></td></tr>{% endfor %}
+            {% empty %}<tr><td colspan="12"><div class="empty-state"><h3>Договоры не найдены</h3></div></td></tr>{% endfor %}
             </tbody>
         </table>
     </div>

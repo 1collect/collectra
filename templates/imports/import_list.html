@@ -1,11 +1,47 @@
 {% extends 'base.html' %}
+{% load static %}
 {% block title %}Импорты{% endblock %}
 {% block page_name %}imports{% endblock %}
 {% block heading %}Импорты{% endblock %}
 {% block content %}
-<div class="page-header"><div><div class="page-eyebrow">Данные</div><h1>Импорты</h1></div><div class="page-actions">{% if perms.imports.view_importtype %}<a class="btn" href="{% url 'imports:types' %}">Типы импорта</a>{% endif %}{% if perms.imports.add_import %}<a class="btn btn-primary" href="{% url 'imports:new' %}"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Новый импорт</a>{% endif %}</div></div>
-<section class="panel"><div class="panel-header"><h2>История импорта</h2><span class="badge">{{ imports|length }}</span></div><div class="p-0 table-container">
-<table class="table table-striped"><thead><tr><th>ID</th><th>Тип</th><th>Файл</th><th>Статус</th><th>Всего</th><th>Успешно</th><th>Ошибок</th><th>Дата</th></tr></thead><tbody>
-{% for item in imports %}<tr><td class="font-mono">{{ item.id }}</td><td>{{ item.import_type.name }}</td><td>{{ item.file_name|default:'—' }}{% if item.error_message %}<div class="text-xs text-danger">{{ item.error_message }}</div>{% endif %}</td><td><span class="badge {% if item.status == 'completed' %}badge-success{% elif item.status == 'failed' %}badge-danger{% elif item.status == 'processing' %}badge-warning{% else %}badge-neutral{% endif %}">{{ item.get_status_display }}</span></td><td>{{ item.total_items }}</td><td>{{ item.successful_items }}</td><td>{{ item.failed_items }}</td><td>{{ item.created_at|date:'d.m.Y H:i' }}</td></tr>{% empty %}<tr><td colspan="8">Импортов пока нет.</td></tr>{% endfor %}
-</tbody></table></div></section>
+<div class="page-header">
+    <div><div class="page-eyebrow">Данные</div><h1>Импорты</h1></div>
+    <div class="page-actions">
+        {% if perms.imports.view_importtype %}<a class="btn" href="{% url 'imports:types' %}">Типы импорта</a>{% endif %}
+        {% if perms.imports.add_import %}<button class="btn btn-primary" data-modal-open="import-upload-modal" type="button"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Новый импорт</button>{% endif %}
+    </div>
+</div>
+<div class="master-detail master-detail--viewport" data-import-workspace>
+    <section class="panel master-detail__master" aria-label="Список импортов">
+        <div class="panel-header"><h2>История импорта</h2><span class="badge">{{ imports|length }}</span></div>
+        <div class="master-detail__list">
+            {% for item in imports %}
+            <a class="master-detail__item{% if selected_import.pk == item.pk %} is-active{% endif %}" href="{% url 'imports:items' item.pk %}" data-import-link data-import-id="{{ item.pk }}"{% if selected_import.pk == item.pk %} aria-current="page"{% endif %}>
+                <div class="master-detail__item-heading"><strong class="truncate">{{ item.file_name|default:'Файл не указан' }}</strong><time datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:'d.m H:i' }}</time></div>
+                <div class="master-detail__item-description truncate">{{ item.import_type.name }}</div>
+                <div class="master-detail__item-meta"><span class="badge {% if item.status == 'completed' %}badge-success{% elif item.status == 'failed' %}badge-danger{% elif item.status == 'processing' %}badge-warning{% else %}badge-neutral{% endif %}"><span class="status-dot"></span>{{ item.get_status_display }}</span><span>{{ item.processed_items }}/{{ item.total_items }}</span></div>
+                <span class="progress progress-sm {% if item.status == 'completed' %}progress-success{% elif item.status == 'failed' %}progress-danger{% elif item.status == 'processing' %}progress-warning{% endif %}" aria-label="Прогресс {{ item.progress_percentage }} процентов"><span class="progress-bar" style="--progress: {{ item.progress_percentage }}%"></span></span>
+            </a>
+            {% empty %}
+            <div class="empty-state"><strong>Импортов пока нет</strong><p>Загрузите первый XLSX-файл, чтобы увидеть результат обработки.</p></div>
+            {% endfor %}
+        </div>
+    </section>
+
+    {% include 'imports/partials/import_detail.html' %}
+</div>
+{% if perms.imports.add_import %}
+<dialog class="modal" id="import-upload-modal"{% if open_upload_modal %} data-auto-open{% endif %}>
+    <form action="{% url 'imports:new' %}" enctype="multipart/form-data" method="post">
+        {% csrf_token %}
+        <div class="modal-header"><h2>Новый импорт</h2><button aria-label="Закрыть" class="btn btn-icon btn-ghost" data-modal-close type="button"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></div>
+        <div class="modal-body">{{ upload_form.non_field_errors }}<p class="panel-note">Выберите тип импорта и файл XLSX размером до 20 МБ.</p><div class="stack">
+            <div class="form-field"><label class="form-label" for="{{ upload_form.import_type.id_for_label }}">{{ upload_form.import_type.label }}</label>{{ upload_form.import_type }}{% for error in upload_form.import_type.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+            <div class="form-field"><label class="form-label" for="{{ upload_form.file.id_for_label }}">{{ upload_form.file.label }}</label>{{ upload_form.file }}{% for error in upload_form.file.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+        </div></div>
+        <div class="modal-footer"><button class="btn" data-modal-close type="button">Отмена</button><button class="btn btn-primary" type="submit">Загрузить</button></div>
+    </form>
+</dialog>
+{% endif %}
 {% endblock %}
+{% block scripts %}<script defer src="{% static 'js/imports.js' %}"></script>{% endblock %}

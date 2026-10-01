@@ -9,7 +9,7 @@
 </div>
 <section class="panel">
     <div class="panel-header"><h2>Реестр контрагентов <span class="badge">{{ page_obj.paginator.count }}</span></h2><span class="badge badge-neutral">По 25 записей</span></div>
-    <div class="p-0 table-container"><table class="table table-striped">
+    <div class="p-0 table-container"><table class="table table-bordered table-compact">
         <thead><tr><th>ID</th><th>Наименование / ФИО</th><th>ИИН</th><th>Договоров</th><th>Действия</th></tr></thead>
         <tbody>{% for counterparty in page_obj %}<tr>
             <td class="font-mono">{{ counterparty.id }}</td>

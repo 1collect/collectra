@@ -9,7 +9,7 @@
 <section class="panel">
     <div class="panel-header"><h2>Учётные записи <span class="badge">{{ users|length }}</span></h2></div>
     <div class="p-0 table-container">
-        <table class="table table-striped">
+        <table class="table table-bordered table-compact">
             <thead><tr><th>Пользователь</th><th>Роли</th><th>Статус</th><th>Доступ</th><th>Действия</th></tr></thead>
             <tbody>
             {% for user_obj in users %}
