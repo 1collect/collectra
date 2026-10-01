@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Debt, Debtor, Import, ImportItem, ImportType
+from .models import Counterparty, Debt, Import, ImportItem, ImportType
 
 
 @admin.register(ImportType)
@@ -27,14 +27,20 @@ class ImportItemAdmin(admin.ModelAdmin):
     readonly_fields = ('created_at',)
 
 
-@admin.register(Debtor)
-class DebtorAdmin(admin.ModelAdmin):
+@admin.register(Counterparty)
+class CounterpartyAdmin(admin.ModelAdmin):
     list_display = ('iin', 'full_name')
     search_fields = ('iin', 'full_name')
 
 
 @admin.register(Debt)
 class DebtAdmin(admin.ModelAdmin):
-    list_display = ('contract_number', 'debtor', 'total_debt', 'final_debt_balance', 'repayment_date')
-    search_fields = ('contract_number', 'debtor__iin', 'debtor__full_name')
-    list_select_related = ('debtor',)
+    list_display = ('contract_number', 'full_name', 'iin', 'counterparty', 'total_debt', 'final_debt_balance', 'repayment_date')
+    search_fields = (
+        'contract_number',
+        'iin',
+        'full_name',
+        'counterparty__iin',
+        'counterparty__full_name',
+    )
+    list_select_related = ('counterparty',)

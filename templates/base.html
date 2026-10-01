@@ -54,7 +54,11 @@
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><rect height="14" rx="2" width="18" x="3" y="7"></rect><path d="M8 7V3h8v4M3 12h18M10 12v3h4v-3"></path></svg>
                 <span>Договоры</span>
             </a>{% endif %}
-            {% if perms.imports.view_import %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:list' or request.resolver_match.view_name == 'imports:types' %}active{% endif %}" href="{% url 'imports:list' %}" title="Импорты">
+            {% if perms.imports.view_counterparty %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:counterparties' or request.resolver_match.view_name == 'imports:counterparty_new' or request.resolver_match.view_name == 'imports:counterparty_edit' or request.resolver_match.view_name == 'imports:counterparty_delete' %}active{% endif %}" href="{% url 'imports:counterparties' %}" title="Контрагенты">
+                <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2m2-10h4m-2-2v4"></path></svg>
+                <span>Контрагенты</span>
+            </a>{% endif %}
+            {% if perms.imports.view_import %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:list' or request.resolver_match.view_name == 'imports:new' or request.resolver_match.view_name == 'imports:types' %}active{% endif %}" href="{% url 'imports:list' %}" title="Импорты">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8ZM14 3v6h5M8 13h8m-8 4h6"></path></svg>
                 <span>Импорты</span>
             </a>{% endif %}
@@ -102,10 +106,10 @@
             </div>
         </header>
         <main class="content" id="main-content" tabindex="-1">
-            {% if messages %}{% for message in messages %}<div class="alert alert-success mb-3">{{ message }}</div>{% endfor %}{% endif %}
+            {% if messages %}{% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} mb-3">{{ message }}</div>{% endfor %}{% endif %}
             {% block content %}{% endblock %}
         </main>
-        <footer class="statusbar"><span class="flex items-center gap-2"><span class="status-dot text-success"></span>Авторизация и права Django</span><span>TEST APP / Компактный режим</span></footer>
+        <footer class="statusbar"><span class="flex items-center gap-2"><span class="status-dot text-success"></span>Система доступна</span><span>TEST APP / Компактный режим</span></footer>
     </div>
     <script defer src="{% static 'js/core.js' %}"></script>
     <script defer src="{% static 'js/sidebar.js' %}"></script>

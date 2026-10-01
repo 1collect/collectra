@@ -4,10 +4,10 @@
 {% block heading %}Пользователи{% endblock %}
 {% block content %}
 <div class="page-header">
-    <div><div class="page-eyebrow">Управление доступом</div><h1>Пользователи</h1><p>Роли, прямые права и состояние учётных записей.</p></div>
+    <div><div class="page-eyebrow">Управление доступом</div><h1>Пользователи</h1></div>
 </div>
 <section class="panel">
-    <div class="panel-header"><h2>Учётные записи <span class="badge">{{ users|length }}</span></h2><span class="badge badge-neutral">Django Auth</span></div>
+    <div class="panel-header"><h2>Учётные записи <span class="badge">{{ users|length }}</span></h2></div>
     <div class="p-0 table-container">
         <table class="table table-striped">
             <thead><tr><th>Пользователь</th><th>Роли</th><th>Статус</th><th>Доступ</th><th>Действия</th></tr></thead>

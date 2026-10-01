@@ -4,7 +4,7 @@
 {% block heading %}{% if role.pk %}Изменение роли{% else %}Новая роль{% endif %}{% endblock %}
 {% block content %}
 <div class="page-header">
-    <div><div class="page-eyebrow">Управление доступом / Роли</div><h1>{% if role.pk %}{{ role.name }}{% else %}Создание роли{% endif %}</h1><p>Выберите права, доступные пользователям с этой ролью.</p></div>
+    <div><div class="page-eyebrow">Управление доступом / Роли</div><h1>{% if role.pk %}{{ role.name }}{% else %}Создание роли{% endif %}</h1></div>
     <div class="page-actions"><a class="btn" href="{% url 'users:roles' %}">Отмена</a></div>
 </div>
 <form method="post">{% csrf_token %}

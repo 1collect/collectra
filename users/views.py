@@ -7,7 +7,12 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import PermissionGroupForm, RoleForm, UserAccessForm
+from .forms import (
+    PermissionGroupForm,
+    RoleForm,
+    UserAccessForm,
+    permission_display_name,
+)
 from .models import PermissionGroup, Role
 
 User = get_user_model()
@@ -22,6 +27,7 @@ def dashboard(request):
         ('users.view_permissiongroup', 'users:groups'),
         ('auth.view_permission', 'users:permissions'),
         ('imports.view_debt', 'imports:debts'),
+        ('imports.view_counterparty', 'imports:counterparties'),
         ('imports.view_import', 'imports:list'),
         ('imports.view_importtype', 'imports:types'),
     )
@@ -32,7 +38,7 @@ def dashboard(request):
 
 
 def permission_required(permission):
-    """Require a real Django permission and return 403 for an authenticated user."""
+    """Require a permission and return 403 for an authenticated user."""
     def decorator(view):
         @login_required
         @wraps(view)
@@ -130,4 +136,6 @@ def permission_list(request):
     permissions = Permission.objects.select_related('content_type').order_by(
         'content_type__app_label', 'content_type__model', 'codename'
     )
+    for permission in permissions:
+        permission.display_name = permission_display_name(permission)
     return render(request, 'users/permission_list.html', {'permissions': permissions})

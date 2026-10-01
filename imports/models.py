@@ -97,8 +97,8 @@ class ImportItem(models.Model):
         return f'{self.import_record} — строка {self.row_number}'
 
 
-class Debtor(models.Model):
-    full_name = models.CharField('ФИО', max_length=255)
+class Counterparty(models.Model):
+    full_name = models.CharField('Наименование / ФИО', max_length=255)
     iin = models.CharField(
         'ИИН',
         max_length=12,
@@ -107,10 +107,10 @@ class Debtor(models.Model):
     )
 
     class Meta:
-        db_table = 'debtors'
+        db_table = 'counterparties'
         ordering = ['full_name']
-        verbose_name = 'должник'
-        verbose_name_plural = 'должники'
+        verbose_name = 'контрагент'
+        verbose_name_plural = 'контрагенты'
 
     def __str__(self):
         return f'{self.full_name} ({self.iin})'
@@ -119,13 +119,18 @@ class Debtor(models.Model):
 class Debt(models.Model):
     MONEY = {'max_digits': 20, 'decimal_places': 2, 'default': 0}
 
-    debtor = models.ForeignKey(
-        Debtor,
+    counterparty = models.ForeignKey(
+        Counterparty,
         on_delete=models.PROTECT,
         related_name='debts',
-        verbose_name='Должник',
+        verbose_name='Контрагент',
+        db_column='counterparty_id',
+        null=True,
+        blank=True,
     )
     contract_number = models.CharField('ДБЗ', max_length=100, unique=True)
+    iin = models.CharField('ИИН', max_length=12, blank=True)
+    full_name = models.CharField('ФИО', max_length=255, blank=True)
 
     purchase_principal = models.DecimalField('Основной долг (выкуп)', **MONEY)
     purchase_interest = models.DecimalField('Вознаграждение (выкуп)', **MONEY)

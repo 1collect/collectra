@@ -3,7 +3,7 @@
 {% block page_name %}imports{% endblock %}
 {% block heading %}Типы импорта{% endblock %}
 {% block content %}
-<div class="page-header"><div><div class="page-eyebrow">Данные / Импорты</div><h1>Типы импорта</h1><p>Поддерживаемые форматы загружаемых данных.</p></div><div class="page-actions"><a class="btn" href="{% url 'imports:list' %}">Назад к импортам</a></div></div>
+<div class="page-header"><div><div class="page-eyebrow">Данные / Импорты</div><h1>Типы импорта</h1></div><div class="page-actions"><a class="btn" href="{% url 'imports:list' %}">Назад к импортам</a></div></div>
 <section class="panel"><div class="panel-header"><h2>Справочник типов</h2><span class="badge">{{ import_types|length }}</span></div><div class="p-0 table-container">
 <table class="table table-striped"><thead><tr><th>Название</th><th>Код</th><th>Описание</th><th>Статус</th></tr></thead><tbody>
 {% for item in import_types %}<tr><td><strong>{{ item.name }}</strong></td><td class="font-mono">{{ item.code }}</td><td>{{ item.description|default:'—' }}</td><td>{% if item.is_active %}<span class="badge badge-success"><span class="status-dot"></span>Активен</span>{% else %}<span class="badge badge-neutral">Выключен</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="4">Типов импорта пока нет.</td></tr>{% endfor %}

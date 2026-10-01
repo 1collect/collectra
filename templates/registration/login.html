@@ -18,7 +18,6 @@
             <section class="panel auth-card">
                 <div class="panel-body">
                     <h1>Вход в систему</h1>
-                    <p>Введите данные своей учётной записи.</p>
                     {% if form.errors %}<div class="alert alert-danger mt-3">Неверное имя пользователя или пароль.</div>{% endif %}
                     {% if next and user.is_authenticated %}<div class="alert alert-warning mt-3">У вашей учётной записи нет доступа к запрошенной странице.</div>{% endif %}
                     <form method="post" action="{% url 'login' %}" novalidate>

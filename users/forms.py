@@ -5,6 +5,29 @@ from django.contrib.auth.models import Permission, User
 from .models import PermissionGroup, Role
 
 
+PERMISSION_ACTIONS = {
+    'add': 'Создание',
+    'change': 'Изменение',
+    'delete': 'Удаление',
+    'view': 'Просмотр',
+}
+
+
+def permission_display_name(permission):
+    action = permission.codename.split('_', 1)[0]
+    model = permission.content_type.model_class()
+    object_name = model._meta.verbose_name if model else permission.content_type.model
+    action_name = PERMISSION_ACTIONS.get(action)
+    if action_name:
+        return f'{action_name}: {object_name}'
+    return str(permission.name)
+
+
+class PermissionMultipleChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, permission):
+        return permission_display_name(permission)
+
+
 class CircuitAuthenticationForm(AuthenticationForm):
     username = forms.CharField(
         label='Имя пользователя',
@@ -32,8 +55,8 @@ class UserAccessForm(forms.ModelForm):
         required=False,
         widget=forms.CheckboxSelectMultiple,
     )
-    user_permissions = forms.ModelMultipleChoiceField(
-        label='Прямые права',
+    user_permissions = PermissionMultipleChoiceField(
+        label='Дополнительные права',
         queryset=Permission.objects.select_related('content_type').order_by(
             'content_type__app_label', 'content_type__model', 'codename'
         ),
@@ -76,7 +99,7 @@ class UserAccessForm(forms.ModelForm):
 
 
 class PermissionGroupForm(forms.ModelForm):
-    permissions = forms.ModelMultipleChoiceField(
+    permissions = PermissionMultipleChoiceField(
         label='Права доступа',
         queryset=Permission.objects.select_related('content_type').order_by(
             'content_type__app_label', 'content_type__model', 'codename'
@@ -93,7 +116,7 @@ class PermissionGroupForm(forms.ModelForm):
 
 
 class RoleForm(forms.ModelForm):
-    permissions = forms.ModelMultipleChoiceField(
+    permissions = PermissionMultipleChoiceField(
         label='Права доступа',
         queryset=Permission.objects.select_related('content_type').order_by(
             'content_type__app_label', 'content_type__model', 'codename'

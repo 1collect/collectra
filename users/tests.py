@@ -2,7 +2,7 @@ from django.contrib.auth.models import Group, Permission, User
 from django.test import TestCase
 from django.urls import reverse
 
-from imports.models import Debt, Debtor, ImportType
+from imports.models import Counterparty, Debt, Debtor, ImportType
 from users.models import PermissionGroup, Role
 
 
@@ -18,6 +18,7 @@ class AccessControlTests(TestCase):
         self.assertContains(response, 'TEST APP')
         self.assertContains(response, 'css/main.css')
         self.assertNotContains(response, 'data-theme-toggle')
+        self.assertNotContains(response, 'Введите данные своей учётной записи.')
 
     def test_authenticated_user_without_permission_gets_403(self):
         self.client.force_login(self.user)
@@ -121,13 +122,25 @@ class SidebarNavigationTests(TestCase):
         self.assertContains(response, f'class="nav-link active" href="{reverse("imports:list")}"')
         self.assertEqual(response.content.count(b'class="nav-link active"'), 1)
 
+    def test_pages_do_not_show_framework_name(self):
+        response = self.client.get(reverse('users:list'))
+
+        self.assertNotContains(response, 'Django', status_code=200)
+
+    def test_permission_table_has_no_application_column(self):
+        response = self.client.get(reverse('users:permissions'))
+
+        self.assertNotContains(response, '<th>Приложение</th>', html=True)
+        self.assertNotContains(response, '<th>Объект</th>', html=True)
+        self.assertContains(response, 'Просмотр: пользователь')
+
 
 class ContractImportSchemaTests(TestCase):
     def test_contract_import_type_is_created_by_migration(self):
         import_type = ImportType.objects.get(code='contracts')
 
         self.assertEqual(import_type.name, 'Импорт договоров')
-        self.assertEqual(len(import_type.expected_columns), 37)
+        self.assertEqual(len(import_type.expected_columns), 12)
         self.assertEqual(import_type.expected_columns[:3], ['ДБЗ', 'ИИН', 'ФИО'])
 
     def test_one_debtor_can_have_multiple_debts(self):

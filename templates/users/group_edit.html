@@ -4,7 +4,7 @@
 {% block heading %}{% if group.pk %}Изменение группы прав{% else %}Новая группа прав{% endif %}{% endblock %}
 {% block content %}
 <div class="page-header">
-    <div><div class="page-eyebrow">Управление доступом / Группы прав</div><h1>{% if group.pk %}{{ group.name }}{% else %}Создание группы прав{% endif %}</h1><p>Выберите системные права для логической группировки. Группа не назначается ролям или пользователям.</p></div>
+    <div><div class="page-eyebrow">Управление доступом / Группы прав</div><h1>{% if group.pk %}{{ group.name }}{% else %}Создание группы прав{% endif %}</h1></div>
     <div class="page-actions"><a class="btn" href="{% url 'users:groups' %}">Отмена</a></div>
 </div>
 <form method="post">{% csrf_token %}

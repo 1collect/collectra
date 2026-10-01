@@ -6,6 +6,11 @@ app_name = 'imports'
 
 urlpatterns = [
     path('', views.import_list, name='list'),
+    path('new/', views.import_upload, name='new'),
     path('contracts/', views.debt_list, name='debts'),
+    path('counterparties/', views.counterparty_list, name='counterparties'),
+    path('counterparties/new/', views.counterparty_edit, name='counterparty_new'),
+    path('counterparties/<int:counterparty_id>/edit/', views.counterparty_edit, name='counterparty_edit'),
+    path('counterparties/<int:counterparty_id>/delete/', views.counterparty_delete, name='counterparty_delete'),
     path('types/', views.import_type_list, name='types'),
 ]

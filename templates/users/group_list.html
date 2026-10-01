@@ -4,7 +4,7 @@
 {% block heading %}Группы прав{% endblock %}
 {% block content %}
 <div class="page-header">
-    <div><div class="page-eyebrow">Управление доступом</div><h1>Группы прав</h1><p>Группы используются только для классификации системных прав.</p></div>
+    <div><div class="page-eyebrow">Управление доступом</div><h1>Группы прав</h1></div>
     <div class="page-actions">{% if perms.users.add_permissiongroup %}<a class="btn btn-primary" href="{% url 'users:group_new' %}"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Создать группу</a>{% endif %}</div>
 </div>
 <div class="grid-3">

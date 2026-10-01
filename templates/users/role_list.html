@@ -4,10 +4,9 @@
 {% block heading %}Роли{% endblock %}
 {% block content %}
 <div class="page-header">
-    <div><div class="page-eyebrow">Управление доступом</div><h1>Роли</h1><p>Роли объединяют права и назначаются пользователям.</p></div>
+    <div><div class="page-eyebrow">Управление доступом</div><h1>Роли</h1></div>
     <div class="page-actions">{% if perms.users.add_role %}<a class="btn btn-primary" href="{% url 'users:role_new' %}"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Создать роль</a>{% endif %}</div>
 </div>
-<div class="alert alert-info mb-4"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="m12 2 9 4v6c0 5-9 10-9 10S3 17 3 12V6Zm-4 9 3 3 5-5"></path></svg><div><strong>Права применяются на сервере</strong> Итоговый доступ складывается из прав всех ролей и прямых прав пользователя.</div></div>
 <div class="grid-3">
 {% for role in roles %}
     <section class="panel">
