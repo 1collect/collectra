@@ -10,6 +10,9 @@ urlpatterns = [
     path('<int:user_id>/toggle-active/', views.user_toggle_active, name='toggle_active'),
     path('roles/', views.role_list, name='roles'),
     path('roles/new/', views.role_edit, name='role_new'),
-    path('roles/<int:group_id>/edit/', views.role_edit, name='role_edit'),
+    path('roles/<int:role_id>/edit/', views.role_edit, name='role_edit'),
+    path('groups/', views.group_list, name='groups'),
+    path('groups/new/', views.group_edit, name='group_new'),
+    path('groups/<int:group_id>/edit/', views.group_edit, name='group_edit'),
     path('permissions/', views.permission_list, name='permissions'),
 ]

@@ -15,7 +15,7 @@
             {% for user_obj in users %}
                 <tr>
                     <td><strong>{{ user_obj.get_full_name|default:user_obj.username }}</strong><div class="text-xs text-muted">{{ user_obj.username }}</div></td>
-                    <td>{% for group in user_obj.groups.all %}<span class="badge badge-info">{{ group.name }}</span> {% empty %}<span class="text-muted">Без роли</span>{% endfor %}</td>
+                    <td>{% for role in user_obj.roles.all %}<span class="badge badge-info">{{ role.name }}</span> {% empty %}<span class="text-muted">Без роли</span>{% endfor %}</td>
                     <td>{% if user_obj.is_active %}<span class="badge badge-success"><span class="status-dot"></span>Активен</span>{% else %}<span class="badge badge-danger"><span class="status-dot"></span>Заблокирован</span>{% endif %}</td>
                     <td>{% if user_obj.is_superuser %}Суперпользователь{% elif user_obj.is_staff %}Панель управления{% else %}Обычный пользователь{% endif %}</td>
                     <td>

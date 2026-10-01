@@ -1,6 +1,8 @@
 from django import forms
 from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.models import Group, Permission, User
+from django.contrib.auth.models import Permission, User
+
+from .models import PermissionGroup, Role
 
 
 class CircuitAuthenticationForm(AuthenticationForm):
@@ -24,9 +26,9 @@ class CircuitAuthenticationForm(AuthenticationForm):
 
 
 class UserAccessForm(forms.ModelForm):
-    groups = forms.ModelMultipleChoiceField(
+    roles = forms.ModelMultipleChoiceField(
         label='Роли',
-        queryset=Group.objects.all().order_by('name'),
+        queryset=Role.objects.all().order_by('name'),
         required=False,
         widget=forms.CheckboxSelectMultiple,
     )
@@ -47,7 +49,7 @@ class UserAccessForm(forms.ModelForm):
             'last_name',
             'is_active',
             'is_staff',
-            'groups',
+            'roles',
             'user_permissions',
         )
         labels = {
@@ -63,8 +65,17 @@ class UserAccessForm(forms.ModelForm):
             'last_name': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.initial['roles'] = self.instance.roles.all()
 
-class GroupForm(forms.ModelForm):
+    def _save_m2m(self):
+        super()._save_m2m()
+        self.instance.roles.set(self.cleaned_data['roles'])
+
+
+class PermissionGroupForm(forms.ModelForm):
     permissions = forms.ModelMultipleChoiceField(
         label='Права доступа',
         queryset=Permission.objects.select_related('content_type').order_by(
@@ -75,7 +86,24 @@ class GroupForm(forms.ModelForm):
     )
 
     class Meta:
-        model = Group
+        model = PermissionGroup
+        fields = ('name', 'permissions')
+        labels = {'name': 'Название группы прав'}
+        widgets = {'name': forms.TextInput(attrs={'class': 'form-control'})}
+
+
+class RoleForm(forms.ModelForm):
+    permissions = forms.ModelMultipleChoiceField(
+        label='Права доступа',
+        queryset=Permission.objects.select_related('content_type').order_by(
+            'content_type__app_label', 'content_type__model', 'codename'
+        ),
+        required=False,
+        widget=forms.CheckboxSelectMultiple,
+    )
+
+    class Meta:
+        model = Role
         fields = ('name', 'permissions')
         labels = {'name': 'Название роли'}
         widgets = {'name': forms.TextInput(attrs={'class': 'form-control'})}

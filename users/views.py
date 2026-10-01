@@ -2,12 +2,13 @@ from django.contrib.auth import get_user_model
 from functools import wraps
 
 from django.contrib.auth.decorators import login_required
-from django.contrib.auth.models import Group, Permission
+from django.contrib.auth.models import Permission
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 
-from .forms import GroupForm, UserAccessForm
+from .forms import PermissionGroupForm, RoleForm, UserAccessForm
+from .models import PermissionGroup, Role
 
 User = get_user_model()
 
@@ -17,7 +18,8 @@ def dashboard(request):
     """Send the user to the first section available through effective permissions."""
     destinations = (
         ('auth.view_user', 'users:list'),
-        ('auth.view_group', 'users:roles'),
+        ('users.view_role', 'users:roles'),
+        ('users.view_permissiongroup', 'users:groups'),
         ('auth.view_permission', 'users:permissions'),
         ('imports.view_debt', 'imports:debts'),
         ('imports.view_import', 'imports:list'),
@@ -44,7 +46,7 @@ def permission_required(permission):
 
 @permission_required('auth.view_user')
 def user_list(request):
-    users = User.objects.prefetch_related('groups', 'user_permissions').order_by('username')
+    users = User.objects.prefetch_related('roles', 'user_permissions').order_by('username')
     return render(request, 'users/user_list.html', {'users': users})
 
 
@@ -72,27 +74,55 @@ def user_toggle_active(request, user_id):
     return redirect('users:list')
 
 
-@permission_required('auth.view_group')
+@permission_required('users.view_role')
 def role_list(request):
-    roles = Group.objects.prefetch_related('permissions').order_by('name')
+    roles = Role.objects.prefetch_related('permissions').order_by('name')
     return render(request, 'users/role_list.html', {'roles': roles})
 
 
-def role_edit(request, group_id=None):
-    required_permission = 'auth.change_group' if group_id else 'auth.add_group'
+def role_edit(request, role_id=None):
+    required_permission = 'users.change_role' if role_id else 'users.add_role'
     if not request.user.is_authenticated:
         return redirect(f'/login/?next={request.path}')
     if not request.user.has_perm(required_permission):
         raise PermissionDenied
-    group = get_object_or_404(Group, pk=group_id) if group_id else Group()
-    form = GroupForm(request.POST or None, instance=group)
+    role = get_object_or_404(Role, pk=role_id) if role_id else Role()
+    form = RoleForm(request.POST or None, instance=role)
 
     if request.method == 'POST' and form.is_valid():
         form.save()
         messages.success(request, 'Роль сохранена.')
         return redirect('users:roles')
 
-    return render(request, 'users/role_edit.html', {'form': form, 'role': group})
+    return render(request, 'users/role_edit.html', {'form': form, 'role': role})
+
+
+@permission_required('users.view_permissiongroup')
+def group_list(request):
+    groups = PermissionGroup.objects.prefetch_related('permissions').order_by('name')
+    return render(request, 'users/group_list.html', {'groups': groups})
+
+
+def group_edit(request, group_id=None):
+    required_permission = (
+        'users.change_permissiongroup' if group_id else 'users.add_permissiongroup'
+    )
+    if not request.user.is_authenticated:
+        return redirect(f'/login/?next={request.path}')
+    if not request.user.has_perm(required_permission):
+        raise PermissionDenied
+    group = (
+        get_object_or_404(PermissionGroup, pk=group_id)
+        if group_id else PermissionGroup()
+    )
+    form = PermissionGroupForm(request.POST or None, instance=group)
+
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Группа прав сохранена.')
+        return redirect('users:groups')
+
+    return render(request, 'users/group_edit.html', {'form': form, 'group': group})
 
 
 @permission_required('auth.view_permission')
