@@ -1,0 +1,21 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+
+# Django runtime data
+.env
+*.sqlite3
+media/
+staticfiles/
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Source packages and private import data
+circuit-admin/
+*.zip
+*.xlsx

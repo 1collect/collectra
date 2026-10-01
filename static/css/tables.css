@@ -1,0 +1,43 @@
+/* Scroll is scoped to tables; the page itself never needs horizontal scroll. */
+.table-container { overflow: auto; max-width: 100%; scrollbar-width: thin; }
+.table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; white-space: nowrap; }
+.table th { position: sticky; top: 0; z-index: 1; background: var(--bg-subtle); color: var(--text-secondary); font-weight: 500; font-size: 10px; height: 32px; padding: 5px 11px; border-bottom: 1px solid var(--border-color); }
+.table td { height: var(--row-height); padding: 3px 11px; border-bottom: 1px solid var(--border-color); }
+.table tbody tr:last-child td { border-bottom: 0; }
+.table tbody tr:hover { background: var(--bg-subtle); }
+.table tbody tr.is-selected { background: var(--primary-soft); }
+.table-striped tbody tr:nth-child(even) { background: var(--bg-subtle); }
+.table-striped tbody tr:hover { background: var(--bg-hover); }
+.table-bordered th, .table-bordered td { border: 1px solid var(--border-color); }
+.table-compact td { height: 30px; padding: 3px 9px; }
+.table .check-cell { width: 30px; padding-left: 12px; padding-right: 2px; }
+.table input[type="checkbox"] { accent-color: var(--primary); width: 12px; height: 12px; vertical-align: middle; margin: 0; }
+.table .sort-button { display: inline-flex; align-items: center; gap: 5px; background: transparent; color: inherit; font: inherit; padding: 0; }
+.table .sort-button .icon { width: 11px; height: 11px; color: var(--text-muted); }
+.table th[aria-sort="ascending"] .sort-button, .table th[aria-sort="descending"] .sort-button { color: var(--primary); }
+.table .person-cell { display: flex; gap: 8px; align-items: center; }
+.table .person-cell > div { line-height: 1.25; }
+.table .person-cell strong { font-size: 12px; font-weight: 500; }
+.table .person-cell small { display: block; font-size: 10px; color: var(--text-muted); }
+.row-actions { display: flex; align-items: center; gap: 1px; justify-content: flex-end; }
+.row-actions .btn { width: 23px; height: 23px; min-height: 23px; }
+.row-actions .icon { width: 13px; height: 13px; }
+.table-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; padding: 10px 12px; border-bottom: 1px solid var(--border-color); }
+.table-toolbar .input-icon { width: 215px; }
+.table-toolbar > select { width: 115px; }
+.table-toolbar .toolbar-spacer { margin-left: auto; }
+.table-advanced { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; border-bottom: 1px solid var(--border-color); background: var(--bg-subtle); padding: 10px 12px; }
+.table-advanced .form-field { width: 150px; }
+.selection-bar { display: flex; align-items: center; gap: 7px; padding: 6px 12px; background: var(--primary-soft); color: var(--primary); border-bottom: 1px solid var(--border-color); font-size: 11px; }
+.table-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border-top: 1px solid var(--border-color); color: var(--text-secondary); font-size: 10px; flex-wrap: wrap; }
+.rows-control { display: inline-flex; gap: 6px; align-items: center; }
+.rows-control select { width: 53px; height: 25px; font-size: 10px; padding: 1px 4px; }
+.pagination { display: flex; align-items: center; gap: 3px; }
+.page-btn { height: 25px; min-width: 25px; display: inline-flex; align-items: center; justify-content: center; background: var(--bg-panel); border: 1px solid var(--border-color); border-radius: 3px; color: var(--text-secondary); font-size: 10px; padding: 2px 6px; }
+.page-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+.page-btn[aria-current="page"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.page-btn .icon { width: 12px; height: 12px; }
+.page-ellipsis { font-size: 10px; padding: 0 3px; }
+.column-menu .check { display: flex; padding: 4px 7px; min-height: 26px; }
+.table-result-info { min-height: 15px; }
+.table .empty-state { white-space: normal; }

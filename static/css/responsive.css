@@ -1,0 +1,89 @@
+@media (min-width: 1700px) { .component-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1200px) {
+  .kit-overview .kit-tokens { display: none; }
+  .dashboard-grid { grid-template-columns: minmax(0, 1.5fr) minmax(235px, 1fr); }
+  .global-search { min-width: 150px; }
+  .kit-nav { flex-wrap: wrap; }
+  .kit-nav-links { flex: 1; }
+  .demo-grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+@media (max-width: 1000px) {
+  .content { padding: 15px; }
+  .metrics-grid { gap: 8px; }
+  .stat-card { padding: 10px; }
+  .sparkline { width: 55px; }
+  .grid-3 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dashboard-grid { grid-template-columns: 1fr; }
+  .kit-nav .input-icon { width: 100%; }
+  .kit-nav-links { width: 100%; flex: auto; }
+  .component-panel { scroll-margin-top: 138px; }
+  .kit-section-label { scroll-margin-top: 138px; }
+}
+@media (max-width: 800px) {
+  .sidebar, .sidebar-collapsed .sidebar { width: var(--sidebar-width); transform: translateX(-100%); z-index: 180; }
+  .shell-main, .sidebar-collapsed .shell-main { margin-left: 0; }
+  .sidebar-collapsed .brand { padding: 0 17px; }
+  .sidebar-collapsed .brand-title, .sidebar-collapsed .brand-version, .sidebar-collapsed .nav-group-title { display: block; }
+  .sidebar-collapsed .workspace { display: flex; }
+  .sidebar-collapsed .nav-link > span { display: inline; }
+  .sidebar-collapsed .nav-link .chevron { display: block; }
+  .sidebar-collapsed .sidebar-status { display: flex; }
+  .sidebar-collapsed .submenu:not([hidden]) { display: block; }
+  .sidebar-collapsed .nav-link { justify-content: flex-start; padding: 0 10px; height: 32px; }
+  .sidebar-collapsed .sidebar-nav { padding-top: 0; }
+  .sidebar-open .sidebar { transform: translateX(0); }
+  .sidebar-open .sidebar-overlay { display: block; position: fixed; inset: 0; z-index: 170; background: var(--overlay); border: 0; }
+  body.sidebar-open { overflow: hidden; }
+  .user-trigger-name { display: none; }
+  .settings-layout { grid-template-columns: 140px minmax(0, 1fr); }
+}
+@media (max-width: 600px) {
+  .topbar { padding: 0 10px; gap: 5px; }
+  .topbar-right, .topbar-left { gap: 3px; }
+  .topbar-separator { margin: 0 2px; }
+  .global-search { min-width: 28px; width: 28px; padding: 0; justify-content: center; border-color: transparent; background: transparent; }
+  .global-search > span, .global-search kbd { display: none; }
+  .breadcrumbs { font-size: 10px; gap: 4px; }
+  .breadcrumbs .root-crumb, .breadcrumbs .root-separator { display: none; }
+  .content { padding: 13px 10px 18px; }
+  .page-header { gap: 9px; flex-wrap: wrap; }
+  .page-actions { justify-content: flex-start; padding: 0; }
+  .page-header h1 { font-size: 16px; }
+  .metrics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .component-grid, .grid-2, .grid-3 { grid-template-columns: 1fr; }
+  .component-grid > .span-2, .grid-2 > .span-2 { grid-column: auto; }
+  .kit-nav a { padding-inline: 7px; font-size: 10px; }
+  .kit-overview { gap: 10px; padding: 10px; }
+  .settings-layout { grid-template-columns: 1fr; }
+  .settings-nav { flex-direction: row; overflow-x: auto; }
+  .settings-nav .tab { width: auto; }
+  .form-grid { gap: 10px; }
+  .form-horizontal .form-field { grid-template-columns: 95px minmax(0, 1fr); }
+  .table-toolbar { gap: 6px; }
+  .table-toolbar .input-icon { flex: 1; min-width: 155px; }
+  .table-toolbar .toolbar-spacer { display: none; }
+  .table-advanced .form-field { width: calc(50% - 6px); }
+  .table-footer { gap: 8px; }
+  .statusbar { padding-inline: 10px; }
+  .statusbar > :last-child { display: none; }
+  .kit-section-label small { display: none; }
+  .toast-container { right: 10px; }
+}
+@media (max-width: 380px) {
+  .form-grid, .demo-grid { grid-template-columns: 1fr; }
+  .form-grid > .span-2, .demo-grid > .span-2 { grid-column: auto; }
+  .topbar .user-trigger .chevron { display: none; }
+  .palette-grid { grid-template-columns: repeat(3, 1fr); }
+  .theme-options { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+@media print {
+  .sidebar, .topbar, .page-actions, .statusbar, .kit-nav, .toast-container { display: none !important; }
+  .shell-main { margin: 0 !important; }
+  .content { padding: 0; }
+  .panel { break-inside: avoid; }
+  body { background: #fff; color: #111; }
+}

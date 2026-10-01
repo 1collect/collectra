@@ -1,0 +1,76 @@
+/* Circuit design tokens. Override these values to brand the entire template. */
+:root {
+  color-scheme: light;
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --bg-body: #f3f5f8;
+  --bg-panel: #ffffff;
+  --bg-subtle: #f8f9fb;
+  --bg-hover: #edf1f7;
+  --bg-sidebar: #182231;
+  --sidebar-text: #b7c2d2;
+  --sidebar-muted: #8190a6;
+  --sidebar-active: #293951;
+  --border-color: #e0e5ec;
+  --border-strong: #c8d0dc;
+  --text-primary: #253146;
+  --text-secondary: #647287;
+  --text-muted: #718097;
+  --primary: #425bd2;
+  --primary-hover: #3148b8;
+  --primary-soft: #edf0ff;
+  --success: #19764f;
+  --success-soft: #eaf6ef;
+  --warning: #95600e;
+  --warning-soft: #fff6e5;
+  --danger: #ba3e47;
+  --danger-soft: #fceef0;
+  --info: #176c98;
+  --info-soft: #eaf4fb;
+  --neutral: #647287;
+  --neutral-soft: #eff2f6;
+  --on-primary: #ffffff;
+  --focus-ring: #788cec;
+  --radius: 4px;
+  --sidebar-width: 228px;
+  --sidebar-collapsed-width: 58px;
+  --topbar-height: 46px;
+  --control-height: 30px;
+  --row-height: 34px;
+  --shadow-float: 0 8px 24px #18223118, 0 2px 6px #1822310a;
+  --overlay: #111a2b66;
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg-body: #111822;
+  --bg-panel: #19222f;
+  --bg-subtle: #1e2938;
+  --bg-hover: #273449;
+  --bg-sidebar: #101722;
+  --sidebar-text: #b8c5d8;
+  --sidebar-muted: #8596af;
+  --sidebar-active: #293850;
+  --border-color: #2c394b;
+  --border-strong: #425169;
+  --text-primary: #e2e9f3;
+  --text-secondary: #a5b4ca;
+  --text-muted: #8b9db7;
+  --primary: #8e9fff;
+  --primary-hover: #a8b5ff;
+  --primary-soft: #283453;
+  --success: #75d5a5;
+  --success-soft: #1c3c33;
+  --warning: #eabe71;
+  --warning-soft: #3b3224;
+  --danger: #f19ba3;
+  --danger-soft: #422932;
+  --info: #82c8ee;
+  --info-soft: #233b50;
+  --neutral: #adbdd2;
+  --neutral-soft: #2a3545;
+  --on-primary: #111c3f;
+  --focus-ring: #9faeff;
+  --shadow-float: 0 8px 28px #00000045;
+  --overlay: #05091299;
+}
+[data-density="comfortable"] { --control-height: 34px; --row-height: 40px; }

@@ -1,0 +1,45 @@
+{% load static %}
+<!DOCTYPE html>
+<html data-density="compact" data-theme="light" lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Вход — CIRCUIT</title>
+    <link href="{% static 'assets/icons/favicon.svg' %}" rel="icon" type="image/svg+xml">
+    <link href="{% static 'css/main.css' %}" rel="stylesheet">
+</head>
+<body data-page="login">
+    <main class="auth-page">
+        <div class="auth-wrapper">
+            <a class="auth-brand" href="{% url 'login' %}">
+                <span aria-hidden="true" class="brand-mark"><i></i><i></i><i></i><i></i></span>
+                <span class="brand-title">CIRCUIT</span>
+            </a>
+            <section class="panel auth-card">
+                <div class="panel-body">
+                    <h1>Вход в систему</h1>
+                    <p>Введите данные своей учётной записи.</p>
+                    {% if form.errors %}<div class="alert alert-danger mt-3">Неверное имя пользователя или пароль.</div>{% endif %}
+                    {% if next and user.is_authenticated %}<div class="alert alert-warning mt-3">У вашей учётной записи нет доступа к запрошенной странице.</div>{% endif %}
+                    <form method="post" action="{% url 'login' %}" novalidate>
+                        {% csrf_token %}
+                        <input type="hidden" name="next" value="{{ next }}">
+                        <div class="form-field">
+                            <label class="form-label" for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+                            {{ form.username }}
+                            {% for error in form.username.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+                        </div>
+                        <div class="form-field">
+                            <label class="form-label" for="{{ form.password.id_for_label }}">{{ form.password.label }}</label>
+                            {{ form.password }}
+                            {% for error in form.password.errors %}<span class="field-error">{{ error }}</span>{% endfor %}
+                        </div>
+                        <button class="btn btn-primary btn-block mt-3" type="submit">Войти <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"></path></svg></button>
+                    </form>
+                </div>
+            </section>
+            <p class="auth-footer">Доступ определяется назначенными ролями и правами.</p>
+        </div>
+    </main>
+</body>
+</html>

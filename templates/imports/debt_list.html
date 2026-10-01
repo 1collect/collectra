@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Договоры{% endblock %}
+{% block page_name %}debts{% endblock %}
+{% block heading %}Договоры{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><div class="page-eyebrow">Данные / Задолженности</div><h1>Договоры</h1><p>Должники, суммы задолженности и состояние погашения.</p></div>
+</div>
+<section class="panel">
+    <div class="panel-header"><h2>Реестр договоров <span class="badge">{{ page_obj.paginator.count }}</span></h2><span class="badge badge-neutral">По 25 записей</span></div>
+    <form class="table-advanced" method="get">
+        <div class="form-field">
+            <label class="form-label" for="debt-search">Поиск</label>
+            <input class="form-control" id="debt-search" name="q" placeholder="ДБЗ, ИИН или ФИО" type="search" value="{{ search }}">
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="debt-status">Статус</label>
+            <select class="form-control" id="debt-status" name="status">
+                <option value="">Все</option>
+                <option value="open" {% if status == 'open' %}selected{% endif %}>Активные</option>
+                <option value="repaid" {% if status == 'repaid' %}selected{% endif %}>Погашенные</option>
+            </select>
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="min-balance">Остаток от</label>
+            <input class="form-control" id="min-balance" inputmode="decimal" name="min_balance" placeholder="0,00" value="{{ min_balance }}">
+        </div>
+        <div class="form-field">
+            <label class="form-label" for="max-balance">Остаток до</label>
+            <input class="form-control" id="max-balance" inputmode="decimal" name="max_balance" placeholder="1000000,00" value="{{ max_balance }}">
+        </div>
+        <button class="btn btn-primary" type="submit">Применить</button>
+        <a class="btn" href="{% url 'imports:debts' %}">Сбросить</a>
+    </form>
+    <div class="p-0 table-container">
+        <table class="table table-striped">
+            <thead><tr><th>ДБЗ</th><th>Должник</th><th>ИИН</th><th>Общая задолженность</th><th>Платежи</th><th>Актуальный остаток</th><th>Итоговый остаток</th><th>Статус</th></tr></thead>
+            <tbody>
+            {% for debt in page_obj %}
+                <tr>
+                    <td><strong class="font-mono">{{ debt.contract_number }}</strong></td>
+                    <td>{{ debt.debtor.full_name }}</td>
+                    <td class="font-mono">{{ debt.debtor.iin }}</td>
+                    <td>{{ debt.total_debt|floatformat:2 }}</td>
+                    <td>{{ debt.payments_amount|floatformat:2 }}</td>
+                    <td>{{ debt.current_balance|floatformat:2 }}</td>
+                    <td><strong>{{ debt.final_debt_balance|floatformat:2 }}</strong></td>
+                    <td>{% if debt.repayment_date %}<span class="badge badge-success"><span class="status-dot"></span>Погашен</span><div class="text-xs text-muted">{{ debt.repayment_date|date:'d.m.Y' }}</div>{% else %}<span class="badge badge-warning"><span class="status-dot"></span>Активен</span>{% endif %}</td>
+                </tr>
+            {% empty %}<tr><td colspan="8"><div class="empty-state"><h3>Договоры не найдены</h3><p>Измените значения фильтров или загрузите данные.</p></div></td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="table-footer">
+        <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        <nav aria-label="Страницы договоров" class="pagination">
+            {% if page_obj.has_previous %}<a class="page-btn" href="?{% if filter_query %}{{ filter_query }}&{% endif %}page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}
+            <span aria-current="page" class="page-btn">{{ page_obj.number }}</span>
+            {% if page_obj.has_next %}<a class="page-btn" href="?{% if filter_query %}{{ filter_query }}&{% endif %}page={{ page_obj.next_page_number }}">Далее</a>{% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

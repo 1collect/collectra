@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% block title %}Импорты{% endblock %}
+{% block page_name %}imports{% endblock %}
+{% block heading %}Импорты{% endblock %}
+{% block content %}
+<div class="page-header"><div><div class="page-eyebrow">Данные</div><h1>Импорты</h1><p>История загрузки и обработки файлов.</p></div><div class="page-actions">{% if perms.imports.view_importtype %}<a class="btn" href="{% url 'imports:types' %}">Типы импорта</a>{% endif %}</div></div>
+<section class="panel"><div class="panel-header"><h2>История импорта</h2><span class="badge">{{ imports|length }}</span></div><div class="p-0 table-container">
+<table class="table table-striped"><thead><tr><th>ID</th><th>Тип</th><th>Файл</th><th>Статус</th><th>Всего</th><th>Успешно</th><th>Ошибок</th><th>Дата</th></tr></thead><tbody>
+{% for item in imports %}<tr><td class="font-mono">{{ item.id }}</td><td>{{ item.import_type.name }}</td><td>{{ item.file_name|default:'—' }}</td><td><span class="badge {% if item.status == 'completed' %}badge-success{% elif item.status == 'failed' %}badge-danger{% elif item.status == 'processing' %}badge-warning{% else %}badge-neutral{% endif %}">{{ item.get_status_display }}</span></td><td>{{ item.total_items }}</td><td>{{ item.successful_items }}</td><td>{{ item.failed_items }}</td><td>{{ item.created_at|date:'d.m.Y H:i' }}</td></tr>{% empty %}<tr><td colspan="8">Импортов пока нет.</td></tr>{% endfor %}
+</tbody></table></div></section>
+{% endblock %}

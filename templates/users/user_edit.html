@@ -1,0 +1,17 @@
+{% extends 'base.html' %}
+{% block title %}Пользователь {{ user_obj.username }}{% endblock %}
+{% block page_name %}users{% endblock %}
+{% block heading %}Изменение пользователя{% endblock %}
+{% block content %}
+<div class="page-header"><div><div class="page-eyebrow">Управление доступом / Пользователи</div><h1>{{ user_obj.get_full_name|default:user_obj.username }}</h1><p>Настройте состояние учётной записи, роли и прямые права.</p></div><div class="page-actions"><a class="btn" href="{% url 'users:list' %}">Назад</a></div></div>
+<form method="post">{% csrf_token %}{{ form.non_field_errors }}
+    <section class="panel mb-4"><div class="panel-header"><h2>Учётная запись</h2></div><div class="panel-body"><div class="form-grid">
+        <div class="form-field"><label class="form-label" for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>{{ form.username }}{{ form.username.errors }}</div>
+        <div class="form-field"><label class="form-label" for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>{{ form.first_name }}{{ form.first_name.errors }}</div>
+        <div class="form-field"><label class="form-label" for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>{{ form.last_name }}{{ form.last_name.errors }}</div>
+        <div class="form-field"><label class="check">{{ form.is_active }}<span>{{ form.is_active.label }}</span></label><label class="check">{{ form.is_staff }}<span>{{ form.is_staff.label }}</span></label></div>
+    </div></div></section>
+    <section class="panel mb-4"><div class="panel-header"><h2>{{ form.groups.label }}</h2></div><div class="panel-body"><div class="grid-3">{% for choice in form.groups %}<label class="check">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>{% empty %}<p class="text-muted">Сначала создайте хотя бы одну роль.</p>{% endfor %}</div></div></section>
+    <section class="panel"><div class="panel-header"><h2>{{ form.user_permissions.label }}</h2><span class="badge badge-neutral">Дополняют права ролей</span></div><div class="panel-body"><div class="grid-3">{% for choice in form.user_permissions %}<label class="check">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>{% endfor %}</div></div><div class="panel-footer"><a class="btn" href="{% url 'users:list' %}">Отмена</a><button class="btn btn-primary" type="submit">Сохранить пользователя</button></div></section>
+</form>
+{% endblock %}
