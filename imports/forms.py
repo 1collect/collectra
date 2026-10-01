@@ -7,7 +7,11 @@ class ImportUploadForm(forms.Form):
     import_type = forms.ModelChoiceField(
         label='Тип импорта',
         queryset=ImportType.objects.none(),
-        widget=forms.Select(attrs={'class': 'form-control'}),
+        empty_label='Выберите тип импорта',
+        widget=forms.Select(attrs={
+            'class': 'form-control',
+            'autofocus': True,
+        }),
     )
     file = forms.FileField(
         label='Файл XLSX',

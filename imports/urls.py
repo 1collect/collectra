@@ -7,6 +7,7 @@ app_name = 'imports'
 urlpatterns = [
     path('', views.import_list, name='list'),
     path('new/', views.import_upload, name='new'),
+    path('<int:import_id>/items/', views.import_items, name='items'),
     path('contracts/', views.debt_list, name='debts'),
     path('counterparties/', views.counterparty_list, name='counterparties'),
     path('counterparties/new/', views.counterparty_edit, name='counterparty_new'),

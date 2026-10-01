@@ -6,14 +6,83 @@ from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import CounterpartyForm, ImportUploadForm
-from .models import Counterparty, Debt, Import, ImportType
+from .models import Counterparty, Debt, Import, ImportItem, ImportType
 from .services import process_xlsx_import
 from users.views import permission_required
 
+
+def add_progress(import_record):
+    import_record.progress_percentage = (
+        round(import_record.processed_items * 100 / import_record.total_items)
+        if import_record.total_items else 0
+    )
+    return import_record
+
+
+def import_workspace_context(request, selected_import_id=None):
+    import_records = list(
+        Import.objects.select_related('import_type', 'created_by')
+    )
+    for import_record in import_records:
+        add_progress(import_record)
+
+    if selected_import_id is None:
+        selected_import = import_records[0] if import_records else None
+    else:
+        selected_import = get_object_or_404(
+            Import.objects.select_related('import_type', 'created_by'),
+            pk=selected_import_id,
+        )
+        add_progress(selected_import)
+
+    page_obj = None
+    rows = []
+    if selected_import is not None:
+        columns = selected_import.metadata.get('columns')
+        if not isinstance(columns, list):
+            columns = selected_import.import_type.expected_columns
+
+        page_obj = Paginator(
+            selected_import.items.order_by('row_number'),
+            50,
+        ).get_page(request.GET.get('page'))
+        rows = [
+            {
+                'item': item,
+                'payload': [
+                    {'name': column, 'value': item.data.get(column, '—')}
+                    for column in columns
+                ],
+            }
+            for item in page_obj
+        ]
+
+    return {
+        'imports': import_records,
+        'selected_import': selected_import,
+        'page_obj': page_obj,
+        'rows': rows,
+        'upload_form': ImportUploadForm(),
+        'open_upload_modal': False,
+    }
+
+
 @permission_required('imports.view_import')
 def import_list(request):
-    imports = Import.objects.select_related('import_type', 'created_by')
-    return render(request, 'imports/import_list.html', {'imports': imports})
+    return render(
+        request,
+        'imports/import_list.html',
+        import_workspace_context(request),
+    )
+
+
+@permission_required('imports.view_import')
+def import_items(request, import_id):
+    return render(
+        request,
+        'imports/import_items.html',
+        import_workspace_context(request, import_id),
+    )
 
 
 @permission_required('imports.add_import')
@@ -37,6 +106,12 @@ def import_upload(request):
             messages.error(request, import_record.error_message)
         return redirect('imports:list')
 
+    if request.user.has_perm('imports.view_import'):
+        context = import_workspace_context(request)
+        context['upload_form'] = form
+        context['open_upload_modal'] = True
+        return render(request, 'imports/import_list.html', context)
+
     return render(request, 'imports/import_upload.html', {'form': form})
 
 
@@ -48,7 +123,10 @@ def import_type_list(request):
 
 @permission_required('imports.view_debt')
 def debt_list(request):
-    debts = Debt.objects.select_related('counterparty').order_by('contract_number')
+    debts = Debt.objects.select_related(
+        'debtor',
+        'counterparty',
+    ).order_by('contract_number')
     page_obj = Paginator(debts, 25).get_page(request.GET.get('page'))
 
     return render(request, 'imports/debt_list.html', {'page_obj': page_obj})

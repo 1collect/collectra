@@ -8,8 +8,12 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import Workbook
 
-from .models import Counterparty, Debt, Debtor, Import, ImportItem, ImportType
-from .services import CONTRACT_IMPORT_COLUMNS
+from .models import Counterparty, Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment
+from .services import (
+    CONTRACT_IMPORT_COLUMNS,
+    EXPENSE_IMPORT_COLUMNS,
+    PAYMENT_IMPORT_COLUMNS,
+)
 
 
 def xlsx_file(headers, rows, name='contracts.xlsx'):
@@ -41,16 +45,8 @@ class DebtListTests(TestCase):
             for field in Debt._meta.fields
             if field.get_internal_type() == 'DecimalField'
         }
-        first_values = money_fields | {
-            'total_debt': 150000,
-            'current_balance': 120000,
-            'final_debt_balance': 120000,
-        }
-        second_values = money_fields | {
-            'total_debt': 50000,
-            'payments_amount': 50000,
-            'final_debt_balance': 0,
-        }
+        first_values = money_fields | {'purchase_total_debt': 150000}
+        second_values = money_fields | {'purchase_total_debt': 50000}
         Debt.objects.create(
             debtor=first_debtor,
             contract_number='DBZ-ACTIVE',
@@ -59,7 +55,6 @@ class DebtListTests(TestCase):
         Debt.objects.create(
             debtor=second_debtor,
             contract_number='DBZ-REPAID',
-            repayment_date=date(2026, 1, 10),
             **second_values,
         )
 
@@ -83,6 +78,226 @@ class DebtListTests(TestCase):
         response = self.client.get(reverse('imports:debts'))
 
         self.assertEqual(response.status_code, 403)
+
+
+class ImportItemsViewTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            'import-reader',
+            password='test-password',
+        )
+        self.user.user_permissions.add(
+            Permission.objects.get(codename='view_import'),
+        )
+        self.import_record = Import.objects.create(
+            import_type=ImportType.objects.get(code='contracts'),
+            file_name='contracts.xlsx',
+            status=Import.Status.COMPLETED,
+            total_items=2,
+            processed_items=2,
+            successful_items=1,
+            failed_items=1,
+            created_by=self.user,
+            metadata={'columns': ['ДБЗ', 'ИИН']},
+        )
+        ImportItem.objects.create(
+            import_record=self.import_record,
+            row_number=2,
+            data={'ДБЗ': 'DBZ-001', 'ИИН': '900101300001'},
+            status=ImportItem.Status.PROCESSED,
+        )
+        ImportItem.objects.create(
+            import_record=self.import_record,
+            row_number=3,
+            data={'ДБЗ': 'DBZ-002', 'ИИН': 'неверный'},
+            status=ImportItem.Status.FAILED,
+            error_message='ИИН должен содержать 12 цифр.',
+        )
+        self.client.force_login(self.user)
+
+    def test_user_can_view_items_of_import(self):
+        response = self.client.get(
+            reverse('imports:items', args=[self.import_record.pk]),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'DBZ-001')
+        self.assertContains(response, 'DBZ-002')
+        self.assertContains(response, 'Полезная нагрузка')
+        self.assertContains(response, 'ИИН должен содержать 12 цифр.')
+        self.assertContains(response, 'table-bordered')
+
+    def test_import_list_shows_master_detail_workspace(self):
+        response = self.client.get(reverse('imports:list'))
+
+        self.assertContains(response, 'data-import-workspace')
+        self.assertContains(response, 'aria-current="page"')
+        self.assertContains(response, 'Всего строк')
+        self.assertContains(response, 'Результат обработки')
+        self.assertContains(response, 'imports.js')
+
+    def test_import_modal_is_hidden_without_add_permission(self):
+        response = self.client.get(reverse('imports:list'))
+
+        self.assertNotContains(response, 'import-upload-modal')
+
+    def test_new_import_uses_auto_open_modal(self):
+        self.user.user_permissions.add(
+            Permission.objects.get(codename='add_import'),
+        )
+
+        response = self.client.get(reverse('imports:new'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="import-upload-modal"')
+        self.assertContains(response, 'data-auto-open')
+        self.assertContains(response, 'enctype="multipart/form-data"')
+
+    def test_user_without_permission_gets_403(self):
+        self.client.force_login(
+            User.objects.create_user('no-import-access', password='test-password'),
+        )
+
+        response = self.client.get(
+            reverse('imports:items', args=[self.import_record.pk]),
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+
+class ExpensePaymentModelsTests(TestCase):
+    def setUp(self):
+        debtor = Debtor.objects.create(
+            full_name='Иванов Иван',
+            iin='900101300001',
+        )
+        self.debt = Debt.objects.create(
+            debtor=debtor,
+            contract_number='DBZ-EXPENSES',
+        )
+
+    def test_debt_can_have_multiple_expenses_and_payments_on_one_date(self):
+        expense_date = date(2026, 10, 1)
+        Expense.objects.create(
+            debt=self.debt,
+            expense_date=expense_date,
+            state_duty=1200,
+            additional_expenses=100,
+        )
+        Expense.objects.create(
+            debt=self.debt,
+            expense_date=expense_date,
+            notary_expenses=500,
+            claim_security=300,
+        )
+        Payment.objects.create(
+            debt=self.debt,
+            amount=10000,
+            status=Payment.Status.CHSI,
+            payment_date=expense_date,
+        )
+        Payment.objects.create(
+            debt=self.debt,
+            amount=5000,
+            status=Payment.Status.WITHHOLDING,
+            payment_date=expense_date,
+        )
+
+        self.assertEqual(self.debt.expenses.count(), 2)
+        self.assertEqual(self.debt.payments.count(), 2)
+        self.assertEqual(
+            self.debt.expenses.filter(expense_date=expense_date).count(),
+            2,
+        )
+        self.assertEqual(
+            self.debt.payments.filter(payment_date=expense_date).count(),
+            2,
+        )
+
+
+class ExpensePaymentImportTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user('finance-importer', password='test-password')
+        self.user.user_permissions.add(
+            Permission.objects.get(codename='view_import'),
+            Permission.objects.get(codename='add_import'),
+        )
+        debtor = Debtor.objects.create(
+            full_name='Иванов Иван',
+            iin='900101300001',
+        )
+        self.debt = Debt.objects.create(
+            debtor=debtor,
+            contract_number='DBZ-FINANCE',
+        )
+        self.expense_type = ImportType.objects.get(code='expenses')
+        self.payment_type = ImportType.objects.get(code='payments')
+        self.client.force_login(self.user)
+
+    def test_xlsx_creates_expense_for_existing_contract(self):
+        values = [
+            'DBZ-FINANCE', 1200, 300, 200, 100, 50, 25, date(2026, 10, 2),
+        ]
+
+        response = self.client.post(reverse('imports:new'), {
+            'import_type': self.expense_type.pk,
+            'file': xlsx_file(EXPENSE_IMPORT_COLUMNS, [values], 'expenses.xlsx'),
+        })
+
+        self.assertRedirects(response, reverse('imports:list'))
+        import_record = Import.objects.get(import_type=self.expense_type)
+        expense = Expense.objects.get()
+        self.assertEqual(import_record.status, Import.Status.COMPLETED)
+        self.assertEqual(import_record.successful_items, 1)
+        self.assertEqual(expense.debt, self.debt)
+        self.assertEqual(expense.state_duty, 1200)
+        self.assertEqual(expense.claim_security, 50)
+        self.assertEqual(expense.additional_expenses, 25)
+        self.assertEqual(expense.expense_date, date(2026, 10, 2))
+
+    def test_xlsx_creates_payment_and_rejects_unknown_contract(self):
+        values = [
+            ['DBZ-FINANCE', 5000, 'ЧСИ', '03.10.2026'],
+            ['DBZ-UNKNOWN', 1500, 'Физическое лицо', '03.10.2026'],
+        ]
+
+        self.client.post(reverse('imports:new'), {
+            'import_type': self.payment_type.pk,
+            'file': xlsx_file(PAYMENT_IMPORT_COLUMNS, values, 'payments.xlsx'),
+        })
+
+        import_record = Import.objects.get(import_type=self.payment_type)
+        payment = Payment.objects.get()
+        failed_item = ImportItem.objects.get(
+            import_record=import_record,
+            status=ImportItem.Status.FAILED,
+        )
+        self.assertEqual(import_record.status, Import.Status.COMPLETED)
+        self.assertEqual(import_record.successful_items, 1)
+        self.assertEqual(import_record.failed_items, 1)
+        self.assertEqual(payment.debt, self.debt)
+        self.assertEqual(payment.amount, 5000)
+        self.assertEqual(payment.status, Payment.Status.CHSI)
+        self.assertEqual(payment.payment_date, date(2026, 10, 3))
+        self.assertIn('DBZ-UNKNOWN', failed_item.error_message)
+
+    def test_xlsx_rejects_payment_with_unknown_status(self):
+        self.client.post(reverse('imports:new'), {
+            'import_type': self.payment_type.pk,
+            'file': xlsx_file(
+                PAYMENT_IMPORT_COLUMNS,
+                [['DBZ-FINANCE', 5000, 'Перевод', '03.10.2026']],
+                'invalid-payment-status.xlsx',
+            ),
+        })
+
+        import_record = Import.objects.get(import_type=self.payment_type)
+        item = import_record.items.get()
+        self.assertEqual(import_record.status, Import.Status.COMPLETED)
+        self.assertEqual(import_record.successful_items, 0)
+        self.assertEqual(import_record.failed_items, 1)
+        self.assertFalse(Payment.objects.exists())
+        self.assertIn('ЧСИ, Физическое лицо, Удержание', item.error_message)
 
 
 class CounterpartyTests(TestCase):
@@ -252,6 +467,144 @@ class XlsxImportTests(TestCase):
         debtor = Debtor.objects.get(iin='900101300001')
         self.assertEqual(Debtor.objects.count(), 1)
         self.assertEqual(debtor.debts.count(), 2)
+
+    def test_invalid_iin_marks_row_failed_without_creating_contract(self):
+        values = [
+            'DBZ-BAD-IIN', '12345', 'Иванов Иван',
+            100, 0, 0, 0, 0, 0, 0, 0, 100,
+        ]
+
+        self.client.post(reverse('imports:new'), {
+            'import_type': self.import_type.pk,
+            'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, [values]),
+        })
+
+        import_record = Import.objects.get()
+        item = ImportItem.objects.get(import_record=import_record)
+        self.assertEqual(import_record.status, Import.Status.COMPLETED)
+        self.assertEqual(import_record.successful_items, 0)
+        self.assertEqual(import_record.failed_items, 1)
+        self.assertEqual(item.status, ImportItem.Status.FAILED)
+        self.assertIn('12 цифр', item.error_message)
+        self.assertFalse(Debtor.objects.exists())
+        self.assertFalse(Debt.objects.exists())
+
+    def test_invalid_amount_does_not_overwrite_existing_contract(self):
+        valid_values = [
+            'DBZ-KEEP', 900101300001, 'Иванов Иван',
+            100, 0, 0, 0, 0, 0, 0, 0, 100,
+        ]
+        invalid_values = [
+            'DBZ-KEEP', 900101300001, 'Иванов Иван',
+            'не число', 0, 0, 0, 0, 0, 0, 0, 999,
+        ]
+
+        self.client.post(reverse('imports:new'), {
+            'import_type': self.import_type.pk,
+            'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, [valid_values]),
+        })
+        self.client.post(reverse('imports:new'), {
+            'import_type': self.import_type.pk,
+            'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, [invalid_values]),
+        })
+
+        debt = Debt.objects.get(contract_number='DBZ-KEEP')
+        failed_import = Import.objects.latest('created_at')
+        failed_item = ImportItem.objects.get(import_record=failed_import)
+        self.assertEqual(debt.purchase_principal, 100)
+        self.assertEqual(debt.purchase_total_debt, 100)
+        self.assertEqual(failed_import.failed_items, 1)
+        self.assertEqual(failed_item.status, ImportItem.Status.FAILED)
+        self.assertIn('должно содержать число', failed_item.error_message)
+
+    def test_non_finite_amount_is_rejected_without_server_error(self):
+        values = [
+            'DBZ-NAN', 900101300001, 'Иванов Иван',
+            'NaN', 0, 0, 0, 0, 0, 0, 0, 100,
+        ]
+
+        response = self.client.post(reverse('imports:new'), {
+            'import_type': self.import_type.pk,
+            'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, [values]),
+        })
+
+        self.assertRedirects(response, reverse('imports:list'))
+        import_record = Import.objects.get()
+        item = ImportItem.objects.get(import_record=import_record)
+        self.assertEqual(import_record.failed_items, 1)
+        self.assertEqual(item.status, ImportItem.Status.FAILED)
+        self.assertFalse(Debt.objects.exists())
+
+    def test_mixed_rows_import_only_valid_contracts(self):
+        rows = [
+            ['DBZ-VALID', 900101300001, 'Иванов Иван', 100, 0, 0, 0, 0, 0, 0, 0, 100],
+            ['DBZ-INVALID', 123, 'Петров Пётр', 200, 0, 0, 0, 0, 0, 0, 0, 200],
+        ]
+
+        self.client.post(reverse('imports:new'), {
+            'import_type': self.import_type.pk,
+            'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, rows),
+        })
+
+        import_record = Import.objects.get()
+        self.assertEqual(import_record.status, Import.Status.COMPLETED)
+        self.assertEqual(import_record.total_items, 2)
+        self.assertEqual(import_record.successful_items, 1)
+        self.assertEqual(import_record.failed_items, 1)
+        self.assertTrue(Debt.objects.filter(contract_number='DBZ-VALID').exists())
+        self.assertFalse(Debt.objects.filter(contract_number='DBZ-INVALID').exists())
+
+    def test_header_only_file_is_rejected(self):
+        self.client.post(reverse('imports:new'), {
+            'import_type': self.import_type.pk,
+            'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, []),
+        })
+
+        import_record = Import.objects.get()
+        self.assertEqual(import_record.status, Import.Status.FAILED)
+        self.assertIn('нет строк с данными', import_record.error_message)
+        self.assertFalse(ImportItem.objects.exists())
+        self.assertFalse(Debt.objects.exists())
+
+    def test_corrupted_xlsx_is_reported_as_failed_import(self):
+        corrupted_file = SimpleUploadedFile(
+            'corrupted.xlsx',
+            b'this is not an xlsx archive',
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+
+        response = self.client.post(reverse('imports:new'), {
+            'import_type': self.import_type.pk,
+            'file': corrupted_file,
+        })
+
+        self.assertRedirects(response, reverse('imports:list'))
+        import_record = Import.objects.get()
+        self.assertEqual(import_record.status, Import.Status.FAILED)
+        self.assertTrue(import_record.error_message)
+        self.assertFalse(ImportItem.objects.exists())
+        self.assertFalse(Debt.objects.exists())
+
+    def test_reimport_can_move_contract_to_another_debtor(self):
+        first_values = [
+            'DBZ-MOVED', 900101300001, 'Иванов Иван',
+            100, 0, 0, 0, 0, 0, 0, 0, 100,
+        ]
+        corrected_values = [
+            'DBZ-MOVED', 910202300002, 'Петров Пётр',
+            100, 0, 0, 0, 0, 0, 0, 0, 100,
+        ]
+
+        for values in (first_values, corrected_values):
+            self.client.post(reverse('imports:new'), {
+                'import_type': self.import_type.pk,
+                'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, [values]),
+            })
+
+        debt = Debt.objects.get(contract_number='DBZ-MOVED')
+        self.assertEqual(debt.debtor.iin, '910202300002')
+        self.assertEqual(debt.debtor.full_name, 'Петров Пётр')
+        self.assertEqual(Debt.objects.count(), 1)
 
     def test_missing_column_creates_failed_import(self):
         headers = list(CONTRACT_IMPORT_COLUMNS[:-1])

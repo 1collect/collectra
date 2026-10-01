@@ -116,6 +116,25 @@ class Counterparty(models.Model):
         return f'{self.full_name} ({self.iin})'
 
 
+class Debtor(models.Model):
+    full_name = models.CharField('ФИО', max_length=255)
+    iin = models.CharField(
+        'ИИН',
+        max_length=12,
+        unique=True,
+        validators=[RegexValidator(r'^\d{12}$', 'ИИН должен содержать 12 цифр.')],
+    )
+
+    class Meta:
+        db_table = 'debtors'
+        ordering = ['full_name']
+        verbose_name = 'должник'
+        verbose_name_plural = 'должники'
+
+    def __str__(self):
+        return f'{self.full_name} ({self.iin})'
+
+
 class Debt(models.Model):
     MONEY = {'max_digits': 20, 'decimal_places': 2, 'default': 0}
 
@@ -128,47 +147,24 @@ class Debt(models.Model):
         null=True,
         blank=True,
     )
+    debtor = models.ForeignKey(
+        Debtor,
+        on_delete=models.PROTECT,
+        related_name='debts',
+        verbose_name='Должник',
+        db_column='debtor_id',
+    )
     contract_number = models.CharField('ДБЗ', max_length=100, unique=True)
-    iin = models.CharField('ИИН', max_length=12, blank=True)
-    full_name = models.CharField('ФИО', max_length=255, blank=True)
 
-    purchase_principal = models.DecimalField('Основной долг (выкуп)', **MONEY)
-    purchase_interest = models.DecimalField('Вознаграждение (выкуп)', **MONEY)
-    purchase_penalties = models.DecimalField('Пеня/Штрафы (выкуп)', **MONEY)
-    purchase_receivable = models.DecimalField('Дебиторская задолженность (выкуп)', **MONEY)
-    purchase_state_duty = models.DecimalField('Гос.пошлина (выкуп)', **MONEY)
-    purchase_representative_expenses = models.DecimalField('Представительские расходы (выкуп)', **MONEY)
-    purchase_notary_expenses = models.DecimalField('Нотариальные расходы (выкуп)', **MONEY)
-    purchase_postal_expenses = models.DecimalField('Почтовые расходы (выкуп)', **MONEY)
-    purchase_total_debt = models.DecimalField('Общая сумма задолженности (выкуп)', **MONEY)
-
-    pkb_state_duty_total = models.DecimalField('Гос.пошлина (ПКБ), начислено', **MONEY)
-    pkb_representative_expenses_total = models.DecimalField('Представительские расходы (ПКБ), начислено', **MONEY)
-    pkb_notary_expenses_total = models.DecimalField('Нотариальные расходы (ПКБ), начислено', **MONEY)
-    pkb_postal_expenses_total = models.DecimalField('Почтовые расходы (ПКБ), начислено', **MONEY)
-    pkb_claim_security_total = models.DecimalField('Обеспечение иска (ПКБ), начислено', **MONEY)
-    total_debt = models.DecimalField('Общая сумма задолженности', **MONEY)
-    payments_amount = models.DecimalField('Сумма платежей', **MONEY)
-
-    principal_balance = models.DecimalField('Основной долг', **MONEY)
-    interest_balance = models.DecimalField('Вознаграждение', **MONEY)
-    penalties_balance = models.DecimalField('Пеня/Штрафы', **MONEY)
-    purchase_receivable_balance = models.DecimalField('Дебиторская задолженность (остаток по выкупу)', **MONEY)
-    pkb_state_duty_balance = models.DecimalField('Гос.пошлина (ПКБ), остаток', **MONEY)
-    pkb_representative_expenses_balance = models.DecimalField('Представительские расходы (ПКБ), остаток', **MONEY)
-    pkb_notary_expenses_balance = models.DecimalField('Нотариальные расходы (ПКБ), остаток', **MONEY)
-    pkb_postal_expenses_balance = models.DecimalField('Почтовые расходы (ПКБ), остаток', **MONEY)
-    pkb_claim_security_balance = models.DecimalField('Обеспечение иска (ПКБ), остаток', **MONEY)
-
-    write_off_amount = models.DecimalField('Списание', **MONEY)
-    write_off_date = models.DateField('Дата списания', null=True, blank=True)
-    court_adjustment_amount = models.DecimalField('Изменения по решению суда, приказы', **MONEY)
-    court_cancellation_amount = models.DecimalField('РС, МС, отмена', **MONEY)
-    overpayment_amount = models.DecimalField('Переплата', **MONEY)
-    current_balance = models.DecimalField('Актуальный остаток', **MONEY)
-    check_amount = models.DecimalField('Проверка', **MONEY)
-    final_debt_balance = models.DecimalField('Итоговый остаток задолженности', **MONEY)
-    repayment_date = models.DateField('Дата погашения', null=True, blank=True)
+    purchase_principal = models.DecimalField('Основной долг', **MONEY)
+    purchase_interest = models.DecimalField('Вознаграждение', **MONEY)
+    purchase_penalties = models.DecimalField('Пеня/Штрафы', **MONEY)
+    purchase_receivable = models.DecimalField('Дебиторская задолженность', **MONEY)
+    purchase_state_duty = models.DecimalField('Гос.пошлина', **MONEY)
+    purchase_representative_expenses = models.DecimalField('Представительские расходы', **MONEY)
+    purchase_notary_expenses = models.DecimalField('Нотариальные расходы', **MONEY)
+    purchase_postal_expenses = models.DecimalField('Почтовые расходы', **MONEY)
+    purchase_total_debt = models.DecimalField('Общая сумма задолженности', **MONEY)
 
     class Meta:
         db_table = 'debts'
@@ -178,3 +174,77 @@ class Debt(models.Model):
 
     def __str__(self):
         return self.contract_number
+
+
+class Expense(models.Model):
+    MONEY = {'max_digits': 20, 'decimal_places': 2, 'default': 0}
+
+    debt = models.ForeignKey(
+        Debt,
+        on_delete=models.PROTECT,
+        related_name='expenses',
+        db_column='debt_id',
+        verbose_name='Договор',
+    )
+    state_duty = models.DecimalField('Гос.пошлина', **MONEY)
+    representative_expenses = models.DecimalField(
+        'Представительские расходы',
+        **MONEY,
+    )
+    notary_expenses = models.DecimalField('Нотариальные расходы', **MONEY)
+    postal_expenses = models.DecimalField('Почтовые расходы', **MONEY)
+    claim_security = models.DecimalField('Обеспечение иска', **MONEY)
+    additional_expenses = models.DecimalField('Дополнительные расходы', **MONEY)
+    expense_date = models.DateField('Дата расхода')
+
+    class Meta:
+        db_table = 'expenses'
+        ordering = ['-expense_date', '-id']
+        verbose_name = 'расход'
+        verbose_name_plural = 'расходы'
+
+    def __str__(self):
+        return f'{self.debt} — {self.expense_date}'
+
+
+class Payment(models.Model):
+    class Status(models.TextChoices):
+        CHSI = 'chsi', 'ЧСИ'
+        INDIVIDUAL = 'individual', 'Физическое лицо'
+        WITHHOLDING = 'withholding', 'Удержание'
+
+    debt = models.ForeignKey(
+        Debt,
+        on_delete=models.PROTECT,
+        related_name='payments',
+        db_column='debt_id',
+        verbose_name='Договор',
+    )
+    amount = models.DecimalField(
+        'Платёж',
+        max_digits=20,
+        decimal_places=2,
+    )
+    status = models.CharField(
+        'Статус платежа',
+        max_length=20,
+        choices=Status.choices,
+    )
+    payment_date = models.DateField('Дата платежа')
+
+    class Meta:
+        db_table = 'payments'
+        ordering = ['-payment_date', '-id']
+        verbose_name = 'платёж'
+        verbose_name_plural = 'платежи'
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(
+                    status__in=('chsi', 'individual', 'withholding'),
+                ),
+                name='payment_status_is_valid',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.debt} — {self.amount}'

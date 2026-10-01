@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Counterparty, Debt, Import, ImportItem, ImportType
+from .models import Counterparty, Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment
 
 
 @admin.register(ImportType)
@@ -33,14 +33,45 @@ class CounterpartyAdmin(admin.ModelAdmin):
     search_fields = ('iin', 'full_name')
 
 
+@admin.register(Debtor)
+class DebtorAdmin(admin.ModelAdmin):
+    list_display = ('iin', 'full_name')
+    search_fields = ('iin', 'full_name')
+
+
 @admin.register(Debt)
 class DebtAdmin(admin.ModelAdmin):
-    list_display = ('contract_number', 'full_name', 'iin', 'counterparty', 'total_debt', 'final_debt_balance', 'repayment_date')
+    list_display = ('contract_number', 'debtor', 'counterparty', 'purchase_total_debt')
     search_fields = (
         'contract_number',
-        'iin',
-        'full_name',
+        'debtor__iin',
+        'debtor__full_name',
         'counterparty__iin',
         'counterparty__full_name',
     )
-    list_select_related = ('counterparty',)
+    list_select_related = ('debtor', 'counterparty')
+
+
+@admin.register(Expense)
+class ExpenseAdmin(admin.ModelAdmin):
+    list_display = (
+        'debt',
+        'expense_date',
+        'state_duty',
+        'representative_expenses',
+        'notary_expenses',
+        'postal_expenses',
+        'claim_security',
+        'additional_expenses',
+    )
+    list_filter = ('expense_date',)
+    search_fields = ('debt__contract_number', 'debt__debtor__iin')
+    list_select_related = ('debt', 'debt__debtor')
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ('debt', 'amount', 'status', 'payment_date')
+    list_filter = ('status', 'payment_date')
+    search_fields = ('debt__contract_number', 'debt__debtor__iin')
+    list_select_related = ('debt', 'debt__debtor')

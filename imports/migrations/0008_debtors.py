@@ -3,6 +3,74 @@ import django.db.models.deletion
 from django.db import migrations, models
 
 
+def rename_legacy_debtor_index(apps, schema_editor):
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT to_regclass('public.debtors_iin_65b9aa8c_like')"
+        )
+        old_index = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT to_regclass('public.counterparties_iin_pattern_ops_idx')"
+        )
+        new_index = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT to_regclass('public.debts_debtor_id_b08678dc')"
+        )
+        old_debt_index = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT to_regclass('public.debts_counterparty_id_idx')"
+        )
+        new_debt_index = cursor.fetchone()[0]
+
+    if old_index and not new_index:
+        schema_editor.execute(
+            'ALTER INDEX "debtors_iin_65b9aa8c_like" '
+            'RENAME TO "counterparties_iin_pattern_ops_idx"'
+        )
+    if old_debt_index and not new_debt_index:
+        schema_editor.execute(
+            'ALTER INDEX "debts_debtor_id_b08678dc" '
+            'RENAME TO "debts_counterparty_id_idx"'
+        )
+
+
+def restore_legacy_debtor_index(apps, schema_editor):
+    if schema_editor.connection.vendor != 'postgresql':
+        return
+
+    with schema_editor.connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT to_regclass('public.counterparties_iin_pattern_ops_idx')"
+        )
+        current_index = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT to_regclass('public.debtors_iin_65b9aa8c_like')"
+        )
+        legacy_index = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT to_regclass('public.debts_counterparty_id_idx')"
+        )
+        current_debt_index = cursor.fetchone()[0]
+        cursor.execute(
+            "SELECT to_regclass('public.debts_debtor_id_b08678dc')"
+        )
+        legacy_debt_index = cursor.fetchone()[0]
+
+    if current_index and not legacy_index:
+        schema_editor.execute(
+            'ALTER INDEX "counterparties_iin_pattern_ops_idx" '
+            'RENAME TO "debtors_iin_65b9aa8c_like"'
+        )
+    if current_debt_index and not legacy_debt_index:
+        schema_editor.execute(
+            'ALTER INDEX "debts_counterparty_id_idx" '
+            'RENAME TO "debts_debtor_id_b08678dc"'
+        )
+
+
 def link_contracts_to_debtors(apps, schema_editor):
     Counterparty = apps.get_model('imports', 'Counterparty')
     Debt = apps.get_model('imports', 'Debt')
@@ -47,6 +115,10 @@ class Migration(migrations.Migration):
     dependencies = [('imports', '0007_materialize_imported_contracts')]
 
     operations = [
+        migrations.RunPython(
+            rename_legacy_debtor_index,
+            restore_legacy_debtor_index,
+        ),
         migrations.CreateModel(
             name='Debtor',
             fields=[

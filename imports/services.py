@@ -7,7 +7,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
-from .models import Debt, Import, ImportItem
+from .models import Debt, Debtor, Expense, Import, ImportItem, Payment
 
 
 CONTRACT_IMPORT_COLUMNS = (
@@ -25,8 +25,23 @@ CONTRACT_IMPORT_COLUMNS = (
     'Общая сумма задолженности (выкуп)',
 )
 
+EXPENSE_IMPORT_COLUMNS = (
+    'ДБЗ',
+    'Гос.пошлина',
+    'Представительские расходы',
+    'Нотариальные расходы',
+    'Почтовые расходы',
+    'Обеспечение иска',
+    'Дополнительные расходы',
+    'Дата расхода',
+)
+
+PAYMENT_IMPORT_COLUMNS = ('ДБЗ', 'Платеж', 'Статус платежа', 'Дата платежа')
+
 TEXT_COLUMNS = {'ДБЗ', 'ИИН', 'ФИО'}
-REQUIRED_COLUMNS = ('ДБЗ', 'ИИН', 'ФИО')
+CONTRACT_REQUIRED_COLUMNS = ('ДБЗ', 'ИИН', 'ФИО')
+EXPENSE_REQUIRED_COLUMNS = ('ДБЗ', 'Дата расхода')
+PAYMENT_REQUIRED_COLUMNS = ('ДБЗ', 'Платеж', 'Статус платежа', 'Дата платежа')
 
 DEBT_COLUMN_FIELDS = {
     'Основной долг (выкуп)': 'purchase_principal',
@@ -40,13 +55,22 @@ DEBT_COLUMN_FIELDS = {
     'Общая сумма задолженности (выкуп)': 'purchase_total_debt',
 }
 
+EXPENSE_COLUMN_FIELDS = {
+    'Гос.пошлина': 'state_duty',
+    'Представительские расходы': 'representative_expenses',
+    'Нотариальные расходы': 'notary_expenses',
+    'Почтовые расходы': 'postal_expenses',
+    'Обеспечение иска': 'claim_security',
+    'Дополнительные расходы': 'additional_expenses',
+}
+
 
 class ImportValidationError(Exception):
     pass
 
 
 def normalize_header(value):
-    return ' '.join(str(value or '').split())
+    return ' '.join(str(value or '').split()).replace('ё', 'е').replace('Ё', 'Е')
 
 
 def serialize_value(column, value):
@@ -70,26 +94,129 @@ def contract_values(data):
     if len(iin) != 12 or not iin.isdigit():
         raise ImportValidationError('ИИН должен содержать 12 цифр.')
 
-    debt_values = {}
-    for column, field_name in DEBT_COLUMN_FIELDS.items():
+    debt_values = decimal_values(data, DEBT_COLUMN_FIELDS)
+    return data['ДБЗ'], iin, data['ФИО'], debt_values
+
+
+def decimal_values(data, column_fields):
+    values = {}
+    for column, field_name in column_fields.items():
         try:
-            debt_values[field_name] = Decimal(data[column] or '0')
-        except InvalidOperation as error:
+            value = Decimal(data[column] or '0')
+            if not value.is_finite():
+                raise InvalidOperation
+            values[field_name] = value
+        except (InvalidOperation, ValueError) as error:
             raise ImportValidationError(
                 f'Поле «{column}» должно содержать число.'
             ) from error
-    return data['ДБЗ'], {
-        'iin': iin,
-        'full_name': data['ФИО'],
-        **debt_values,
+    return values
+
+
+def debt_for_contract(contract_number):
+    try:
+        return Debt.objects.get(contract_number=contract_number)
+    except Debt.DoesNotExist as error:
+        raise ImportValidationError(
+            f'Договор с ДБЗ «{contract_number}» не найден.'
+        ) from error
+
+
+def parse_date(value, column):
+    value = str(value).strip()
+    try:
+        return date.fromisoformat(value.split('T', maxsplit=1)[0])
+    except ValueError:
+        for date_format in ('%d.%m.%Y', '%d/%m/%Y'):
+            try:
+                return datetime.strptime(value, date_format).date()
+            except ValueError:
+                continue
+    raise ImportValidationError(
+        f'Поле «{column}» должно содержать дату в формате ДД.ММ.ГГГГ или ГГГГ-ММ-ДД.'
+    )
+
+
+def expense_values(data):
+    return {
+        'debt': debt_for_contract(data['ДБЗ']),
+        **decimal_values(data, EXPENSE_COLUMN_FIELDS),
+        'expense_date': parse_date(data['Дата расхода'], 'Дата расхода'),
     }
 
 
-def save_contract(contract_number, debt_values):
+def payment_values(data):
+    statuses_by_label = {
+        label.casefold(): value
+        for value, label in Payment.Status.choices
+    }
+    try:
+        status = statuses_by_label[data['Статус платежа'].strip().casefold()]
+    except KeyError as error:
+        raise ImportValidationError(
+            'Поле «Статус платежа» должно быть одним из значений: '
+            'ЧСИ, Физическое лицо, Удержание.'
+        ) from error
+
+    return {
+        'debt': debt_for_contract(data['ДБЗ']),
+        'amount': decimal_values(data, {'Платеж': 'amount'})['amount'],
+        'status': status,
+        'payment_date': parse_date(data['Дата платежа'], 'Дата платежа'),
+    }
+
+
+def save_contract(contract_number, iin, full_name, debt_values):
+    debtor, created = Debtor.objects.get_or_create(
+        iin=iin,
+        defaults={'full_name': full_name},
+    )
+    if not created and debtor.full_name != full_name:
+        debtor.full_name = full_name
+        debtor.save(update_fields=('full_name',))
+
     Debt.objects.update_or_create(
         contract_number=contract_number,
-        defaults=debt_values,
+        defaults={
+            'debtor': debtor,
+            'counterparty': None,
+            **debt_values,
+        },
     )
+
+
+def save_expense(values):
+    Expense.objects.create(**values)
+
+
+def save_payment(values):
+    Payment.objects.create(**values)
+
+
+def save_contract_record(values):
+    save_contract(*values)
+
+
+IMPORT_HANDLERS = {
+    'contracts': (
+        CONTRACT_IMPORT_COLUMNS,
+        CONTRACT_REQUIRED_COLUMNS,
+        contract_values,
+        save_contract_record,
+    ),
+    'expenses': (
+        EXPENSE_IMPORT_COLUMNS,
+        EXPENSE_REQUIRED_COLUMNS,
+        expense_values,
+        save_expense,
+    ),
+    'payments': (
+        PAYMENT_IMPORT_COLUMNS,
+        PAYMENT_REQUIRED_COLUMNS,
+        payment_values,
+        save_payment,
+    ),
+}
 
 
 def process_xlsx_import(import_record, uploaded_file):
@@ -100,6 +227,13 @@ def process_xlsx_import(import_record, uploaded_file):
 
     workbook = None
     try:
+        try:
+            columns, required_columns, values_func, save_func = IMPORT_HANDLERS[
+                import_record.import_type.code
+            ]
+        except KeyError as error:
+            raise ImportValidationError('Неподдерживаемый тип импорта.') from error
+
         uploaded_file.seek(0)
         workbook = load_workbook(uploaded_file, read_only=True, data_only=True)
         worksheet = workbook.active
@@ -114,7 +248,7 @@ def process_xlsx_import(import_record, uploaded_file):
             if normalize_header(value)
         }
         missing_columns = [
-            column for column in CONTRACT_IMPORT_COLUMNS
+            column for column in columns
             if column not in header_positions
         ]
         if missing_columns:
@@ -123,7 +257,7 @@ def process_xlsx_import(import_record, uploaded_file):
             )
 
         items = []
-        contracts = []
+        records = []
         successful_items = 0
         failed_items = 0
         processed_at = timezone.now()
@@ -134,13 +268,13 @@ def process_xlsx_import(import_record, uploaded_file):
                     row[header_positions[column]]
                     if header_positions[column] < len(row) else None,
                 )
-                for column in CONTRACT_IMPORT_COLUMNS
+                for column in columns
             }
             if not any(value not in (None, '') for value in data.values()):
                 continue
 
             empty_required = [
-                column for column in REQUIRED_COLUMNS if not data[column]
+                column for column in required_columns if not data[column]
             ]
             if empty_required:
                 status = ImportItem.Status.FAILED
@@ -148,7 +282,7 @@ def process_xlsx_import(import_record, uploaded_file):
                 failed_items += 1
             else:
                 try:
-                    contracts.append(contract_values(data))
+                    records.append(values_func(data))
                 except ImportValidationError as error:
                     status = ImportItem.Status.FAILED
                     error_message = str(error)
@@ -172,8 +306,8 @@ def process_xlsx_import(import_record, uploaded_file):
 
         with transaction.atomic():
             ImportItem.objects.bulk_create(items, batch_size=500)
-            for contract in contracts:
-                save_contract(*contract)
+            for record in records:
+                save_func(record)
             import_record.status = Import.Status.COMPLETED
             import_record.total_items = len(items)
             import_record.processed_items = len(items)
@@ -182,7 +316,7 @@ def process_xlsx_import(import_record, uploaded_file):
             import_record.completed_at = timezone.now()
             import_record.metadata = {
                 'sheet': worksheet.title,
-                'columns': list(CONTRACT_IMPORT_COLUMNS),
+                'columns': list(columns),
             }
             import_record.save(update_fields=(
                 'status',
