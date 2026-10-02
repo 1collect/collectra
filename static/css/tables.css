@@ -41,3 +41,19 @@
 .column-menu .check { display: flex; padding: 4px 7px; min-height: 26px; }
 .table-result-info { min-height: 15px; }
 .table .empty-state { white-space: normal; }
+
+/* Import history: keep the record key visible while the wide table scrolls. */
+.import-table { width: max-content; min-width: 100%; table-layout: fixed; }
+.import-table th, .import-table td { text-align: left; }
+.import-table .import-id-column { position: sticky; left: 0; z-index: 2; width: 76px; min-width: 76px; max-width: 76px; background: var(--bg-panel); }
+.import-table thead .import-id-column { z-index: 4; background: var(--bg-subtle); }
+.import-table tbody tr:hover .import-id-column { background: var(--bg-subtle); }
+.import-table th:nth-child(2), .import-table td:nth-child(2) { width: 280px; min-width: 220px; white-space: normal; overflow-wrap: anywhere; }
+.import-table th:nth-child(3), .import-table td:nth-child(3) { width: 150px; min-width: 130px; }
+.import-table th:nth-child(4), .import-table td:nth-child(4) { width: 130px; min-width: 125px; }
+.import-table .import-number-column, .import-table .import-number { width: 105px; min-width: 95px; text-align: right; font-variant-numeric: tabular-nums; }
+.import-table th:nth-child(8), .import-table td:nth-child(8) { width: 160px; min-width: 140px; }
+.import-table th:nth-child(9), .import-table td:nth-child(9) { width: 142px; min-width: 142px; font-variant-numeric: tabular-nums; }
+.import-table th:nth-child(10), .import-table td:nth-child(10) { width: 105px; min-width: 105px; text-align: right; }
+.import-table .import-action { white-space: nowrap; }
+.import-table-container:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }

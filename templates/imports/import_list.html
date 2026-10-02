@@ -12,24 +12,25 @@
 </div>
 <section class="panel" aria-label="Список импортов">
     <div class="panel-header"><h2>История импорта</h2><span class="badge">{{ imports|length }}</span></div>
-    <div class="p-0 table-container">
-        <table class="table table-bordered table-compact">
-            <thead><tr><th>ID</th><th>Тип</th><th>Файл</th><th>Статус</th><th>Всего</th><th>Успешно</th><th>Ошибок</th><th>Дата</th><th></th></tr></thead>
+    <div class="p-0 table-container import-table-container" tabindex="0" role="region" aria-label="Import history table">
+        <table class="table table-bordered table-compact import-table">
+            <thead><tr><th class="import-id-column">ID</th><th class="import-file-column">&#1060;&#1072;&#1081;&#1083;</th><th class="import-type-column">&#1058;&#1080;&#1087;</th><th class="import-status-column">&#1057;&#1090;&#1072;&#1090;&#1091;&#1089;</th><th class="import-number-column">&#1042;&#1089;&#1077;&#1075;&#1086;</th><th class="import-number-column">&#1059;&#1089;&#1087;&#1077;&#1096;&#1085;&#1086;</th><th class="import-number-column">&#1054;&#1096;&#1080;&#1073;&#1086;&#1082;</th><th class="import-author-column">&#1040;&#1074;&#1090;&#1086;&#1088;</th><th class="import-date-column">&#1044;&#1072;&#1090;&#1072;</th><th class="import-action-column">&#1044;&#1077;&#1081;&#1089;&#1090;&#1074;&#1080;&#1077;</th></tr></thead>
             <tbody>
                 {% for item in imports %}
                 <tr>
-                    <td class="font-mono"><a href="{% url 'imports:items' item.pk %}">#{{ item.pk }}</a></td>
-                    <td>{{ item.import_type.name }}</td>
+                    <td class="font-mono import-id-column"><a href="{% url 'imports:items' item.pk %}">#{{ item.pk }}</a></td>
                     <td><a href="{% url 'imports:items' item.pk %}"><strong>{{ item.file_name|default:'Файл не указан' }}</strong></a>{% if item.error_message %}<div class="text-xs text-danger">{{ item.error_message }}</div>{% endif %}</td>
+                    <td>{{ item.import_type.name }}</td>
                     <td><span class="badge {% if item.status == 'completed' %}badge-success{% elif item.status == 'failed' %}badge-danger{% elif item.status == 'processing' %}badge-warning{% else %}badge-neutral{% endif %}"><span class="status-dot"></span>{{ item.get_status_display }}</span></td>
-                    <td>{{ item.total_items }}</td>
-                    <td class="text-success">{{ item.successful_items }}</td>
-                    <td{% if item.failed_items %} class="text-danger"{% endif %}>{{ item.failed_items }}</td>
+                    <td class="import-number">{{ item.total_items }}</td>
+                    <td class="import-number text-success">{{ item.successful_items }}</td>
+                    <td class="import-number{% if item.failed_items %} text-danger{% endif %}">{{ item.failed_items }}</td>
+                    <td>{{ item.created_by.get_full_name|default:item.created_by.username|default:'—' }}</td>
                     <td><time datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:'d.m.Y H:i' }}</time></td>
-                    <td><a class="btn btn-sm" href="{% url 'imports:items' item.pk %}">Открыть</a></td>
+                    <td class="import-action"><a class="btn btn-sm" href="{% url 'imports:items' item.pk %}">Открыть</a></td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="9"><div class="empty-state"><strong>Импортов пока нет</strong><p>Загрузите первый XLSX-файл, чтобы увидеть результат обработки.</p></div></td></tr>
+                <tr><td colspan="10"><div class="empty-state"><strong>Импортов пока нет</strong><p>Загрузите первый XLSX-файл, чтобы увидеть результат обработки.</p></div></td></tr>
                 {% endfor %}
             </tbody>
         </table>
