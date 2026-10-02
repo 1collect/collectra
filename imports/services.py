@@ -342,14 +342,13 @@ def review_financial_change(*, change_id, reviewer, approve, comment=''):
     if change.requested_by_id == reviewer.pk:
         raise FinancialChangeError('Автор заявки не может подтвердить собственное изменение.')
 
-    record = change.record
-    record = record.__class__.objects.select_for_update().get(pk=record.pk)
-    if financial_record_snapshot(record) != change.old_data:
-        raise FinancialChangeError(
-            'Запись изменилась после создания заявки. Отклоните заявку и создайте новую.'
-        )
-
     if approve:
+        record = change.record
+        record = record.__class__.objects.select_for_update().get(pk=record.pk)
+        if financial_record_snapshot(record) != change.old_data:
+            raise FinancialChangeError(
+                'Запись изменилась после создания заявки. Отклоните заявку и создайте новую.'
+            )
         old_debt_id = record.debt_id
         for field, value in change.new_data.items():
             setattr(record, field, _restore_value(record, field, value))

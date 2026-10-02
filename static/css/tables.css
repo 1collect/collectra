@@ -1,7 +1,8 @@
 /* Scroll is scoped to tables; the page itself never needs horizontal scroll. */
 .table-container { overflow: auto; max-width: 100%; scrollbar-width: thin; }
-.table { width: 100%; border-collapse: collapse; text-align: left; font-size: 12px; white-space: nowrap; }
-.table th { position: sticky; top: 0; z-index: 1; background: var(--bg-subtle); color: var(--text-secondary); font-weight: 500; font-size: 10px; height: 32px; padding: 5px 11px; border-bottom: 1px solid var(--border-color); }
+.table { width: 100%; border-collapse: collapse; text-align: left; font-family: var(--font-sans); font-size: 11px; white-space: nowrap; }
+.table.table * { font-family: var(--font-sans); font-size: 11px; }
+.table th { position: sticky; top: 0; z-index: 1; background: var(--bg-subtle); color: var(--text-secondary); font-weight: 500; height: 32px; padding: 5px 11px; border-bottom: 1px solid var(--border-color); }
 .table td { height: var(--row-height); padding: 3px 11px; border-bottom: 1px solid var(--border-strong); }
 .table tbody tr:last-child td { border-bottom: 1px solid var(--border-strong); }
 .table tbody tr:hover { background: var(--bg-subtle); }
@@ -17,8 +18,8 @@
 .table th[aria-sort="ascending"] .sort-button, .table th[aria-sort="descending"] .sort-button { color: var(--primary); }
 .table .person-cell { display: flex; gap: 8px; align-items: center; }
 .table .person-cell > div { line-height: 1.25; }
-.table .person-cell strong { font-size: 12px; font-weight: 500; }
-.table .person-cell small { display: block; font-size: 10px; color: var(--text-muted); }
+.table .person-cell strong { font-weight: 500; }
+.table .person-cell small { display: block; color: var(--text-muted); }
 .row-actions { display: flex; align-items: center; gap: 1px; justify-content: flex-end; }
 .row-actions .btn { width: 23px; height: 23px; min-height: 23px; }
 .row-actions .icon { width: 13px; height: 13px; }

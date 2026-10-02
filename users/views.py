@@ -29,7 +29,6 @@ def dashboard(request):
         ('imports.view_debt', 'imports:debts'),
         ('imports.view_payment', 'imports:payments'),
         ('imports.view_expense', 'imports:expenses'),
-        ('imports.approve_financialchangerequest', 'imports:change_requests'),
         ('imports.view_counterparty', 'imports:counterparties'),
         ('imports.view_import', 'imports:list'),
     )

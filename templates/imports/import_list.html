@@ -19,7 +19,7 @@
                 {% for item in imports %}
                 <tr>
                     <td class="font-mono import-id-column"><a href="{% url 'imports:items' item.pk %}">#{{ item.pk }}</a></td>
-                    <td><a href="{% url 'imports:items' item.pk %}"><strong>{{ item.file_name|default:'Файл не указан' }}</strong></a>{% if item.error_message %}<div class="text-xs text-danger">{{ item.error_message }}</div>{% endif %}</td>
+                    <td><strong>{{ item.file_name|default:'Файл не указан' }}</strong>{% if item.error_message %}<div class="text-xs text-danger">{{ item.error_message }}</div>{% endif %}</td>
                     <td>{{ item.import_type.name }}</td>
                     <td><span class="badge {% if item.status == 'completed' %}badge-success{% elif item.status == 'failed' %}badge-danger{% elif item.status == 'processing' %}badge-warning{% else %}badge-neutral{% endif %}"><span class="status-dot"></span>{{ item.get_status_display }}</span></td>
                     <td class="import-number">{{ item.total_items }}</td>

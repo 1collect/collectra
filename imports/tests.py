@@ -149,6 +149,8 @@ class ImportItemsViewTests(TestCase):
 
         self.assertContains(response, 'История импорта')
         self.assertContains(response, 'table-bordered')
+        self.assertContains(response, 'Автор')
+        self.assertContains(response, 'import-reader')
         self.assertContains(
             response,
             reverse('imports:items', args=[self.import_record.pk]),
