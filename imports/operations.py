@@ -6,6 +6,7 @@ from .audit import log_action
 from .balances import calculate_balance
 from .models import Debt, Payment, Expense, WriteOff, PaymentRefund, FinancialRecordHistory, FinancialChangeRequest, ActionLog
 from .services import recalculate_debt, recalculate_payment
+from users.access import is_system_administrator
 
 
 def balance_on(debt, day):
@@ -42,7 +43,7 @@ def cancel_record(record, *, actor, reason):
 
 @transaction.atomic
 def delete_record(record, *, actor, reason):
-    if not actor.is_superuser: raise ValidationError('Физическое удаление доступно только администратору.')
+    if not is_system_administrator(actor): raise ValidationError('Физическое удаление доступно только администратору.')
     if not reason.strip(): raise ValidationError('Укажите причину удаления.')
     if isinstance(record, Debt):
         if record.payments.exists() or record.expenses.exists() or record.writeoffs.exists() or record.documents.exists():

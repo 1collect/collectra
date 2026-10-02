@@ -10,7 +10,7 @@
 <section class="panel"><div class="panel-body">
 {% if perms.imports.change_debt %}<a class="btn" href="{% url 'imports:debt_edit' debt.pk %}">Изменить ДБЗ</a><a class="btn" href="{% url 'imports:operation_action' 'debt' debt.pk 'cancel' %}">Отменить ДБЗ</a>{% endif %}
 {% if perms.imports.change_debtor %}<a class="btn" href="{% url 'imports:catalog_edit' 'debtors' debt.debtor.pk %}">Изменить заёмщика</a>{% endif %}
-{% if request.user.is_superuser %}<a class="btn" href="{% url 'imports:operation_action' 'debt' debt.pk 'delete' %}">Удалить ДБЗ</a>{% endif %}
+{% if perms.users.administer_system %}<a class="btn" href="{% url 'imports:operation_action' 'debt' debt.pk 'delete' %}">Удалить ДБЗ</a>{% endif %}
 <p>КА: {{ debt.collection_agency|default:'—' }} · Кредитор: {{ debt.original_creditor|default:'—' }} · Цессия: {{ debt.cession|default:'—' }}</p>
 <p>Реестр: {{ debt.registry_number }} от {{ debt.registry_date|date:'d.m.Y' }} · ДБЗ: {{ debt.dbz_start_date|date:'d.m.Y' }} — {{ debt.dbz_end_date|date:'d.m.Y' }} · Выдано: {{ debt.issued_credit_amount|floatformat:2 }} · Просрочка: {{ debt.overdue_days }} дней</p>
 <p>Заёмщик: {{ debt.debtor.birth_date|date:'d.m.Y' }} · {{ debt.debtor.gender }} · {{ debt.debtor.document_type }} · {{ debt.debtor.document_issuer }} · {{ debt.debtor.document_issue_date|date:'d.m.Y' }}<br>Адрес: {{ debt.debtor.residential_address }} · {{ debt.debtor.region }} · КАТО {{ debt.debtor.kato }}</p>

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% block heading %}Журнал действий{% endblock %}
 {% block content %}
-<div class="page-header"><h1>Журнал действий</h1>{% if request.user.is_superuser %}<a class="btn" href="{% url 'imports:recalculate' %}">Полный перерасчёт</a>{% endif %}</div>
+<div class="page-header"><h1>Журнал действий</h1>{% if perms.users.administer_system %}<a class="btn" href="{% url 'imports:recalculate' %}">Полный перерасчёт</a>{% endif %}</div>
 <form method="get"><input class="form-control" name="q" value="{{ request.GET.q }}" placeholder="Действие, пользователь, ID, причина"><button class="btn">Найти</button></form>
 <section class="panel"><div class="table-container"><table class="table"><thead><tr><th>Дата</th><th>Пользователь</th><th>Действие</th><th>Объект</th><th>Причина / результат</th></tr></thead><tbody>{% for entry in page_obj %}<tr><td>{{ entry.created_at|date:'d.m.Y H:i' }}</td><td>{{ entry.actor|default:'Система' }}</td><td>{{ entry.action }}</td><td>{{ entry.object_type }} #{{ entry.object_id }}</td><td>{{ entry.reason }}{% if entry.details %}<details><summary>Подробности</summary><pre>{{ entry.details }}</pre></details>{% endif %}</td></tr>{% empty %}<tr><td>Нет событий</td></tr>{% endfor %}</tbody></table></div></section>
 {% include 'imports/project_pagination.html' %}

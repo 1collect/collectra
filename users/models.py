@@ -40,6 +40,7 @@ class Role(models.Model):
         ordering = ('name',)
         verbose_name = 'Роль'
         verbose_name_plural = 'Роли'
+        permissions = [('administer_system', 'Полное администрирование системы')]
 
     def __str__(self):
         return self.name

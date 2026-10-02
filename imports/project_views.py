@@ -10,6 +10,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
 from users.views import permission_required
+from users.access import is_system_administrator
 from . import models as m
 from . import project_forms as f
 from .audit import log_action
@@ -138,7 +139,7 @@ def operation_action(request, kind, pk, action):
     if kind not in RECORDS or action not in ('cancel', 'delete'): raise Http404
     model = RECORDS[kind]
     check(request, 'imports.' + ('delete_' if action == 'delete' else 'change_') + model._meta.model_name)
-    if action == 'delete' and not request.user.is_superuser: raise PermissionDenied
+    if action == 'delete' and not is_system_administrator(request.user): raise PermissionDenied
     obj = get_object_or_404(model, pk=pk)
     form = f.ReasonForm(request.POST if request.method == 'POST' else None)
     if request.method == 'POST' and form.is_valid():
@@ -153,7 +154,7 @@ def operation_action(request, kind, pk, action):
 
 @permission_required('imports.recalculate_debt')
 def full_recalculation(request):
-    if not request.user.is_superuser: raise PermissionDenied
+    if not is_system_administrator(request.user): raise PermissionDenied
     if request.method == 'POST':
         ids = list(m.Debt.objects.exclude(status='cancelled').values_list('pk', flat=True))
         errors = 0
