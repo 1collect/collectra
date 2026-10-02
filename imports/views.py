@@ -14,7 +14,7 @@ from .forms import (
     ImportUploadForm, PaymentChangeForm, PaymentRefundForm, WriteOffForm,
     PaymentCreateForm, ExpenseCreateForm,
 )
-from .balances import apply_balance, calculate_balance, filter_by_current_status
+from .balances import apply_balance, calculate_balance, filter_by_current_status, CATEGORY_LABELS, PURCHASE_FIELDS
 from .models import (
     Counterparty, Debt, Expense, FinancialChangeRequest, Import, ImportItem,
     Payment, PaymentRefund, WriteOff,
@@ -193,16 +193,47 @@ def debt_list(request):
     else:
         status = ''
     page_obj = Paginator(debts, 25).get_page(request.GET.get('page'))
-    page_obj.object_list = list(page_obj.object_list.prefetch_related('payments', 'expenses', 'writeoffs'))
+    page_obj.object_list = list(page_obj.object_list.prefetch_related('payments__refunds', 'expenses', 'writeoffs'))
     for debt in page_obj.object_list:
         apply_balance(debt, calculate_balance(debt))
 
-    return render(request, 'imports/debt_list.html', {
+    template = 'imports/partials/debt_register.html' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'imports/debt_list.html'
+    response = render(request, template, {
         'page_obj': page_obj, 'query': query, 'status': status,
         'status_choices': Debt.Status.choices,
         'query_string': list_query_string(request),
         'filters_active': bool(query or status),
     })
+    response['Cache-Control'] = 'no-store'
+    return response
+
+
+@permission_required('imports.view_debt')
+def debt_detail(request, debt_id):
+    debt = get_object_or_404(
+        Debt.objects.select_related('debtor').prefetch_related('payments__refunds', 'expenses', 'writeoffs'),
+        pk=debt_id,
+    )
+    balance = calculate_balance(debt)
+    apply_balance(debt, balance)
+    categories = [{
+        'label': label,
+        'initial': balance['opening'][field] + balance['own'].get(field, 0),
+        'current': balance['current'][field],
+    } for field, label in CATEGORY_LABELS.items()]
+    source_rows = [{'label': Debt._meta.get_field(field).verbose_name, 'amount': getattr(debt, field)}
+                   for field in PURCHASE_FIELDS]
+    for operation in balance['operations']:
+        operation['label'] = {'payment': 'Платёж', 'writeoff': 'Списание', 'expense': 'Расход'}[operation['kind']]
+        operation['parts'] = [{'label': CATEGORY_LABELS[field], 'amount': value}
+                              for field, value in operation['allocation'].items() if value]
+    template = 'imports/partials/debt_balance.html' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'imports/debt_detail.html'
+    response = render(request, template, {
+        'debt': debt, 'categories': categories, 'source_rows': source_rows,
+        'operations_page': Paginator(balance['operations'], 25).get_page(request.GET.get('page')),
+    })
+    response['Cache-Control'] = 'no-store'
+    return response
 
 
 def _financial_list(request, *, model, title, kind):

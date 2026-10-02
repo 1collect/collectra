@@ -65,7 +65,7 @@ class WriteOffTests(TestCase):
     def test_partial_limits_and_invalid_inputs_leave_history_unchanged(self):
         self.writeoff(amount='150')
         for category, amount in [
-            (WriteOff.Category.INTEREST, '51'), ('purchase_principal', '1'),
+            (WriteOff.Category.INTEREST, '51'), ('unknown_category', '1'),
             ('', '1'), (WriteOff.Category.INTEREST, '0'),
             (WriteOff.Category.INTEREST, '-1'), (WriteOff.Category.INTEREST, 'NaN'),
         ]:
@@ -83,7 +83,10 @@ class WriteOffTests(TestCase):
         )
         with self.assertRaises(WriteOffValidationError):
             self.writeoff(amount='51')
-        self.writeoff(amount='50')
+        # Interest was already paid; only the receivable category remains.
+        with self.assertRaises(WriteOffValidationError):
+            self.writeoff(amount='50')
+        self.writeoff(category=WriteOff.Category.RECEIVABLE, amount='50')
         self.debt.refresh_from_db()
         self.assertEqual(self.debt.status, Debt.Status.CLOSED)
 

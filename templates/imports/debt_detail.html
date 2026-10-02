@@ -1,0 +1,11 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Расчёт договора {{ debt.contract_number }}{% endblock %}
+{% block page_name %}debts{% endblock %}
+{% block heading %}Расчёт договора{% endblock %}
+{% block content %}
+<div class="page-header"><div><div class="page-eyebrow">Данные / Договоры / Расчёт</div><h1>{{ debt.contract_number }}</h1><p class="text-muted">{{ debt.debtor.full_name }} · ИИН {{ debt.debtor.iin }}</p></div><a class="btn" href="{% url 'imports:debts' %}">Все договоры</a></div>
+<p class="text-muted">Исходные суммы сохраняются отдельно. Текущие остатки учитывают платежи, расходы, списания и возвраты. <span data-balance-status role="status">Автообновление включено.</span></p>
+<div class="stack" data-live-balances>{% include 'imports/partials/debt_balance.html' %}</div>
+{% endblock %}
+{% block scripts %}<script defer src="{% static 'js/balances.js' %}"></script>{% endblock %}

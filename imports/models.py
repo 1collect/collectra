@@ -330,12 +330,13 @@ class Payment(AuditedFinancialRecord):
 
 
 class WriteOff(AuditedFinancialRecord):
-    audit_fields = ('debt', 'writeoff_date', 'kind', 'category', 'amount')
+    audit_fields = ('debt', 'writeoff_date', 'kind', 'category', 'amount', 'distribution')
     class Kind(models.TextChoices):
         FULL = 'full', 'Полное списание'
         PARTIAL = 'partial', 'Частичное списание'
 
     class Category(models.TextChoices):
+        PRINCIPAL = 'purchase_principal', 'Основной долг'
         INTEREST = 'purchase_interest', 'Вознаграждение (выкуп)'
         PENALTIES = 'purchase_penalties', 'Пеня/Штрафы (выкуп)'
         RECEIVABLE = 'purchase_receivable', 'Дебиторская задолженность (выкуп)'
@@ -343,6 +344,12 @@ class WriteOff(AuditedFinancialRecord):
         REPRESENTATIVE = 'purchase_representative_expenses', 'Представительские расходы (выкуп)'
         NOTARY = 'purchase_notary_expenses', 'Нотариальные расходы (выкуп)'
         POSTAL = 'purchase_postal_expenses', 'Почтовые расходы (выкуп)'
+        OWN_STATE_DUTY = 'state_duty', 'Гос. пошлина наша'
+        OWN_REPRESENTATIVE = 'representative_expenses', 'Представительские расходы наши'
+        OWN_NOTARY = 'notary_expenses', 'Нотариальные расходы наши'
+        OWN_POSTAL = 'postal_expenses', 'Почтовые расходы наши'
+        CLAIM_SECURITY = 'claim_security', 'Обеспечение иска'
+        ADDITIONAL = 'additional_expenses', 'Дополнительные расходы'
 
     debt = models.ForeignKey(
         Debt, on_delete=models.PROTECT, related_name='writeoffs',
@@ -352,6 +359,7 @@ class WriteOff(AuditedFinancialRecord):
     kind = models.CharField('Тип списания', max_length=20, choices=Kind.choices)
     category = models.CharField('Категория', max_length=40, choices=Category.choices, blank=True)
     amount = models.DecimalField('Сумма списания', max_digits=20, decimal_places=2)
+    distribution = models.JSONField('Распределение по категориям', default=dict, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
         related_name='writeoffs', verbose_name='Создал',
@@ -369,9 +377,12 @@ class WriteOff(AuditedFinancialRecord):
                 condition=(
                     models.Q(kind='full', category='')
                     | models.Q(kind='partial', category__in=(
+                        'purchase_principal',
                         'purchase_interest', 'purchase_penalties', 'purchase_receivable',
                         'purchase_state_duty', 'purchase_representative_expenses',
                         'purchase_notary_expenses', 'purchase_postal_expenses',
+                        'state_duty', 'representative_expenses', 'notary_expenses',
+                        'postal_expenses', 'claim_security', 'additional_expenses',
                     ))
                 ),
                 name='writeoff_kind_category_valid',

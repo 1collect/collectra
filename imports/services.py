@@ -8,7 +8,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
-from .balances import apply_balance, calculate_balance
+from .balances import apply_balance, calculate_balance, CATEGORY_LABELS, WRITEOFF_CATEGORIES
 from .audit import audit_user
 from .models import (
     Debt, Debtor, Expense, FinancialChangeRequest, Import, ImportItem,
@@ -269,15 +269,17 @@ def create_writeoff(*, debt_id, kind, category, writeoff_date, created_by, amoun
         raise WriteOffValidationError('Выберите тип списания.')
     if kind == WriteOff.Kind.PARTIAL and category not in WriteOff.Category.values:
         raise WriteOffValidationError('Выберите категорию частичного списания.')
-    debt = recalculate_debt(debt)
+    balance = calculate_balance(debt, as_of=writeoff_date)
+    if balance['needs_manual_review']:
+        raise WriteOffValidationError(balance['recalculation_error_message'])
+    current = balance['current']
     if kind == WriteOff.Kind.FULL:
         category = ''
-        amount = debt.outstanding_amount
+        amount = balance['outstanding_amount']
+        distribution = {field: str(value) for field, value in current.items()}
     else:
-        already_written_off = debt.writeoffs.filter(category=category).aggregate(
-            total=Sum('amount'),
-        )['total'] or Decimal('0')
-        available = min(debt.outstanding_amount, max(getattr(debt, category) - already_written_off, Decimal('0')))
+        current_category = WRITEOFF_CATEGORIES[category]
+        available = current[current_category]
         try:
             amount = Decimal(str(amount))
         except (InvalidOperation, ValueError):
@@ -286,11 +288,12 @@ def create_writeoff(*, debt_id, kind, category, writeoff_date, created_by, amoun
             raise WriteOffValidationError('Сумма списания должна быть больше нуля.')
         if amount > available:
             raise WriteOffValidationError(f'Сумма списания не может превышать доступный остаток {available:.2f}.')
+        distribution = {current_category: str(amount)}
     if amount <= 0:
         raise WriteOffValidationError('Нет доступной суммы для списания.')
     writeoff = WriteOff(
         debt=debt, kind=kind, category=category, amount=amount,
-        writeoff_date=writeoff_date, created_by=created_by,
+        writeoff_date=writeoff_date, created_by=created_by, distribution=distribution,
     )
     writeoff.full_clean()
     writeoff.save()
@@ -490,28 +493,26 @@ def reserve_writeoff(values, balances):
     debt_id = values['debt_id']
     if debt_id not in balances:
         debt = Debt.objects.get(pk=debt_id)
-        existing = list(debt.writeoffs.all())
-        paid = sum((item.effective_amount for item in debt.payments.all()), Decimal('0'))
-        written_off = sum((item.amount for item in existing), Decimal('0'))
-        categories = {}
-        for item in existing:
-            categories[item.category] = categories.get(item.category, Decimal('0')) + item.amount
-        balances[debt_id] = {'debt': debt, 'remaining': calculate_balance(debt)['outstanding_amount'],
-                             'categories': categories}
+        balance = calculate_balance(debt, as_of=values['writeoff_date'])
+        balances[debt_id] = {'remaining': balance['outstanding_amount'],
+                            'current': balance['current'].copy()}
     state = balances[debt_id]
     category = values['category']
     if values['kind'] == WriteOff.Kind.FULL:
         amount = state['remaining']
     else:
         amount = values['amount']
-        available = min(state['remaining'], max(getattr(state['debt'], category) - state['categories'].get(category, 0), Decimal('0')))
+        available = state['current'][WRITEOFF_CATEGORIES[category]]
         if amount > available:
             raise ImportValidationError(f'Сумма списания не может превышать доступный остаток {available:.2f}.')
     if amount <= 0:
         raise ImportValidationError('Нет доступной суммы для списания.')
     values['amount'] = amount
     state['remaining'] -= amount
-    state['categories'][category] = state['categories'].get(category, Decimal('0')) + amount
+    if category:
+        state['current'][WRITEOFF_CATEGORIES[category]] -= amount
+    else:
+        state['current'] = dict.fromkeys(CATEGORY_LABELS, Decimal('0'))
 
 
 def save_imported_writeoff(values):

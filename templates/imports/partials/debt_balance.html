@@ -1,0 +1,33 @@
+{% if debt.needs_manual_review %}<div class="alert alert-danger">Требуется проверка: {{ debt.recalculation_error_message }}</div>{% endif %}
+{% if debt.opening_difference %}<div class="alert alert-warning">Сумма компонентов выкупа отличается от загруженного итога на {{ debt.opening_difference|floatformat:'2g' }}. Для старых записей нераспределённая часть сохранена в основном долге. Проверьте исходные данные.</div>{% endif %}
+<section class="panel">
+    <div class="panel-header"><h2>Текущее состояние</h2><span class="badge {% if debt.status == 'closed' %}badge-success{% else %}badge-warning{% endif %}">{% if debt.status == 'closed' %}{% if debt.closure_kind == 'paid' %}Закрыт платежами{% elif debt.closure_kind == 'written_off' %}Закрыт списанием{% else %}Закрыт платежами и списаниями{% endif %}{% else %}Активен{% endif %}</span></div>
+    <div class="import-preview__stats">
+        <div class="card stat-card"><span class="stat-label">Актуальный остаток</span><strong class="stat-value">{{ debt.outstanding_amount|floatformat:'2g' }}</strong></div>
+        <div class="card stat-card"><span class="stat-label">Оплачено с учётом возвратов</span><strong class="stat-value">{{ debt.paid_amount|floatformat:'2g' }}</strong></div>
+        <div class="card stat-card"><span class="stat-label">Списано</span><strong class="stat-value">{{ debt.written_off_amount|floatformat:'2g' }}</strong></div>
+        <div class="card stat-card"><span class="stat-label">Переплата</span><strong class="stat-value">{{ debt.overpayment_amount|floatformat:'2g' }}</strong></div>
+    </div>
+    <div class="panel-footer"><span>Дата закрытия: <strong>{{ debt.closed_at|date:'d.m.Y'|default:'—' }}</strong></span><span>Общая сумма задолженности: <strong>{{ debt.total_amount|floatformat:'2g' }}</strong></span><span>Выкуп и наши расходы: <strong>{{ debt.accrued_amount|floatformat:'2g' }}</strong></span></div>
+</section>
+<section class="panel">
+    <div class="panel-header"><h2>Исходные суммы и текущие остатки</h2></div>
+    <div class="panel-body"><p class="text-muted">Платежи погашают категории сверху вниз. Расходы по выкупу включены в дебиторскую задолженность. Наши расходы показаны отдельно.</p></div>
+    <div class="table-container" tabindex="0" role="region" aria-label="Расчёт по категориям"><table class="table table-bordered table-compact">
+        <thead><tr><th scope="col">Категория</th><th scope="col">Исходная сумма</th><th scope="col">Текущий остаток</th></tr></thead>
+        <tbody>{% for row in categories %}<tr><th scope="row">{{ row.label }}</th><td class="cell-number">{{ row.initial|floatformat:'2g' }}</td><td class="cell-number">{{ row.current|floatformat:'2g' }}</td></tr>{% endfor %}</tbody>
+        <tfoot><tr><th scope="row">Итого</th><td class="cell-number">{{ debt.accrued_amount|floatformat:'2g' }}</td><td class="cell-number"><strong>{{ debt.outstanding_amount|floatformat:'2g' }}</strong></td></tr></tfoot>
+    </table></div>
+</section>
+<section class="panel">
+    <div class="panel-header"><h2>Состав исходного выкупа</h2><span class="badge badge-neutral">Исходные значения</span></div>
+    <div class="table-container"><table class="table table-bordered table-compact"><thead><tr><th scope="col">Компонент</th><th scope="col">Сумма при загрузке</th></tr></thead><tbody>{% for row in source_rows %}<tr><th scope="row">{{ row.label }}</th><td class="cell-number">{{ row.amount|floatformat:'2g' }}</td></tr>{% endfor %}</tbody></table></div>
+</section>
+<section class="panel">
+    <div class="panel-header"><h2>Как рассчитан остаток</h2><span class="badge">{{ operations_page.paginator.count }} операций</span></div>
+    <div class="table-container" tabindex="0" role="region" aria-label="Распределение операций"><table class="table table-bordered table-compact">
+        <thead><tr><th scope="col">Дата</th><th scope="col">Операция</th><th scope="col">Действующая сумма</th><th scope="col">Распределение</th><th scope="col">Остаток после операции</th><th scope="col">Переплата</th></tr></thead>
+        <tbody>{% for item in operations_page %}<tr><td class="cell-date">{{ item.date|date:'d.m.Y' }}</td><td>{{ item.label }} #{{ item.id }}</td><td class="cell-number">{{ item.amount|floatformat:'2g' }}</td><td>{% for part in item.parts %}<div>{{ part.label }}: {{ part.amount|floatformat:'2g' }}</div>{% empty %}—{% endfor %}</td><td class="cell-number">{{ item.outstanding|floatformat:'2g' }}</td><td class="cell-number">{{ item.overpayment|floatformat:'2g' }}</td></tr>{% empty %}<tr><td colspan="6"><div class="empty-state">Финансовых операций пока нет.</div></td></tr>{% endfor %}</tbody>
+    </table></div>
+    {% if operations_page.paginator.num_pages > 1 %}<div class="table-footer"><span>Страница {{ operations_page.number }} из {{ operations_page.paginator.num_pages }}</span><nav class="pagination" aria-label="Страницы операций">{% if operations_page.has_previous %}<a class="page-btn" href="?page={{ operations_page.previous_page_number }}">Назад</a>{% endif %}{% if operations_page.has_next %}<a class="page-btn" href="?page={{ operations_page.next_page_number }}">Далее</a>{% endif %}</nav></div>{% endif %}
+</section>

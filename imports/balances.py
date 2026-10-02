@@ -1,4 +1,4 @@
-"""Current contract figures, derived without changing imported source amounts."""
+"""Pure calculation from opening amounts and dated financial operations."""
 from decimal import Decimal
 
 
@@ -12,62 +12,143 @@ OWN_FIELDS = (
     'state_duty', 'representative_expenses', 'notary_expenses',
     'postal_expenses', 'claim_security', 'additional_expenses',
 )
+CATEGORY_LABELS = {
+    'principal': 'Основной долг', 'interest': 'Вознаграждение',
+    'penalties': 'Пеня / штрафы', 'receivable': 'Дебиторская задолженность',
+    'state_duty': 'Гос. пошлина', 'representative_expenses': 'Представительские расходы',
+    'notary_expenses': 'Нотариальные расходы', 'postal_expenses': 'Почтовые расходы',
+    'claim_security': 'Обеспечение иска', 'additional_expenses': 'Дополнительные расходы',
+}
+WRITEOFF_CATEGORIES = {
+    'purchase_principal': 'principal', 'purchase_interest': 'interest',
+    'purchase_penalties': 'penalties',
+    **{field: 'receivable' for field in PURCHASE_FIELDS[3:]},
+    **{field: field for field in OWN_FIELDS},
+}
 
 
-def calculate_balance(debt):
-    payments = list(debt.payments.all())
-    expenses = list(debt.expenses.all())
-    writeoffs = list(debt.writeoffs.all())
+def distribute(amount, current, reserved=None):
+    allocation = {}
+    for field in CATEGORY_LABELS:
+        available = max(current[field] - (reserved or {}).get(field, ZERO), ZERO)
+        applied = min(available, amount)
+        current[field] -= applied
+        amount -= applied
+        allocation[field] = applied
+    return allocation, amount
+
+
+def calculate_balance(debt, *, as_of=None):
+    payments = [p for p in debt.payments.all() if as_of is None or p.payment_date <= as_of]
+    expenses = [e for e in debt.expenses.all() if as_of is None or e.expense_date <= as_of]
+    writeoffs = [w for w in debt.writeoffs.all() if as_of is None or w.writeoff_date <= as_of]
     purchase = {field: Decimal(getattr(debt, field)) for field in PURCHASE_FIELDS}
+    component_total = sum(purchase.values(), ZERO)
+    # Preserve incomplete legacy opening balances and show the discrepancy.
+    opening_difference = Decimal(debt.purchase_total_debt) - component_total
+    if opening_difference > 0:
+        purchase['purchase_principal'] += opening_difference
     purchase_total = sum(purchase.values(), ZERO)
-    # Legacy records may have only a total or an incomplete breakdown. Keep
-    # their unallocated opening balance in principal rather than losing debt.
-    if debt.purchase_total_debt > purchase_total:
-        purchase['purchase_principal'] += Decimal(debt.purchase_total_debt) - purchase_total
-        purchase_total = Decimal(debt.purchase_total_debt)
-    own = {field: sum((getattr(item, field) for item in expenses), ZERO) for field in OWN_FIELDS}
-    paid = sum((item.effective_amount for item in payments), ZERO)
-    written_off = sum((item.amount for item in writeoffs), ZERO)
-    total = purchase_total + sum(own.values(), ZERO)
-    outstanding = max(total - written_off - paid, ZERO)
-    overpayment = max(paid - max(total - written_off, ZERO), ZERO)
-
-    # Category writeoffs stay attached to their source category during refunds.
-    for item in writeoffs:
-        if item.category in purchase:
-            purchase[item.category] = max(purchase[item.category] - item.amount, ZERO)
-    current = {
-        'principal': purchase['purchase_principal'],
-        'interest': purchase['purchase_interest'],
+    opening = {
+        'principal': purchase['purchase_principal'], 'interest': purchase['purchase_interest'],
         'penalties': purchase['purchase_penalties'],
         'receivable': sum((purchase[field] for field in PURCHASE_FIELDS[3:]), ZERO),
-        **own,
+        **dict.fromkeys(OWN_FIELDS, ZERO),
     }
-    remaining = paid + sum((item.amount for item in writeoffs if not item.category), ZERO)
-    for field in current:
-        applied = min(current[field], remaining)
-        current[field] -= applied
-        remaining -= applied
+    own = {field: sum((Decimal(getattr(item, field)) for item in expenses), ZERO) for field in OWN_FIELDS}
+    total = purchase_total + sum(own.values(), ZERO)
+    effective = {}
+    for payment in payments:
+        refunds = list(payment.refunds.all())
+        refunded = sum((r.amount for r in refunds if r.status == 'active'
+                        and (as_of is None or r.refund_date <= as_of)), ZERO)
+        if not refunds and as_of is None:
+            refunded = payment.refunded_amount
+        effective[payment.pk] = max(payment.amount - refunded, ZERO)
+    paid = sum(effective.values(), ZERO)
+    written_off = sum((item.amount for item in writeoffs), ZERO)
+    events = [(e.expense_date, 0, e.pk, 'expense', e) for e in expenses]
+    events += [(w.writeoff_date, 1, w.pk, 'writeoff', w) for w in writeoffs]
+    events += [(p.payment_date, 2, p.pk, 'payment', p) for p in payments]
+    events.sort(key=lambda event: event[:3])
 
+    # Legacy writeoffs acquire a fixed distribution in the data migration.
+    probe = opening.copy()
+    allocations = {}
+    credit = ZERO
+    for _, _, _, kind, item in events:
+        if kind == 'expense':
+            for field in OWN_FIELDS:
+                probe[field] += Decimal(getattr(item, field))
+            _, credit = distribute(credit, probe)
+        elif kind == 'payment':
+            _, credit = distribute(credit + effective[item.pk], probe)
+        else:
+            if item.distribution:
+                allocation = {field: Decimal(item.distribution.get(field, '0')) for field in CATEGORY_LABELS}
+            elif item.category:
+                allocation = dict.fromkeys(CATEGORY_LABELS, ZERO)
+                allocation[WRITEOFF_CATEGORIES[item.category]] = item.amount
+            else:
+                allocation, _ = distribute(item.amount, probe.copy())
+            allocations[item.pk] = allocation
+            for field, amount in allocation.items():
+                probe[field] = max(probe[field] - amount, ZERO)
+
+    # Protect the fixed categories of later writeoffs when replaying automatic
+    # payments after a refund. A writeoff never migrates to another category.
+    reserved = {field: sum((a[field] for a in allocations.values()), ZERO) for field in CATEGORY_LABELS}
+    current = opening.copy()
+    credit = ZERO
     closed_at = None
-    if total > 0 and outstanding == 0:
-        running = purchase_total
-        events = [(item.expense_date, 0, item.pk, sum((getattr(item, field) for field in OWN_FIELDS), ZERO)) for item in expenses]
-        events += [(item.writeoff_date, 1, item.pk, -item.amount) for item in writeoffs]
-        events += [(item.payment_date, 2, item.pk, -item.effective_amount) for item in payments]
-        for event_date, _, _, amount in sorted(events):
-            was_open = running > 0
-            running += amount
-            if running > 0:
-                closed_at = None
-            elif was_open:
-                closed_at = event_date
+    error = ''
+    operations = []
+    for event_date, _, _, kind, item in events:
+        before = sum(current.values(), ZERO)
+        allocation = dict.fromkeys(CATEGORY_LABELS, ZERO)
+        if kind == 'expense':
+            for field in OWN_FIELDS:
+                current[field] += Decimal(getattr(item, field))
+            _, credit = distribute(credit, current, reserved)
+            amount = sum((Decimal(getattr(item, field)) for field in OWN_FIELDS), ZERO)
+        elif kind == 'payment':
+            amount = effective[item.pk]
+            allocation, surplus = distribute(amount, current, reserved)
+            credit += surplus
+        else:
+            amount = item.amount
+            allocation = allocations[item.pk]
+            if sum(allocation.values(), ZERO) != amount or any(
+                value < 0 or value > current[field] for field, value in allocation.items()
+            ):
+                error = f'Списание #{item.pk} невозможно применить к текущим остаткам. Проверьте суммы и даты операций.'
+                break
+            for field, value in allocation.items():
+                current[field] -= value
+                reserved[field] -= value
+        after = sum(current.values(), ZERO)
+        if after > 0:
+            closed_at = None
+        elif before > 0:
+            closed_at = event_date
+        operations.append({
+            'date': event_date, 'kind': kind, 'id': item.pk, 'amount': amount,
+            'allocation': allocation, 'outstanding': after, 'overpayment': credit,
+        })
+    outstanding = sum(current.values(), ZERO)
+    closure_kind = 'mixed' if paid > 0 and written_off > 0 else ('written_off' if written_off > 0 else 'paid')
     return {
-        'current': current, 'purchase_total': purchase_total, 'total_amount': total,
+        'current': current, 'opening': opening, 'own': own,
+        # The imported debt total is fixed; expenses affect the balance only.
+        'purchase_total': purchase_total, 'total_amount': Decimal(debt.purchase_total_debt),
+        'accrued_amount': total,
         'paid_amount': paid, 'written_off_amount': written_off,
-        'outstanding_amount': outstanding, 'overpayment_amount': overpayment,
-        'status': 'closed' if total > 0 and outstanding == 0 else 'active',
-        'closed_at': closed_at,
+        'outstanding_amount': outstanding, 'overpayment_amount': credit,
+        'status': 'closed' if total > 0 and outstanding == 0 and not error else 'active',
+        'closed_at': closed_at if not error else None, 'closure_kind': closure_kind,
+        'opening_difference': opening_difference, 'needs_manual_review': bool(error),
+        'recalculation_error_message': error, 'operations': operations,
+        'writeoff_allocations': allocations,
     }
 
 
@@ -78,26 +159,8 @@ def apply_balance(debt, balance):
 
 
 def filter_by_current_status(debts, status):
-    """Filter before pagination, using live amounts rather than cached status."""
-    from django.db.models import DecimalField, F, OuterRef, Subquery, Sum, Value
-    from django.db.models.functions import Coalesce, Greatest
-    from .models import Expense, Payment, WriteOff
-
-    money = DecimalField(max_digits=20, decimal_places=2)
-    zero = Value(ZERO, output_field=money)
-
-    def related_sum(model, amount):
-        query = model.objects.filter(debt_id=OuterRef('pk')).order_by().values('debt_id').annotate(
-            amount_total=Sum(amount, output_field=money),
-        ).values('amount_total')
-        return Coalesce(Subquery(query, output_field=money), zero)
-
-    purchase = sum((F(field) for field in PURCHASE_FIELDS), zero)
-    own = sum((F(field) for field in OWN_FIELDS), zero)
-    debts = debts.annotate(
-        live_total=Greatest(purchase, F('purchase_total_debt')) + related_sum(Expense, own),
-        live_paid=related_sum(Payment, Greatest(F('amount') - F('refunded_amount'), zero)),
-        live_written_off=related_sum(WriteOff, F('amount')),
-    ).annotate(live_reductions=F('live_paid') + F('live_written_off'))
-    closed = debts.filter(live_total__gt=0, live_total__lte=F('live_reductions'))
-    return closed if status == 'closed' else debts.exclude(pk__in=closed.values('pk'))
+    if status not in ('active', 'closed'):
+        return debts
+    records = debts.prefetch_related('payments__refunds', 'expenses', 'writeoffs')
+    matching = [debt.pk for debt in records if calculate_balance(debt)['status'] == status]
+    return debts.filter(pk__in=matching)
