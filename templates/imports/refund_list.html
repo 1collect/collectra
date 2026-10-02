@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% block title %}Возвраты платежей{% endblock %}
+{% block page_name %}refunds{% endblock %}
+{% block heading %}Возвраты платежей{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><div class="page-eyebrow">Данные / Платежи</div><h1>Возвраты платежей</h1></div>
+    <a class="btn btn-primary" href="{% url 'imports:refund_new' %}">Создать возврат</a>
+</div>
+<section class="panel">
+    <div class="panel-header"><h2>История возвратов <span class="badge">{{ page_obj.paginator.count }}</span></h2></div>
+    <div class="p-0 table-container">
+        <table class="table table-bordered table-compact">
+            <thead><tr><th>Договор</th><th>Исходный платёж</th><th>Категория</th><th>Сумма возврата</th><th>Дата</th><th>Основание</th><th>Статус</th><th>Создал</th></tr></thead>
+            <tbody>
+            {% for refund in page_obj %}
+                <tr>
+                    <td><strong class="font-mono">{{ refund.payment.debt.contract_number }}</strong></td>
+                    <td>{{ refund.payment.amount|floatformat:2 }} от {{ refund.payment.payment_date|date:'d.m.Y' }}<br><span class="text-muted">Действует: {{ refund.payment.effective_amount|floatformat:2 }}</span></td>
+                    <td>{{ refund.get_payment_category_display }}</td>
+                    <td><strong>{{ refund.amount|floatformat:2 }}</strong></td>
+                    <td>{{ refund.refund_date|date:'d.m.Y' }}</td>
+                    <td>{{ refund.reason }}</td>
+                    <td><span class="badge {% if refund.status == 'active' %}badge-success{% else %}badge-neutral{% endif %}">{{ refund.get_status_display }}</span></td>
+                    <td>{{ refund.created_by.get_full_name|default:refund.created_by.username }}</td>
+                </tr>
+            {% empty %}<tr><td colspan="8"><div class="empty-state"><h3>Возвратов пока нет</h3><p>Создайте возврат вручную для исходного платежа.</p></div></td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}<div class="table-footer"><span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span><nav class="pagination" aria-label="Страницы возвратов">{% if page_obj.has_previous %}<a class="page-btn" href="?page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}<span class="page-btn" aria-current="page">{{ page_obj.number }}</span>{% if page_obj.has_next %}<a class="page-btn" href="?page={{ page_obj.next_page_number }}">Далее</a>{% endif %}</nav></div>{% endif %}
+</section>
+{% endblock %}

@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 from io import BytesIO
 
 from django.contrib.auth.models import Permission, User
@@ -8,11 +9,15 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import Workbook
 
-from .models import Counterparty, Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment
+from .models import Counterparty, Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment, PaymentRefund
 from .services import (
     CONTRACT_IMPORT_COLUMNS,
     EXPENSE_IMPORT_COLUMNS,
     PAYMENT_IMPORT_COLUMNS,
+    RefundValidationError,
+    cancel_payment_refund,
+    create_payment_refund,
+    recalculate_debt,
 )
 
 
@@ -627,3 +632,142 @@ class XlsxImportTests(TestCase):
         response = self.client.get(reverse('imports:new'))
 
         self.assertEqual(response.status_code, 403)
+
+
+class PaymentRefundTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user('coordinator', password='test-password')
+        self.user.user_permissions.add(
+            Permission.objects.get(codename='add_paymentrefund'),
+        )
+        debtor = Debtor.objects.create(
+            full_name='Возвратов Тест',
+            iin='900101300099',
+        )
+        self.debt = Debt.objects.create(
+            debtor=debtor,
+            contract_number='DBZ-REFUND',
+            purchase_total_debt=Decimal('1000.00'),
+        )
+        self.payment = Payment.objects.create(
+            debt=self.debt,
+            amount=Decimal('1200.00'),
+            status=Payment.Status.CHSI,
+            payment_date=date(2026, 9, 20),
+        )
+        recalculate_debt(self.debt)
+        self.client.force_login(self.user)
+
+    def create_refund(self, amount, refund_date=date(2026, 10, 2)):
+        return create_payment_refund(
+            payment_id=self.payment.pk,
+            amount=Decimal(amount),
+            refund_date=refund_date,
+            reason='Возврат по заявлению должника',
+            created_by=self.user,
+        )
+
+    def test_partial_refund_updates_payment_and_closed_contract(self):
+        refund = self.create_refund('200.00')
+
+        self.payment.refresh_from_db()
+        self.debt.refresh_from_db()
+        self.assertEqual(refund.payment, self.payment)
+        self.assertEqual(refund.payment_category, Payment.Status.CHSI)
+        self.assertEqual(self.payment.refunded_amount, Decimal('200.00'))
+        self.assertEqual(self.payment.effective_amount, Decimal('1000.00'))
+        self.assertEqual(
+            self.payment.refund_status,
+            Payment.RefundStatus.PARTIALLY_REFUNDED,
+        )
+        self.assertEqual(self.payment.status, Payment.Status.CHSI)
+        self.assertEqual(self.debt.paid_amount, Decimal('1000.00'))
+        self.assertEqual(self.debt.outstanding_amount, Decimal('0.00'))
+        self.assertEqual(self.debt.overpayment_amount, Decimal('0.00'))
+        self.assertEqual(self.debt.status, Debt.Status.CLOSED)
+        self.assertEqual(self.debt.closed_at, date(2026, 9, 20))
+
+    def test_full_refund_reopens_contract(self):
+        self.create_refund('1200.00')
+
+        self.payment.refresh_from_db()
+        self.debt.refresh_from_db()
+        self.assertEqual(self.payment.effective_amount, Decimal('0.00'))
+        self.assertEqual(self.payment.refund_status, Payment.RefundStatus.REFUNDED)
+        self.assertEqual(self.debt.paid_amount, Decimal('0.00'))
+        self.assertEqual(self.debt.outstanding_amount, Decimal('1000.00'))
+        self.assertEqual(self.debt.status, Debt.Status.ACTIVE)
+        self.assertIsNone(self.debt.closed_at)
+
+    def test_repeated_refund_uses_only_remaining_amount(self):
+        self.create_refund('400.00')
+        self.create_refund('300.00')
+
+        with self.assertRaisesRegex(RefundValidationError, '500.00'):
+            self.create_refund('501.00')
+
+        self.payment.refresh_from_db()
+        self.debt.refresh_from_db()
+        self.assertEqual(PaymentRefund.objects.count(), 2)
+        self.assertEqual(self.payment.refunded_amount, Decimal('700.00'))
+        self.assertEqual(self.payment.effective_amount, Decimal('500.00'))
+        self.assertEqual(self.debt.paid_amount, Decimal('500.00'))
+        self.assertEqual(self.debt.outstanding_amount, Decimal('500.00'))
+
+    def test_cancelled_refund_is_not_counted_twice_and_history_keeps_category(self):
+        refund = self.create_refund('300.00')
+        self.payment.status = Payment.Status.INDIVIDUAL
+        self.payment.save(update_fields=('status',))
+
+        cancel_payment_refund(refund.pk)
+
+        refund.refresh_from_db()
+        self.payment.refresh_from_db()
+        self.debt.refresh_from_db()
+        self.assertEqual(refund.status, PaymentRefund.Status.CANCELLED)
+        self.assertEqual(refund.payment_category, Payment.Status.CHSI)
+        self.assertEqual(self.payment.refunded_amount, Decimal('0.00'))
+        self.assertEqual(self.payment.effective_amount, Decimal('1200.00'))
+        self.assertEqual(self.debt.overpayment_amount, Decimal('200.00'))
+
+    def test_manual_form_creates_refund_and_history_entry(self):
+        response = self.client.post(reverse('imports:refund_new'), {
+            'payment': self.payment.pk,
+            'amount': '250.00',
+            'refund_date': '2026-10-02',
+            'reason': 'Платёж поступил ошибочно',
+        })
+
+        self.assertRedirects(response, reverse('imports:refunds'))
+        refund = PaymentRefund.objects.get()
+        self.assertEqual(refund.created_by, self.user)
+        history = self.client.get(reverse('imports:refunds'))
+        self.assertContains(history, 'Платёж поступил ошибочно')
+        self.assertContains(history, 'DBZ-REFUND')
+
+    def test_user_without_existing_permission_cannot_manage_refunds(self):
+        self.client.force_login(User.objects.create_user('reader', password='test-password'))
+
+        self.assertEqual(self.client.get(reverse('imports:refunds')).status_code, 403)
+        self.assertEqual(self.client.get(reverse('imports:refund_new')).status_code, 403)
+
+    def test_form_rejects_zero_and_excessive_repeat(self):
+        response = self.client.post(reverse('imports:refund_new'), {
+            'payment': self.payment.pk,
+            'amount': '0',
+            'refund_date': '2026-10-02',
+            'reason': 'Некорректный возврат',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Сумма возврата должна быть больше нуля.')
+
+        self.create_refund('1100.00')
+        response = self.client.post(reverse('imports:refund_new'), {
+            'payment': self.payment.pk,
+            'amount': '101.00',
+            'refund_date': '2026-10-02',
+            'reason': 'Повторный возврат',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '100.00')
+        self.assertEqual(PaymentRefund.objects.count(), 1)

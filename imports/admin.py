@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Counterparty, Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment
+from .models import Counterparty, Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment, PaymentRefund
 
 
 @admin.register(ImportType)
@@ -41,7 +41,11 @@ class DebtorAdmin(admin.ModelAdmin):
 
 @admin.register(Debt)
 class DebtAdmin(admin.ModelAdmin):
-    list_display = ('contract_number', 'debtor', 'counterparty', 'purchase_total_debt')
+    list_display = (
+        'contract_number', 'debtor', 'counterparty', 'purchase_total_debt',
+        'paid_amount', 'outstanding_amount', 'overpayment_amount', 'status', 'closed_at',
+    )
+    list_filter = ('status',)
     search_fields = (
         'contract_number',
         'debtor__iin',
@@ -71,7 +75,25 @@ class ExpenseAdmin(admin.ModelAdmin):
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
-    list_display = ('debt', 'amount', 'status', 'payment_date')
-    list_filter = ('status', 'payment_date')
+    list_display = ('debt', 'amount', 'refunded_amount', 'refund_status', 'status', 'payment_date')
+    list_filter = ('status', 'refund_status', 'payment_date')
     search_fields = ('debt__contract_number', 'debt__debtor__iin')
     list_select_related = ('debt', 'debt__debtor')
+
+
+@admin.register(PaymentRefund)
+class PaymentRefundAdmin(admin.ModelAdmin):
+    list_display = ('payment', 'amount', 'refund_date', 'status', 'created_by', 'created_at')
+    list_filter = ('status', 'refund_date')
+    search_fields = ('payment__debt__contract_number', 'reason')
+    list_select_related = ('payment', 'payment__debt', 'created_by')
+    readonly_fields = (
+        'payment', 'amount', 'refund_date', 'reason', 'payment_category', 'status', 'created_by',
+        'created_at', 'cancelled_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False

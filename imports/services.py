@@ -3,11 +3,12 @@ from decimal import Decimal, InvalidOperation
 from zipfile import BadZipFile
 
 from django.db import transaction
+from django.db.models import Sum
 from django.utils import timezone
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
-from .models import Debt, Debtor, Expense, Import, ImportItem, Payment
+from .models import Debt, Debtor, Expense, Import, ImportItem, Payment, PaymentRefund
 
 
 CONTRACT_IMPORT_COLUMNS = (
@@ -175,7 +176,7 @@ def save_contract(contract_number, iin, full_name, debt_values):
         debtor.full_name = full_name
         debtor.save(update_fields=('full_name',))
 
-    Debt.objects.update_or_create(
+    debt, _ = Debt.objects.update_or_create(
         contract_number=contract_number,
         defaults={
             'debtor': debtor,
@@ -183,6 +184,7 @@ def save_contract(contract_number, iin, full_name, debt_values):
             **debt_values,
         },
     )
+    recalculate_debt(debt)
 
 
 def save_expense(values):
@@ -190,7 +192,132 @@ def save_expense(values):
 
 
 def save_payment(values):
-    Payment.objects.create(**values)
+    payment = Payment.objects.create(**values)
+    recalculate_debt(payment.debt_id)
+
+
+class RefundValidationError(Exception):
+    pass
+
+
+def _active_refund_total(payment_id):
+    return PaymentRefund.objects.filter(
+        payment_id=payment_id,
+        status=PaymentRefund.Status.ACTIVE,
+    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+
+
+def recalculate_payment(payment):
+    """Synchronize cached refund data from the immutable refund history."""
+    refunded_amount = _active_refund_total(payment.pk)
+    if refunded_amount <= 0:
+        refund_status = Payment.RefundStatus.ACTIVE
+    elif refunded_amount >= payment.amount:
+        refund_status = Payment.RefundStatus.REFUNDED
+    else:
+        refund_status = Payment.RefundStatus.PARTIALLY_REFUNDED
+
+    Payment.objects.filter(pk=payment.pk).update(
+        refunded_amount=refunded_amount,
+        refund_status=refund_status,
+    )
+    payment.refunded_amount = refunded_amount
+    payment.refund_status = refund_status
+    return payment
+
+
+def recalculate_debt(debt_or_id):
+    """Recalculate contract figures using every payment exactly once."""
+    debt = (
+        debt_or_id
+        if isinstance(debt_or_id, Debt)
+        else Debt.objects.get(pk=debt_or_id)
+    )
+    payments = list(debt.payments.order_by('payment_date', 'id'))
+    paid_amount = sum(
+        (payment.effective_amount for payment in payments),
+        Decimal('0'),
+    )
+    total_debt = debt.purchase_total_debt
+    outstanding_amount = max(total_debt - paid_amount, Decimal('0'))
+    overpayment_amount = max(paid_amount - total_debt, Decimal('0'))
+
+    closed_at = None
+    if total_debt > 0 and paid_amount >= total_debt:
+        running_total = Decimal('0')
+        for payment in payments:
+            running_total += payment.effective_amount
+            if running_total >= total_debt:
+                closed_at = payment.payment_date
+                break
+        status = Debt.Status.CLOSED
+    else:
+        status = Debt.Status.ACTIVE
+
+    Debt.objects.filter(pk=debt.pk).update(
+        paid_amount=paid_amount,
+        outstanding_amount=outstanding_amount,
+        overpayment_amount=overpayment_amount,
+        status=status,
+        closed_at=closed_at,
+    )
+    debt.paid_amount = paid_amount
+    debt.outstanding_amount = outstanding_amount
+    debt.overpayment_amount = overpayment_amount
+    debt.status = status
+    debt.closed_at = closed_at
+    return debt
+
+
+@transaction.atomic
+def create_payment_refund(*, payment_id, amount, refund_date, reason, created_by):
+    """Create a refund while serializing changes for the source payment."""
+    payment = Payment.objects.select_for_update().select_related('debt').get(
+        pk=payment_id,
+    )
+    Debt.objects.select_for_update().get(pk=payment.debt_id)
+    amount = Decimal(amount)
+    reason = reason.strip()
+    if amount <= 0:
+        raise RefundValidationError('Сумма возврата должна быть больше нуля.')
+    if not reason:
+        raise RefundValidationError('Укажите основание возврата.')
+
+    active_refunds = _active_refund_total(payment.pk)
+    refundable_amount = payment.amount - active_refunds
+    if amount > refundable_amount:
+        raise RefundValidationError(
+            'Сумма возврата не может превышать доступный остаток '
+            f'{refundable_amount:.2f}.'
+        )
+
+    refund = PaymentRefund.objects.create(
+        payment=payment,
+        amount=amount,
+        refund_date=refund_date,
+        reason=reason,
+        payment_category=payment.status,
+        created_by=created_by,
+    )
+    recalculate_payment(payment)
+    recalculate_debt(payment.debt_id)
+    return refund
+
+
+@transaction.atomic
+def cancel_payment_refund(refund_id):
+    refund = PaymentRefund.objects.select_for_update().select_related(
+        'payment',
+    ).get(pk=refund_id)
+    Payment.objects.select_for_update().get(pk=refund.payment_id)
+    Debt.objects.select_for_update().get(pk=refund.payment.debt_id)
+    if refund.status == PaymentRefund.Status.ACTIVE:
+        refund.status = PaymentRefund.Status.CANCELLED
+        refund.cancelled_at = timezone.now()
+        refund.save(update_fields=('status', 'cancelled_at'))
+        recalculate_payment(refund.payment)
+        recalculate_debt(refund.payment.debt_id)
+    return refund
 
 
 def save_contract_record(values):

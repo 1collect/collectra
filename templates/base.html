@@ -58,6 +58,10 @@
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2m2-10h4m-2-2v4"></path></svg>
                 <span>Контрагенты</span>
             </a>{% endif %}
+            {% if perms.imports.add_paymentrefund %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:refunds' or request.resolver_match.view_name == 'imports:refund_new' %}active{% endif %}" href="{% url 'imports:refunds' %}" title="Возвраты платежей">
+                <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M9 7H4v-5M4 7a9 9 0 1 1-1 7m6-3h7m-7 4h5"></path></svg>
+                <span>Возвраты</span>
+            </a>{% endif %}
             {% if perms.imports.view_import %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:list' or request.resolver_match.view_name == 'imports:items' or request.resolver_match.view_name == 'imports:new' or request.resolver_match.view_name == 'imports:types' %}active{% endif %}" href="{% url 'imports:list' %}" title="Импорты">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8ZM14 3v6h5M8 13h8m-8 4h6"></path></svg>
                 <span>Импорты</span>

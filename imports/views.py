@@ -1,13 +1,13 @@
 from django.core.paginator import Paginator
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
-from .forms import CounterpartyForm, ImportUploadForm
-from .models import Counterparty, Debt, Import, ImportItem, ImportType
-from .services import process_xlsx_import
+from .forms import CounterpartyForm, ImportUploadForm, PaymentRefundForm
+from .models import Counterparty, Debt, Import, ImportItem, ImportType, PaymentRefund
+from .services import RefundValidationError, create_payment_refund, process_xlsx_import
 from users.views import permission_required
 
 
@@ -130,6 +130,41 @@ def debt_list(request):
     page_obj = Paginator(debts, 25).get_page(request.GET.get('page'))
 
     return render(request, 'imports/debt_list.html', {'page_obj': page_obj})
+
+
+@permission_required('imports.add_paymentrefund')
+def refund_list(request):
+    refunds = PaymentRefund.objects.select_related(
+        'payment',
+        'payment__debt',
+        'created_by',
+    )
+    page_obj = Paginator(refunds, 25).get_page(request.GET.get('page'))
+    return render(request, 'imports/refund_list.html', {'page_obj': page_obj})
+
+
+@permission_required('imports.add_paymentrefund')
+def refund_create(request):
+    initial = {}
+    if request.method == 'GET':
+        initial['payment'] = request.GET.get('payment')
+        initial['refund_date'] = timezone.localdate()
+    form = PaymentRefundForm(request.POST or None, initial=initial)
+    if request.method == 'POST' and form.is_valid():
+        try:
+            create_payment_refund(
+                payment_id=form.cleaned_data['payment'].pk,
+                amount=form.cleaned_data['amount'],
+                refund_date=form.cleaned_data['refund_date'],
+                reason=form.cleaned_data['reason'],
+                created_by=request.user,
+            )
+        except RefundValidationError as error:
+            form.add_error('amount', str(error))
+        else:
+            messages.success(request, 'Возврат платежа сохранён, договор пересчитан.')
+            return redirect('imports:refunds')
+    return render(request, 'imports/refund_form.html', {'form': form})
 
 
 @permission_required('imports.view_counterparty')
