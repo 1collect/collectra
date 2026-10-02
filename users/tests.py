@@ -11,6 +11,10 @@ class AccessControlTests(TestCase):
         self.password = 'secure-test-password'
         self.user = User.objects.create_user('operator', password=self.password)
 
+    def test_contracts_redirect_anonymous_user_to_existing_login_page(self):
+        response = self.client.get(reverse('imports:debts'))
+        self.assertRedirects(response, '/login/?next=/imports/contracts/')
+
     def test_login_page_uses_russian_test_app_interface(self):
         response = self.client.get(reverse('login'))
 

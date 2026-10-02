@@ -10,13 +10,13 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .forms import (
-    CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
+    CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
     ImportUploadForm, PaymentChangeForm, PaymentRefundForm, WriteOffForm,
     PaymentCreateForm, ExpenseCreateForm,
 )
 from .balances import apply_balance, calculate_balance, filter_by_current_status, CATEGORY_LABELS, PURCHASE_FIELDS
 from .models import (
-    Counterparty, Debt, Expense, FinancialChangeRequest, Import, ImportItem,
+    CollectionAgency, Counterparty, Debt, Expense, FinancialChangeRequest, Import, ImportItem,
     Payment, PaymentRefund, WriteOff,
 )
 from .services import (
@@ -529,6 +529,43 @@ def refund_create(request):
             messages.success(request, 'Возврат платежа сохранён, договор пересчитан.')
             return redirect('imports:refunds')
     return render(request, 'imports/refund_form.html', {'form': form})
+
+
+@permission_required('imports.view_collectionagency')
+def collection_agency_list(request):
+    agencies = CollectionAgency.objects.all()
+    query = request.GET.get('q', '').strip()
+    if query:
+        agencies = agencies.filter(Q(name__icontains=query) | Q(bin__icontains=query))
+    return render(request, 'imports/collection_agency_list.html', {
+        'page_obj': Paginator(agencies, 25).get_page(request.GET.get('page')),
+        'query': query, 'query_string': list_query_string(request),
+    })
+
+
+def collection_agency_edit(request, agency_id=None):
+    permission = 'imports.change_collectionagency' if agency_id else 'imports.add_collectionagency'
+    if not request.user.is_authenticated:
+        return redirect(f'/login/?next={request.path}')
+    if not request.user.has_perm(permission):
+        raise PermissionDenied
+    agency = get_object_or_404(CollectionAgency, pk=agency_id) if agency_id else CollectionAgency()
+    form = CollectionAgencyForm(request.POST if request.method == 'POST' else None, instance=agency)
+    if request.method == 'POST' and form.is_valid():
+        form.save()
+        messages.success(request, 'Коллекторское агентство сохранено.')
+        return redirect('imports:collection_agencies')
+    return render(request, 'imports/collection_agency_edit.html', {'form': form, 'agency': agency})
+
+
+@permission_required('imports.delete_collectionagency')
+def collection_agency_delete(request, agency_id):
+    agency = get_object_or_404(CollectionAgency, pk=agency_id)
+    if request.method == 'POST':
+        agency.delete()
+        messages.success(request, 'Коллекторское агентство удалено.')
+        return redirect('imports:collection_agencies')
+    return render(request, 'imports/collection_agency_delete.html', {'agency': agency})
 
 
 @permission_required('imports.view_counterparty')

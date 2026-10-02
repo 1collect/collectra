@@ -3,7 +3,7 @@ from decimal import Decimal
 from django import forms
 from django.db.models import F, Sum
 
-from .models import Counterparty, Debt, Expense, ImportType, Payment, PaymentRefund, WriteOff
+from .models import CollectionAgency, Counterparty, Debt, Expense, ImportType, Payment, PaymentRefund, WriteOff
 
 
 class WriteOffForm(forms.ModelForm):
@@ -197,6 +197,19 @@ class ImportUploadForm(forms.Form):
         if uploaded_file.size > 20 * 1024 * 1024:
             raise forms.ValidationError('Размер файла не должен превышать 20 МБ.')
         return uploaded_file
+
+
+class CollectionAgencyForm(forms.ModelForm):
+    class Meta:
+        model = CollectionAgency
+        fields = ('name', 'bin', 'phone', 'email', 'address')
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'bin': forms.TextInput(attrs={'class': 'form-control', 'inputmode': 'numeric', 'maxlength': '12'}),
+            'phone': forms.TextInput(attrs={'class': 'form-control', 'type': 'tel'}),
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'address': forms.TextInput(attrs={'class': 'form-control'}),
+        }
 
 
 class CounterpartyForm(forms.ModelForm):

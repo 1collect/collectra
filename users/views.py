@@ -31,6 +31,7 @@ def dashboard(request):
         ('imports.view_expense', 'imports:expenses'),
         ('imports.view_writeoff', 'imports:writeoffs'),
         ('imports.view_counterparty', 'imports:counterparties'),
+        ('imports.view_collectionagency', 'imports:collection_agencies'),
         ('imports.view_import', 'imports:list'),
     )
     for permission, route_name in destinations:

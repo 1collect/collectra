@@ -1,3 +1,4 @@
+from copy import copy
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from zipfile import BadZipFile
@@ -8,7 +9,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
-from .balances import apply_balance, calculate_balance, CATEGORY_LABELS, WRITEOFF_CATEGORIES
+from .balances import apply_balance, calculate_balance, WRITEOFF_CATEGORIES
 from .audit import audit_user
 from .models import (
     Debt, Debtor, Expense, FinancialChangeRequest, Import, ImportItem,
@@ -492,27 +493,34 @@ def reserve_writeoff(values, balances):
     """Check cumulative file limits without changing contracts or creating entries."""
     debt_id = values['debt_id']
     if debt_id not in balances:
-        debt = Debt.objects.get(pk=debt_id)
-        balance = calculate_balance(debt, as_of=values['writeoff_date'])
-        balances[debt_id] = {'remaining': balance['outstanding_amount'],
-                            'current': balance['current'].copy()}
+        debt = Debt.objects.prefetch_related('payments__refunds', 'expenses', 'writeoffs').get(pk=debt_id)
+        balances[debt_id] = {'debt': debt, 'staged': []}
     state = balances[debt_id]
+    projected = copy(state['debt'])
+    projected._prefetched_objects_cache = state['debt']._prefetched_objects_cache.copy()
+    existing = list(state['debt'].writeoffs.all())
+    projected._prefetched_objects_cache['writeoffs'] = existing + state['staged']
+    balance = calculate_balance(projected, as_of=values['writeoff_date'])
+    if balance['needs_manual_review']:
+        raise ImportValidationError(balance['recalculation_error_message'])
+    current = balance['current']
     category = values['category']
     if values['kind'] == WriteOff.Kind.FULL:
-        amount = state['remaining']
+        amount = balance['outstanding_amount']
+        distribution = {field: str(value) for field, value in current.items()}
     else:
         amount = values['amount']
-        available = state['current'][WRITEOFF_CATEGORIES[category]]
+        available = current[WRITEOFF_CATEGORIES[category]]
         if amount > available:
             raise ImportValidationError(f'Сумма списания не может превышать доступный остаток {available:.2f}.')
+        distribution = {WRITEOFF_CATEGORIES[category]: str(amount)}
     if amount <= 0:
         raise ImportValidationError('Нет доступной суммы для списания.')
     values['amount'] = amount
-    state['remaining'] -= amount
-    if category:
-        state['current'][WRITEOFF_CATEGORIES[category]] -= amount
-    else:
-        state['current'] = dict.fromkeys(CATEGORY_LABELS, Decimal('0'))
+    next_id = max((item.pk for item in existing + state['staged']), default=0) + 1
+    state['staged'].append(WriteOff(pk=next_id, debt_id=debt_id, kind=values['kind'],
+                                  category=category, amount=amount, distribution=distribution,
+                                  writeoff_date=values['writeoff_date']))
 
 
 def save_imported_writeoff(values):

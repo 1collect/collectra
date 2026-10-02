@@ -149,6 +149,26 @@ class Counterparty(models.Model):
         return f'{self.full_name} ({self.iin})'
 
 
+class CollectionAgency(models.Model):
+    name = models.CharField('Наименование', max_length=255)
+    bin = models.CharField(
+        'БИН', max_length=12, unique=True,
+        validators=[RegexValidator(r'^[0-9]{12}$', 'БИН должен содержать 12 цифр.')],
+    )
+    phone = models.CharField('Телефон', max_length=50, blank=True)
+    email = models.EmailField('Электронная почта', blank=True)
+    address = models.CharField('Адрес', max_length=500, blank=True)
+
+    class Meta:
+        db_table = 'collection_agencies'
+        ordering = ['name', 'pk']
+        verbose_name = 'коллекторское агентство'
+        verbose_name_plural = 'коллекторские агентства'
+
+    def __str__(self):
+        return f'{self.name} ({self.bin})'
+
+
 class Debtor(models.Model):
     full_name = models.CharField('ФИО', max_length=255)
     iin = models.CharField(

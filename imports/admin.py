@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from .models import (
-    Counterparty, Debt, Debtor, Expense, FinancialChangeRequest, Import,
+    CollectionAgency, Counterparty, Debt, Debtor, Expense, FinancialChangeRequest, Import,
     ImportItem, ImportType, Payment, PaymentRefund, WriteOff, FinancialRecordHistory,
 )
 
@@ -28,6 +28,12 @@ class ImportItemAdmin(admin.ModelAdmin):
     list_filter = ('import_record__import_type', 'status')
     search_fields = ('error_message',)
     readonly_fields = ('created_at',)
+
+
+@admin.register(CollectionAgency)
+class CollectionAgencyAdmin(admin.ModelAdmin):
+    list_display = ('name', 'bin', 'phone', 'email')
+    search_fields = ('name', 'bin')
 
 
 @admin.register(Counterparty)

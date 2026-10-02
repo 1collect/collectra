@@ -163,3 +163,17 @@ class DynamicBalanceTests(TestCase):
         balance = calculate_balance(self.debt)
         self.assertTrue(balance['needs_manual_review'])
         self.assertTrue(all(value >= 0 for value in balance['current'].values()))
+
+    def test_writeoff_preview_accounts_for_operations_between_file_dates(self):
+        from .services import reserve_writeoff
+
+        Expense.objects.create(debt=self.debt, state_duty=200, expense_date=date(2026, 10, 2))
+        Payment.objects.create(debt=self.debt, amount=100, status='individual', payment_date=date(2026, 10, 3))
+        staged = {}
+        reserve_writeoff({'debt_id': self.debt.pk, 'kind': 'partial', 'category': 'purchase_interest',
+                          'amount': Decimal('50'), 'writeoff_date': date(2026, 10, 1)}, staged)
+        full = {'debt_id': self.debt.pk, 'kind': 'full', 'category': '', 'amount': None,
+                'writeoff_date': date(2026, 10, 4)}
+        reserve_writeoff(full, staged)
+        self.assertEqual(full['amount'], Decimal('1050'))
+        self.assertFalse(WriteOff.objects.exists())

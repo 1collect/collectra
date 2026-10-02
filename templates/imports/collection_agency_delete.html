@@ -1,0 +1,10 @@
+{% extends 'base.html' %}
+{% block title %}Удаление агентства{% endblock %}
+{% block page_name %}collection-agencies{% endblock %}
+{% block heading %}Удаление агентства{% endblock %}
+{% block content %}
+<div class="page-header"><div><div class="page-eyebrow">Справочники / Коллекторские агентства</div><h1>Удаление агентства</h1></div></div>
+<section class="panel"><div class="panel-body"><p>Удалить агентство <strong>{{ agency.name }}</strong> (БИН {{ agency.bin }})?</p></div>
+    <div class="panel-footer"><a class="btn" href="{% url 'imports:collection_agencies' %}">Отмена</a><form method="post">{% csrf_token %}<button class="btn btn-danger" type="submit">Удалить агентство</button></form></div>
+</section>
+{% endblock %}
