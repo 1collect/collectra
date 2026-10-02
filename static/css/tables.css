@@ -1,7 +1,7 @@
 /* Scroll is scoped to tables; the page itself never needs horizontal scroll. */
 .table-container { overflow: auto; max-width: 100%; scrollbar-width: thin; }
 .table { width: 100%; border-collapse: collapse; text-align: left; font-family: var(--font-sans); font-size: 11px; white-space: nowrap; }
-.table.table * { font-family: var(--font-sans); font-size: 11px; }
+.table, .table * { font-family: var(--font-sans) !important; font-size: 11px !important; }
 .table th { position: sticky; top: 0; z-index: 1; background: var(--bg-subtle); color: var(--text-secondary); font-weight: 500; height: 32px; padding: 5px 11px; border-bottom: 1px solid var(--border-color); }
 .table td { height: var(--row-height); padding: 3px 11px; border-bottom: 1px solid var(--border-strong); }
 .table tbody tr:last-child td { border-bottom: 1px solid var(--border-strong); }
