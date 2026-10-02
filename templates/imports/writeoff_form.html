@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Новое списание{% endblock %}
+{% block page_name %}writeoffs{% endblock %}
+{% block heading %}Новое списание{% endblock %}
+{% block content %}
+<div class="page-header"><div><div class="page-eyebrow">Списания / Создание</div><h1>Новое списание</h1></div></div>
+<section class="panel">
+    <div class="panel-header"><h2>Данные списания</h2></div>
+    <div class="panel-body">
+        <p class="panel-note">Полное списание погашает весь текущий остаток задолженности. При частичном списании выберите категорию и укажите сумму в пределах её остатка и остатка долга. Исходные суммы выкупа сохраняются.</p>
+        <form method="post" novalidate id="writeoff-form">
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+            <div class="form-grid">
+                {% for field in form %}
+                <div class="form-field {% if field.name == 'debt' %}span-2{% endif %}" {% if field.name == 'category' or field.name == 'amount' %}data-partial-writeoff{% endif %}>
+                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
+                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+                </div>
+                {% endfor %}
+            </div>
+            <div class="form-actions">
+                {% if perms.imports.view_writeoff %}<a class="btn btn-outline-secondary" href="{% url 'imports:writeoffs' %}">Отмена</a>{% endif %}
+                <button class="btn btn-primary" type="submit">Сохранить списание</button>
+            </div>
+        </form>
+    </div>
+</section>
+{% endblock %}
+{% block scripts %}<script defer src="{% static 'js/writeoffs.js' %}"></script>{% endblock %}

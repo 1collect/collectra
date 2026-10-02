@@ -10,7 +10,7 @@ from openpyxl.utils.exceptions import InvalidFileException
 
 from .models import (
     Debt, Debtor, Expense, FinancialChangeRequest, Import, ImportItem,
-    Payment, PaymentRefund,
+    Payment, PaymentRefund, WriteOff,
 )
 
 
@@ -253,16 +253,21 @@ def recalculate_debt(debt_or_id):
         Decimal('0'),
     )
     total_debt = debt.purchase_total_debt
-    outstanding_amount = max(total_debt - paid_amount, Decimal('0'))
-    overpayment_amount = max(paid_amount - total_debt, Decimal('0'))
+    writeoffs = list(debt.writeoffs.order_by('writeoff_date', 'id'))
+    written_off_amount = sum((item.amount for item in writeoffs), Decimal('0'))
+    collectible_amount = max(total_debt - written_off_amount, Decimal('0'))
+    outstanding_amount = max(collectible_amount - paid_amount, Decimal('0'))
+    overpayment_amount = max(paid_amount - collectible_amount, Decimal('0'))
 
     closed_at = None
-    if total_debt > 0 and paid_amount >= total_debt:
+    if total_debt > 0 and outstanding_amount == 0:
         running_total = Decimal('0')
-        for payment in payments:
-            running_total += payment.effective_amount
+        events = [(payment.payment_date, payment.effective_amount) for payment in payments]
+        events.extend((item.writeoff_date, item.amount) for item in writeoffs)
+        for event_date, amount in sorted(events):
+            running_total += amount
             if running_total >= total_debt:
-                closed_at = payment.payment_date
+                closed_at = event_date
                 break
         status = Debt.Status.CLOSED
     else:
@@ -270,17 +275,59 @@ def recalculate_debt(debt_or_id):
 
     Debt.objects.filter(pk=debt.pk).update(
         paid_amount=paid_amount,
+        written_off_amount=written_off_amount,
         outstanding_amount=outstanding_amount,
         overpayment_amount=overpayment_amount,
         status=status,
         closed_at=closed_at,
     )
     debt.paid_amount = paid_amount
+    debt.written_off_amount = written_off_amount
     debt.outstanding_amount = outstanding_amount
     debt.overpayment_amount = overpayment_amount
     debt.status = status
     debt.closed_at = closed_at
     return debt
+
+
+class WriteOffValidationError(Exception):
+    pass
+
+
+@transaction.atomic
+def create_writeoff(*, debt_id, kind, category, writeoff_date, created_by, amount=None):
+    debt = Debt.objects.select_for_update().get(pk=debt_id)
+    if kind not in WriteOff.Kind.values:
+        raise WriteOffValidationError('Выберите тип списания.')
+    if kind == WriteOff.Kind.PARTIAL and category not in WriteOff.Category.values:
+        raise WriteOffValidationError('Выберите категорию частичного списания.')
+    debt = recalculate_debt(debt)
+    if kind == WriteOff.Kind.FULL:
+        category = ''
+        amount = debt.outstanding_amount
+    else:
+        already_written_off = debt.writeoffs.filter(category=category).aggregate(
+            total=Sum('amount'),
+        )['total'] or Decimal('0')
+        available = min(debt.outstanding_amount, max(getattr(debt, category) - already_written_off, Decimal('0')))
+        try:
+            amount = Decimal(str(amount))
+        except (InvalidOperation, ValueError):
+            raise WriteOffValidationError('Укажите сумму частичного списания.')
+        if not amount.is_finite() or amount <= 0:
+            raise WriteOffValidationError('Сумма списания должна быть больше нуля.')
+        if amount > available:
+            raise WriteOffValidationError(f'Сумма списания не может превышать доступный остаток {available:.2f}.')
+    if amount <= 0:
+        raise WriteOffValidationError('Нет доступной суммы для списания.')
+    writeoff = WriteOff(
+        debt=debt, kind=kind, category=category, amount=amount,
+        writeoff_date=writeoff_date, created_by=created_by,
+    )
+    writeoff.full_clean()
+    writeoff.save()
+    recalculate_debt(debt)
+    return writeoff
 
 
 PAYMENT_CHANGE_FIELDS = ('debt', 'amount', 'status', 'payment_date')

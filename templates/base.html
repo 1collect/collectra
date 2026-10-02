@@ -56,8 +56,11 @@
             {% if perms.imports.view_payment %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:payments' or request.resolver_match.view_name == 'imports:payment_edit' or request.resolver_match.view_name == 'imports:payment_history' %}active{% endif %}" href="{% url 'imports:payments' %}" title="Платежи">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M3 6h18v12H3zM7 10h4m6 4h.01"></path></svg><span>Платежи</span>
             </a>{% endif %}
-            {% if perms.imports.view_expense %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:expenses' or request.resolver_match.view_name == 'imports:expense_edit' or request.resolver_match.view_name == 'imports:expense_history' %}active{% endif %}" href="{% url 'imports:expenses' %}" title="Списания">
-                <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8m-8 4h8m-8 4h5"></path></svg><span>Списания</span>
+            {% if perms.imports.view_expense %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:expenses' or request.resolver_match.view_name == 'imports:expense_edit' or request.resolver_match.view_name == 'imports:expense_history' %}active{% endif %}" href="{% url 'imports:expenses' %}" title="Расходы">
+                <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8m-8 4h8m-8 4h5"></path></svg><span>Расходы</span>
+            </a>{% endif %}
+            {% if perms.imports.view_writeoff %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:writeoffs' or request.resolver_match.view_name == 'imports:writeoff_new' %}active{% endif %}" href="{% url 'imports:writeoffs' %}" title="Списания">
+                <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8m-8 4h8m-8 4h4m3-1 3 3m0-3-3 3"></path></svg><span>Списания</span>
             </a>{% endif %}
             {% if perms.imports.view_counterparty %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:counterparties' or request.resolver_match.view_name == 'imports:counterparty_new' or request.resolver_match.view_name == 'imports:counterparty_edit' or request.resolver_match.view_name == 'imports:counterparty_delete' %}active{% endif %}" href="{% url 'imports:counterparties' %}" title="Контрагенты">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2m2-10h4m-2-2v4"></path></svg>

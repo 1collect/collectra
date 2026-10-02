@@ -1,7 +1,43 @@
+from decimal import Decimal
+
 from django import forms
 from django.db.models import F, Sum
 
-from .models import Counterparty, Expense, ImportType, Payment, PaymentRefund
+from .models import Counterparty, Debt, Expense, ImportType, Payment, PaymentRefund, WriteOff
+
+
+class WriteOffForm(forms.ModelForm):
+    amount = forms.DecimalField(
+        label='Сумма списания', max_digits=20, decimal_places=2,
+        min_value=Decimal('0.01'), required=False,
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
+    )
+
+    class Meta:
+        model = WriteOff
+        fields = ('debt', 'writeoff_date', 'kind', 'category')
+        widgets = {
+            'debt': forms.Select(attrs={'class': 'form-control'}),
+            'writeoff_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'kind': forms.Select(attrs={'class': 'form-control'}),
+            'category': forms.Select(attrs={'class': 'form-control'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['debt'].queryset = Debt.objects.order_by('contract_number')
+        self.fields['category'].help_text = 'Для частичного списания выберите одну категорию.'
+
+    def clean(self):
+        data = super().clean()
+        if data.get('kind') == WriteOff.Kind.PARTIAL and not data.get('category'):
+            self.add_error('category', 'Выберите категорию частичного списания.')
+        if data.get('kind') == WriteOff.Kind.PARTIAL and data.get('amount') is None:
+            self.add_error('amount', 'Укажите сумму частичного списания.')
+        if data.get('kind') == WriteOff.Kind.FULL:
+            data['category'] = ''
+            data['amount'] = None
+        return data
 
 
 class ChangeReasonMixin(forms.ModelForm):

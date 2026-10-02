@@ -8,15 +8,16 @@ from django.utils import timezone
 
 from .forms import (
     CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
-    ImportUploadForm, PaymentChangeForm, PaymentRefundForm,
+    ImportUploadForm, PaymentChangeForm, PaymentRefundForm, WriteOffForm,
 )
 from .models import (
     Counterparty, Debt, Expense, FinancialChangeRequest, Import, ImportItem,
-    Payment, PaymentRefund,
+    Payment, PaymentRefund, WriteOff,
 )
 from .services import (
     FinancialChangeError, RefundValidationError, create_financial_change_request,
     create_payment_refund, process_xlsx_import, review_financial_change,
+    create_writeoff, WriteOffValidationError,
 )
 from users.views import permission_required
 
@@ -186,7 +187,43 @@ def payment_list(request):
 
 
 def expense_list(request):
-    return _financial_list(request, model=Expense, title='Списания', kind='expense')
+    return _financial_list(request, model=Expense, title='Расходы', kind='expense')
+
+
+@permission_required('imports.view_writeoff')
+def writeoff_list(request):
+    records = WriteOff.objects.select_related('debt', 'debt__debtor', 'created_by')
+    query = request.GET.get('q', '').strip()
+    if query:
+        records = records.filter(
+            Q(debt__contract_number__icontains=query)
+            | Q(debt__debtor__full_name__icontains=query)
+            | Q(debt__debtor__iin__icontains=query)
+        )
+    return render(request, 'imports/writeoff_list.html', {
+        'page_obj': Paginator(records, 25).get_page(request.GET.get('page')),
+        'query': query, 'query_string': list_query_string(request),
+    })
+
+
+@permission_required('imports.add_writeoff')
+def writeoff_create(request):
+    form = WriteOffForm(request.POST if request.method == 'POST' else None,
+                        initial={'writeoff_date': timezone.localdate(), 'kind': WriteOff.Kind.FULL})
+    if request.method == 'POST' and form.is_valid():
+        try:
+            create_writeoff(
+                debt_id=form.cleaned_data['debt'].pk,
+                kind=form.cleaned_data['kind'], category=form.cleaned_data['category'],
+                amount=form.cleaned_data['amount'],
+                writeoff_date=form.cleaned_data['writeoff_date'], created_by=request.user,
+            )
+        except WriteOffValidationError as error:
+            form.add_error(None, str(error))
+        else:
+            messages.success(request, 'Списание сохранено. Остаток долга пересчитан.')
+            return redirect('imports:writeoffs')
+    return render(request, 'imports/writeoff_form.html', {'form': form})
 
 
 def _financial_edit(request, *, model, form_class, record_id, kind, title):
@@ -224,7 +261,7 @@ def payment_edit(request, record_id):
 def expense_edit(request, record_id):
     return _financial_edit(
         request, model=Expense, form_class=ExpenseChangeForm,
-        record_id=record_id, kind='expense', title='Изменить списание',
+        record_id=record_id, kind='expense', title='Изменить расход',
     )
 
 
@@ -268,7 +305,7 @@ def payment_history(request, record_id):
 def expense_history(request, record_id):
     return _financial_history(
         request, model=Expense, record_id=record_id,
-        kind='expense', title='История списания',
+        kind='expense', title='История расхода',
     )
 
 

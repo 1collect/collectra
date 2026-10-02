@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+{% block title %}Списания{% endblock %}
+{% block page_name %}writeoffs{% endblock %}
+{% block heading %}Списания{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><div class="page-eyebrow">Данные / Финансы</div><h1>Списания</h1></div>
+    {% if perms.imports.add_writeoff %}<a class="btn btn-primary" href="{% url 'imports:writeoff_new' %}">Добавить списание</a>{% endif %}
+</div>
+<section class="panel">
+    <div class="panel-header"><h2>Реестр списаний <span class="badge">{{ page_obj.paginator.count }}</span></h2></div>
+    <div class="panel-body">
+        <form method="get" class="flex gap-2">
+            <label class="sr-only" for="writeoff-search">Поиск по договору, ФИО или ИИН</label>
+            <input class="form-control" id="writeoff-search" name="q" value="{{ query }}" placeholder="Договор, ФИО или ИИН" type="search">
+            <button class="btn" type="submit">Найти</button>
+            {% if query %}<a class="btn" href="{% url 'imports:writeoffs' %}">Сбросить</a>{% endif %}
+        </form>
+    </div>
+    <div class="p-0 table-container">
+        <table class="table table-bordered table-compact">
+            <thead><tr><th scope="col">Договор</th><th scope="col">Тип списания</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма</th><th scope="col">Дата списания</th><th scope="col">Создал</th></tr></thead>
+            <tbody>{% for item in page_obj %}
+                <tr>
+                    <td class="cell-text"><strong class="font-mono">{{ item.debt.contract_number }}</strong><br><span class="text-muted">{{ item.debt.debtor.full_name }}</span></td>
+                    <td>{{ item.get_kind_display }}</td>
+                    <td>{% if item.kind == 'full' %}Весь остаток задолженности{% else %}{{ item.get_category_display }}{% endif %}</td>
+                    <td class="cell-number">{{ item.amount|floatformat:2 }}</td>
+                    <td class="cell-date">{{ item.writeoff_date|date:'d.m.Y' }}</td>
+                    <td>{{ item.created_by.get_full_name|default:item.created_by.username }}</td>
+                </tr>
+            {% empty %}<tr><td colspan="6"><div class="empty-state"><h3>Списания не найдены</h3></div></td></tr>{% endfor %}</tbody>
+        </table>
+    </div>
+    {% if page_obj.paginator.num_pages > 1 %}
+    <div class="table-footer"><span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
+        <nav class="pagination" aria-label="Страницы списаний">
+            {% if page_obj.has_previous %}<a class="page-btn" href="?{% if query_string %}{{ query_string }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}
+            <span class="page-btn" aria-current="page">{{ page_obj.number }}</span>
+            {% if page_obj.has_next %}<a class="page-btn" href="?{% if query_string %}{{ query_string }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Далее</a>{% endif %}
+        </nav>
+    </div>
+    {% endif %}
+</section>
+{% endblock %}

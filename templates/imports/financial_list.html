@@ -20,7 +20,7 @@
             <td class="cell-text"><strong class="font-mono">{{ item.debt.contract_number }}</strong><br><span class="text-muted">{{ item.debt.debtor.full_name }}</span></td>
             <td class="cell-number">{{ item.state_duty|floatformat:2 }}</td><td class="cell-number">{{ item.representative_expenses|floatformat:2 }}</td><td class="cell-number">{{ item.notary_expenses|floatformat:2 }}</td><td class="cell-number">{{ item.postal_expenses|floatformat:2 }}</td><td class="cell-number">{{ item.claim_security|floatformat:2 }}</td><td class="cell-number">{{ item.additional_expenses|floatformat:2 }}</td><td class="cell-date">{{ item.expense_date|date:'d.m.Y' }}</td>
             <td class="cell-actions"><div class="flex gap-2">{% if perms.imports.change_expense %}<a class="btn btn-sm" href="{% url 'imports:expense_edit' item.pk %}">Изменить</a>{% endif %}<a class="btn btn-sm" href="{% url 'imports:expense_history' item.pk %}">История</a></div></td>
-        </tr>{% empty %}<tr><td colspan="9"><div class="empty-state"><h3>Списаний пока нет</h3></div></td></tr>{% endfor %}</tbody>
+        </tr>{% empty %}<tr><td colspan="9"><div class="empty-state"><h3>Расходов пока нет</h3></div></td></tr>{% endfor %}</tbody>
         {% endif %}
     </table></div>
     {% if page_obj.paginator.num_pages > 1 %}<div class="table-footer"><span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span><nav class="pagination">{% if page_obj.has_previous %}<a class="page-btn" href="?page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}{% if page_obj.has_next %}<a class="page-btn" href="?page={{ page_obj.next_page_number }}">Далее</a>{% endif %}</nav></div>{% endif %}

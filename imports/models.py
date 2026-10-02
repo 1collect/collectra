@@ -171,6 +171,7 @@ class Debt(models.Model):
     purchase_postal_expenses = models.DecimalField('Почтовые расходы', **MONEY)
     purchase_total_debt = models.DecimalField('Общая сумма задолженности', **MONEY)
     paid_amount = models.DecimalField('Оплачено', **MONEY)
+    written_off_amount = models.DecimalField('Списано', **MONEY)
     outstanding_amount = models.DecimalField('Остаток', **MONEY)
     overpayment_amount = models.DecimalField('Переплата', **MONEY)
     status = models.CharField(
@@ -291,6 +292,58 @@ class Payment(models.Model):
         return self.effective_amount
 
 
+class WriteOff(models.Model):
+    class Kind(models.TextChoices):
+        FULL = 'full', 'Полное списание'
+        PARTIAL = 'partial', 'Частичное списание'
+
+    class Category(models.TextChoices):
+        INTEREST = 'purchase_interest', 'Вознаграждение (выкуп)'
+        PENALTIES = 'purchase_penalties', 'Пеня/Штрафы (выкуп)'
+        RECEIVABLE = 'purchase_receivable', 'Дебиторская задолженность (выкуп)'
+        STATE_DUTY = 'purchase_state_duty', 'Гос.пошлина (выкуп)'
+        REPRESENTATIVE = 'purchase_representative_expenses', 'Представительские расходы (выкуп)'
+        NOTARY = 'purchase_notary_expenses', 'Нотариальные расходы (выкуп)'
+        POSTAL = 'purchase_postal_expenses', 'Почтовые расходы (выкуп)'
+
+    debt = models.ForeignKey(
+        Debt, on_delete=models.PROTECT, related_name='writeoffs',
+        db_column='debt_id', verbose_name='Договор',
+    )
+    writeoff_date = models.DateField('Дата списания')
+    kind = models.CharField('Тип списания', max_length=20, choices=Kind.choices)
+    category = models.CharField('Категория', max_length=40, choices=Category.choices, blank=True)
+    amount = models.DecimalField('Сумма списания', max_digits=20, decimal_places=2)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.PROTECT,
+        related_name='writeoffs', verbose_name='Создал',
+    )
+    created_at = models.DateTimeField('Создано', auto_now_add=True)
+
+    class Meta:
+        db_table = 'writeoffs'
+        ordering = ['-writeoff_date', '-id']
+        verbose_name = 'списание'
+        verbose_name_plural = 'списания'
+        constraints = [
+            models.CheckConstraint(condition=models.Q(amount__gt=0), name='writeoff_amount_positive'),
+            models.CheckConstraint(
+                condition=(
+                    models.Q(kind='full', category='')
+                    | models.Q(kind='partial', category__in=(
+                        'purchase_interest', 'purchase_penalties', 'purchase_receivable',
+                        'purchase_state_duty', 'purchase_representative_expenses',
+                        'purchase_notary_expenses', 'purchase_postal_expenses',
+                    ))
+                ),
+                name='writeoff_kind_category_valid',
+            ),
+        ]
+
+    def __str__(self):
+        return f'{self.debt} — {self.get_kind_display()} {self.amount}'
+
+
 class FinancialChangeRequest(models.Model):
     class Status(models.TextChoices):
         PENDING = 'pending', 'На подтверждении'
@@ -311,7 +364,7 @@ class FinancialChangeRequest(models.Model):
         related_name='change_requests',
         null=True,
         blank=True,
-        verbose_name='Списание',
+        verbose_name='Расход',
     )
     old_data = models.JSONField('Исходные значения')
     new_data = models.JSONField('Новые значения')
@@ -343,7 +396,7 @@ class FinancialChangeRequest(models.Model):
         verbose_name = 'заявка на изменение финансовой записи'
         verbose_name_plural = 'заявки на изменение финансовых записей'
         permissions = [
-            ('approve_financialchangerequest', 'Может подтверждать изменения платежей и списаний'),
+            ('approve_financialchangerequest', 'Может подтверждать изменения платежей и расходов'),
         ]
         constraints = [
             models.CheckConstraint(
@@ -361,7 +414,7 @@ class FinancialChangeRequest(models.Model):
 
     @property
     def record_type(self):
-        return 'Платёж' if self.payment_id else 'Списание'
+        return 'Платёж' if self.payment_id else 'Расход'
 
     def __str__(self):
         return f'{self.record_type} #{self.payment_id or self.expense_id} — {self.get_status_display()}'
