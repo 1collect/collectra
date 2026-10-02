@@ -1,13 +1,23 @@
 from django.core.paginator import Paginator
 from django.contrib import messages
+from django.core.exceptions import PermissionDenied
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
-from .forms import CounterpartyForm, ImportUploadForm, PaymentRefundForm
-from .models import Counterparty, Debt, Import, ImportItem, PaymentRefund
-from .services import RefundValidationError, create_payment_refund, process_xlsx_import
+from .forms import (
+    CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
+    ImportUploadForm, PaymentChangeForm, PaymentRefundForm,
+)
+from .models import (
+    Counterparty, Debt, Expense, FinancialChangeRequest, Import, ImportItem,
+    Payment, PaymentRefund,
+)
+from .services import (
+    FinancialChangeError, RefundValidationError, create_financial_change_request,
+    create_payment_refund, process_xlsx_import, review_financial_change,
+)
 from users.views import permission_required
 
 
@@ -34,7 +44,7 @@ def import_workspace_context(request, selected_import_id=None):
         add_progress(import_record)
 
     if selected_import_id is None:
-        selected_import = import_records[0] if import_records else None
+        selected_import = None
     else:
         selected_import = get_object_or_404(
             Import.objects.select_related('import_type', 'created_by'),
@@ -147,6 +157,162 @@ def debt_list(request):
         'status_choices': Debt.Status.choices,
         'query_string': list_query_string(request),
         'filters_active': bool(query or status),
+    })
+
+
+def _financial_list(request, *, model, title, kind):
+    permission = f'imports.view_{model._meta.model_name}'
+    if not request.user.is_authenticated:
+        return redirect(f'/login/?next={request.path}')
+    if not request.user.has_perm(permission):
+        raise PermissionDenied
+    records = model.objects.select_related('debt', 'debt__debtor')
+    query = request.GET.get('q', '').strip()
+    if query:
+        records = records.filter(
+            Q(debt__contract_number__icontains=query)
+            | Q(debt__debtor__full_name__icontains=query)
+            | Q(debt__debtor__iin__icontains=query)
+        )
+    page_obj = Paginator(records, 25).get_page(request.GET.get('page'))
+    return render(request, 'imports/financial_list.html', {
+        'page_obj': page_obj, 'query': query, 'title': title, 'kind': kind,
+        'query_string': list_query_string(request), 'filters_active': bool(query),
+    })
+
+
+def payment_list(request):
+    return _financial_list(request, model=Payment, title='Платежи', kind='payment')
+
+
+def expense_list(request):
+    return _financial_list(request, model=Expense, title='Списания', kind='expense')
+
+
+def _financial_edit(request, *, model, form_class, record_id, kind, title):
+    if not request.user.is_authenticated:
+        return redirect(f'/login/?next={request.path}')
+    if not request.user.has_perm(f'imports.change_{model._meta.model_name}'):
+        raise PermissionDenied
+    record = get_object_or_404(model.objects.select_related('debt'), pk=record_id)
+    form = form_class(request.POST or None, instance=record)
+    if request.method == 'POST' and form.is_valid():
+        try:
+            create_financial_change_request(
+                record=record,
+                cleaned_data=form.cleaned_data,
+                reason=form.cleaned_data['reason'],
+                requested_by=request.user,
+            )
+        except FinancialChangeError as error:
+            form.add_error(None, str(error))
+        else:
+            messages.success(request, 'Изменение отправлено на подтверждение.')
+            return redirect(f'imports:{kind}_history', record_id=record.pk)
+    return render(request, 'imports/financial_edit.html', {
+        'form': form, 'record': record, 'kind': kind, 'title': title,
+    })
+
+
+def payment_edit(request, record_id):
+    return _financial_edit(
+        request, model=Payment, form_class=PaymentChangeForm,
+        record_id=record_id, kind='payment', title='Изменить платёж',
+    )
+
+
+def expense_edit(request, record_id):
+    return _financial_edit(
+        request, model=Expense, form_class=ExpenseChangeForm,
+        record_id=record_id, kind='expense', title='Изменить списание',
+    )
+
+
+def _change_rows(change):
+    record = change.record
+    rows = []
+    for field, new_value in change.new_data.items():
+        old_value = change.old_data.get(field)
+        if old_value == new_value:
+            continue
+        label = record._meta.get_field(field).verbose_name
+        if field == 'debt':
+            debts = Debt.objects.in_bulk([old_value, new_value])
+            old_value = debts.get(old_value, old_value)
+            new_value = debts.get(new_value, new_value)
+        rows.append({'label': label, 'old': old_value, 'new': new_value})
+    return rows
+
+
+def _financial_history(request, *, model, record_id, kind, title):
+    if not request.user.is_authenticated:
+        return redirect(f'/login/?next={request.path}')
+    if not request.user.has_perm(f'imports.view_{model._meta.model_name}'):
+        raise PermissionDenied
+    record = get_object_or_404(model.objects.select_related('debt'), pk=record_id)
+    changes = list(record.change_requests.select_related('requested_by', 'reviewed_by'))
+    for change in changes:
+        change.changed_rows = _change_rows(change)
+    return render(request, 'imports/financial_history.html', {
+        'record': record, 'changes': changes, 'kind': kind, 'title': title,
+    })
+
+
+def payment_history(request, record_id):
+    return _financial_history(
+        request, model=Payment, record_id=record_id,
+        kind='payment', title='История платежа',
+    )
+
+
+def expense_history(request, record_id):
+    return _financial_history(
+        request, model=Expense, record_id=record_id,
+        kind='expense', title='История списания',
+    )
+
+
+@permission_required('imports.approve_financialchangerequest')
+def financial_change_list(request):
+    changes = FinancialChangeRequest.objects.select_related(
+        'payment__debt', 'expense__debt', 'requested_by', 'reviewed_by',
+    )
+    status = request.GET.get('status', FinancialChangeRequest.Status.PENDING)
+    if status in FinancialChangeRequest.Status.values:
+        changes = changes.filter(status=status)
+    else:
+        status = ''
+    return render(request, 'imports/financial_change_list.html', {
+        'changes': changes, 'status': status,
+        'status_choices': FinancialChangeRequest.Status.choices,
+    })
+
+
+@permission_required('imports.approve_financialchangerequest')
+def financial_change_review(request, change_id):
+    change = get_object_or_404(
+        FinancialChangeRequest.objects.select_related(
+            'payment__debt', 'expense__debt', 'requested_by', 'reviewed_by',
+        ),
+        pk=change_id,
+    )
+    change.changed_rows = _change_rows(change)
+    form = FinancialChangeReviewForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        try:
+            review_financial_change(
+                change_id=change.pk,
+                reviewer=request.user,
+                approve=form.cleaned_data['action'] == 'approve',
+                comment=form.cleaned_data['comment'],
+            )
+        except FinancialChangeError as error:
+            form.add_error(None, str(error))
+        else:
+            messages.success(request, 'Решение по заявке сохранено.')
+            return redirect('imports:change_requests')
+    return render(request, 'imports/financial_change_review.html', {
+        'change': change, 'form': form,
     })
 
 

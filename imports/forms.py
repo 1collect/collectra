@@ -1,7 +1,76 @@
 from django import forms
 from django.db.models import F, Sum
 
-from .models import Counterparty, ImportType, Payment, PaymentRefund
+from .models import Counterparty, Expense, ImportType, Payment, PaymentRefund
+
+
+class ChangeReasonMixin(forms.ModelForm):
+    reason = forms.CharField(
+        label='Причина изменения',
+        widget=forms.Textarea(attrs={
+            'class': 'form-control', 'rows': 3,
+            'placeholder': 'Обязательно укажите, почему данные нужно изменить',
+        }),
+    )
+
+    def clean_reason(self):
+        reason = self.cleaned_data['reason'].strip()
+        if not reason:
+            raise forms.ValidationError('Укажите причину изменения.')
+        return reason
+
+
+class PaymentChangeForm(ChangeReasonMixin, forms.ModelForm):
+    class Meta:
+        model = Payment
+        fields = ('debt', 'amount', 'status', 'payment_date')
+        widgets = {
+            'debt': forms.Select(attrs={'class': 'form-control'}),
+            'amount': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
+            'status': forms.Select(attrs={'class': 'form-control'}),
+            'payment_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        }
+
+    def clean_amount(self):
+        amount = self.cleaned_data['amount']
+        if amount <= 0:
+            raise forms.ValidationError('Сумма платежа должна быть больше нуля.')
+        if self.instance.pk and amount < self.instance.refunded_amount:
+            raise forms.ValidationError(
+                f'Сумма не может быть меньше уже возвращённой суммы {self.instance.refunded_amount:.2f}.'
+            )
+        return amount
+
+
+class ExpenseChangeForm(ChangeReasonMixin, forms.ModelForm):
+    class Meta:
+        model = Expense
+        fields = (
+            'debt', 'state_duty', 'representative_expenses', 'notary_expenses',
+            'postal_expenses', 'claim_security', 'additional_expenses', 'expense_date',
+        )
+        widgets = {
+            'debt': forms.Select(attrs={'class': 'form-control'}),
+            'state_duty': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
+            'representative_expenses': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
+            'notary_expenses': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
+            'postal_expenses': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
+            'claim_security': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
+            'additional_expenses': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
+            'expense_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+        }
+
+
+class FinancialChangeReviewForm(forms.Form):
+    action = forms.ChoiceField(
+        label='Решение',
+        choices=(('approve', 'Подтвердить'), ('reject', 'Отклонить')),
+        widget=forms.RadioSelect,
+    )
+    comment = forms.CharField(
+        label='Комментарий', required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+    )
 
 
 class PaymentChoiceField(forms.ModelChoiceField):

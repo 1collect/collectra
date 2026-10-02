@@ -1,6 +1,9 @@
 from django.contrib import admin
 
-from .models import Counterparty, Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment, PaymentRefund
+from .models import (
+    Counterparty, Debt, Debtor, Expense, FinancialChangeRequest, Import,
+    ImportItem, ImportType, Payment, PaymentRefund,
+)
 
 
 @admin.register(ImportType)
@@ -79,6 +82,23 @@ class PaymentAdmin(admin.ModelAdmin):
     list_filter = ('status', 'refund_status', 'payment_date')
     search_fields = ('debt__contract_number', 'debt__debtor__iin')
     list_select_related = ('debt', 'debt__debtor')
+
+
+@admin.register(FinancialChangeRequest)
+class FinancialChangeRequestAdmin(admin.ModelAdmin):
+    list_display = ('id', 'record_type', 'status', 'requested_by', 'reviewed_by', 'created_at')
+    list_filter = ('status', 'created_at')
+    search_fields = ('reason', 'payment__debt__contract_number', 'expense__debt__contract_number')
+    readonly_fields = (
+        'payment', 'expense', 'old_data', 'new_data', 'reason', 'status',
+        'requested_by', 'reviewed_by', 'review_comment', 'created_at', 'reviewed_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(PaymentRefund)

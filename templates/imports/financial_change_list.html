@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}Подтверждение изменений{% endblock %}
+{% block heading %}Подтверждение изменений{% endblock %}
+{% block content %}
+<div class="page-header"><div><div class="page-eyebrow">Финансы / Контроль</div><h1>Заявки на изменение</h1></div></div>
+<section class="panel"><div class="panel-header"><h2>Заявки <span class="badge">{{ changes|length }}</span></h2><form method="get"><select class="form-control" name="status" onchange="this.form.submit()"><option value="">Все статусы</option>{% for value,label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></form></div><div class="p-0 table-container"><table class="table table-bordered table-compact">
+<thead><tr><th>Дата</th><th>Запись</th><th>Договор</th><th>Автор</th><th>Причина</th><th>Статус</th><th></th></tr></thead><tbody>{% for change in changes %}<tr><td>{{ change.created_at|date:'d.m.Y H:i' }}</td><td>{{ change.record_type }} #{{ change.payment_id|default:change.expense_id }}</td><td>{{ change.record.debt.contract_number }}</td><td>{{ change.requested_by.get_full_name|default:change.requested_by.username }}</td><td>{{ change.reason }}</td><td><span class="badge {% if change.status == 'approved' %}badge-success{% elif change.status == 'rejected' %}badge-danger{% else %}badge-warning{% endif %}">{{ change.get_status_display }}</span></td><td><a class="btn btn-sm" href="{% url 'imports:change_review' change.pk %}">Открыть</a></td></tr>{% empty %}<tr><td colspan="7"><div class="empty-state"><h3>Заявок нет</h3></div></td></tr>{% endfor %}</tbody>
+</table></div></section>
+{% endblock %}

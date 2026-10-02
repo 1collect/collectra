@@ -1,4 +1,4 @@
-<section class="panel master-detail__detail" data-import-detail{% if selected_import %} data-import-id="{{ selected_import.pk }}"{% endif %} tabindex="-1">
+<section class="panel master-detail__detail"{% if selected_import %} data-import-id="{{ selected_import.pk }}"{% endif %}>
     {% if selected_import %}
     <div class="panel-header master-detail__detail-header">
         <div class="min-w-0"><div class="text-xs text-muted">Выбранный импорт #{{ selected_import.pk }}</div><h2 class="truncate">{{ selected_import.file_name|default:'Файл не указан' }}</h2></div>
@@ -28,7 +28,7 @@
             </tbody>
         </table>
     </div>
-    {% if page_obj.paginator.num_pages > 1 %}<div class="table-footer"><span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span><nav aria-label="Страницы строк импорта" class="pagination">{% if page_obj.has_previous %}<a class="page-btn" data-import-page-link href="?page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}<span aria-current="page" class="page-btn">{{ page_obj.number }}</span>{% if page_obj.has_next %}<a class="page-btn" data-import-page-link href="?page={{ page_obj.next_page_number }}">Далее</a>{% endif %}</nav></div>{% endif %}
+    {% if page_obj.paginator.num_pages > 1 %}<div class="table-footer"><span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span><nav aria-label="Страницы строк импорта" class="pagination">{% if page_obj.has_previous %}<a class="page-btn" href="?page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}<span aria-current="page" class="page-btn">{{ page_obj.number }}</span>{% if page_obj.has_next %}<a class="page-btn" href="?page={{ page_obj.next_page_number }}">Далее</a>{% endif %}</nav></div>{% endif %}
     {% else %}
     <div class="empty-state master-detail__empty"><strong>Импорт не выбран</strong><p>После загрузки файла его данные появятся здесь.</p></div>
     {% endif %}

@@ -291,6 +291,82 @@ class Payment(models.Model):
         return self.effective_amount
 
 
+class FinancialChangeRequest(models.Model):
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'На подтверждении'
+        APPROVED = 'approved', 'Подтверждено'
+        REJECTED = 'rejected', 'Отклонено'
+
+    payment = models.ForeignKey(
+        Payment,
+        on_delete=models.PROTECT,
+        related_name='change_requests',
+        null=True,
+        blank=True,
+        verbose_name='Платёж',
+    )
+    expense = models.ForeignKey(
+        Expense,
+        on_delete=models.PROTECT,
+        related_name='change_requests',
+        null=True,
+        blank=True,
+        verbose_name='Списание',
+    )
+    old_data = models.JSONField('Исходные значения')
+    new_data = models.JSONField('Новые значения')
+    reason = models.TextField('Причина изменения')
+    status = models.CharField(
+        'Статус', max_length=20, choices=Status.choices, default=Status.PENDING,
+    )
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='financial_change_requests',
+        verbose_name='Автор заявки',
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='reviewed_financial_changes',
+        null=True,
+        blank=True,
+        verbose_name='Проверил',
+    )
+    review_comment = models.TextField('Комментарий проверяющего', blank=True)
+    created_at = models.DateTimeField('Создано', auto_now_add=True)
+    reviewed_at = models.DateTimeField('Проверено', null=True, blank=True)
+
+    class Meta:
+        db_table = 'financial_change_requests'
+        ordering = ('-created_at', '-id')
+        verbose_name = 'заявка на изменение финансовой записи'
+        verbose_name_plural = 'заявки на изменение финансовых записей'
+        permissions = [
+            ('approve_financialchangerequest', 'Может подтверждать изменения платежей и списаний'),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(payment__isnull=False, expense__isnull=True)
+                    | models.Q(payment__isnull=True, expense__isnull=False)
+                ),
+                name='financial_change_has_one_record',
+            ),
+        ]
+
+    @property
+    def record(self):
+        return self.payment or self.expense
+
+    @property
+    def record_type(self):
+        return 'Платёж' if self.payment_id else 'Списание'
+
+    def __str__(self):
+        return f'{self.record_type} #{self.payment_id or self.expense_id} — {self.get_status_display()}'
+
+
 class PaymentRefund(models.Model):
     class Status(models.TextChoices):
         ACTIVE = 'active', 'Действует'

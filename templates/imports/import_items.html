@@ -1,2 +1,11 @@
-{% extends 'imports/import_list.html' %}
-{% block title %}Просмотр импорта{% endblock %}
+{% extends 'base.html' %}
+{% block title %}Импорт #{{ selected_import.pk }}{% endblock %}
+{% block page_name %}imports{% endblock %}
+{% block heading %}Просмотр импорта{% endblock %}
+{% block content %}
+<div class="page-header">
+    <div><div class="page-eyebrow">Данные / Импорты</div><h1>Импорт #{{ selected_import.pk }}</h1></div>
+    <div class="page-actions"><a class="btn" href="{% url 'imports:list' %}">Назад к импортам</a></div>
+</div>
+{% include 'imports/partials/import_detail.html' %}
+{% endblock %}

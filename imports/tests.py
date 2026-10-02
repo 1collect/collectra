@@ -9,15 +9,21 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import Workbook
 
-from .models import Counterparty, Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment, PaymentRefund
+from .models import (
+    Counterparty, Debt, Debtor, Expense, FinancialChangeRequest, Import,
+    ImportItem, ImportType, Payment, PaymentRefund,
+)
 from .services import (
     CONTRACT_IMPORT_COLUMNS,
     EXPENSE_IMPORT_COLUMNS,
     PAYMENT_IMPORT_COLUMNS,
     RefundValidationError,
+    FinancialChangeError,
     cancel_payment_refund,
+    create_financial_change_request,
     create_payment_refund,
     recalculate_debt,
+    review_financial_change,
 )
 
 
@@ -138,13 +144,16 @@ class ImportItemsViewTests(TestCase):
         self.assertContains(response, 'ИИН должен содержать 12 цифр.')
         self.assertContains(response, 'table-bordered')
 
-    def test_import_list_shows_master_detail_workspace(self):
+    def test_import_list_shows_table_linking_to_import_items(self):
         response = self.client.get(reverse('imports:list'))
 
-        self.assertContains(response, 'data-import-workspace')
-        self.assertContains(response, 'aria-current="page"')
-        self.assertContains(response, 'Всего строк')
-        self.assertContains(response, 'Результат обработки')
+        self.assertContains(response, 'История импорта')
+        self.assertContains(response, 'table-bordered')
+        self.assertContains(
+            response,
+            reverse('imports:items', args=[self.import_record.pk]),
+        )
+        self.assertNotContains(response, 'Результат обработки')
         self.assertContains(response, 'imports.js')
 
     def test_import_modal_is_hidden_without_add_permission(self):
@@ -224,6 +233,108 @@ class ExpensePaymentModelsTests(TestCase):
             self.debt.payments.filter(payment_date=expense_date).count(),
             2,
         )
+
+
+class FinancialChangeWorkflowTests(TestCase):
+    def setUp(self):
+        self.author = User.objects.create_user('editor', password='test-password')
+        self.approver = User.objects.create_user('approver', password='test-password')
+        self.author.user_permissions.add(*Permission.objects.filter(
+            codename__in=('view_payment', 'change_payment', 'view_expense', 'change_expense'),
+        ))
+        self.approver.user_permissions.add(
+            Permission.objects.get(codename='approve_financialchangerequest'),
+        )
+        debtor = Debtor.objects.create(
+            full_name='Тестовый должник', iin='900101300777',
+        )
+        self.debt = Debt.objects.create(
+            debtor=debtor, contract_number='DBZ-CHANGE',
+            purchase_total_debt=Decimal('1000.00'),
+        )
+        self.payment = Payment.objects.create(
+            debt=self.debt, amount=Decimal('300.00'),
+            status=Payment.Status.CHSI, payment_date=date(2026, 10, 1),
+        )
+        self.expense = Expense.objects.create(
+            debt=self.debt, state_duty=Decimal('100.00'),
+            expense_date=date(2026, 10, 1),
+        )
+        recalculate_debt(self.debt)
+
+    def test_payment_edit_creates_pending_request_without_changing_payment(self):
+        self.client.force_login(self.author)
+        response = self.client.post(reverse('imports:payment_edit', args=[self.payment.pk]), {
+            'debt': self.debt.pk,
+            'amount': '450.00',
+            'status': Payment.Status.WITHHOLDING,
+            'payment_date': '2026-10-02',
+            'reason': 'Исправление банковской выписки',
+        })
+
+        if response.status_code == 200:
+            self.fail(response.context['form'].errors.as_text())
+        change = FinancialChangeRequest.objects.get()
+        self.assertRedirects(response, reverse('imports:payment_history', args=[self.payment.pk]))
+        self.payment.refresh_from_db()
+        self.assertEqual(self.payment.amount, Decimal('300.00'))
+        self.assertEqual(change.status, FinancialChangeRequest.Status.PENDING)
+        self.assertEqual(change.reason, 'Исправление банковской выписки')
+        self.assertEqual(change.new_data['amount'], '450.00')
+
+    def test_reason_is_required(self):
+        self.client.force_login(self.author)
+        response = self.client.post(reverse('imports:payment_edit', args=[self.payment.pk]), {
+            'debt': self.debt.pk, 'amount': '450.00',
+            'status': Payment.Status.CHSI, 'payment_date': '2026-10-01',
+            'reason': '',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(FinancialChangeRequest.objects.exists())
+
+    def test_approval_applies_payment_and_recalculates_contract(self):
+        change = create_financial_change_request(
+            record=self.payment,
+            cleaned_data={
+                'debt': self.debt, 'amount': Decimal('700.00'),
+                'status': Payment.Status.INDIVIDUAL,
+                'payment_date': date(2026, 10, 3),
+            },
+            reason='Уточнена сумма', requested_by=self.author,
+        )
+
+        review_financial_change(
+            change_id=change.pk, reviewer=self.approver,
+            approve=True, comment='Проверено по выписке',
+        )
+
+        self.payment.refresh_from_db()
+        self.debt.refresh_from_db()
+        change.refresh_from_db()
+        self.assertEqual(self.payment.amount, Decimal('700.00'))
+        self.assertEqual(self.payment.status, Payment.Status.INDIVIDUAL)
+        self.assertEqual(self.debt.paid_amount, Decimal('700.00'))
+        self.assertEqual(change.status, FinancialChangeRequest.Status.APPROVED)
+        self.assertEqual(change.reviewed_by, self.approver)
+
+    def test_author_cannot_approve_own_request(self):
+        change = create_financial_change_request(
+            record=self.expense,
+            cleaned_data={
+                'debt': self.debt, 'state_duty': Decimal('200.00'),
+                'representative_expenses': Decimal('0'),
+                'notary_expenses': Decimal('0'), 'postal_expenses': Decimal('0'),
+                'claim_security': Decimal('0'), 'additional_expenses': Decimal('0'),
+                'expense_date': date(2026, 10, 1),
+            },
+            reason='Корректировка', requested_by=self.author,
+        )
+
+        with self.assertRaises(FinancialChangeError):
+            review_financial_change(
+                change_id=change.pk, reviewer=self.author, approve=True,
+            )
 
 
 class ExpensePaymentImportTests(TestCase):
