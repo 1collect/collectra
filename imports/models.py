@@ -1,7 +1,37 @@
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
-from django.db import models
+from django.db import models, router, transaction
+
+from .audit import audit_user, record_snapshot
+
+
+class AuditedFinancialRecord(models.Model):
+    class Meta:
+        abstract = True
+
+    def save(self, *args, **kwargs):
+        actor = kwargs.pop('audit_actor', None) or audit_user.get()
+        reason = kwargs.pop('audit_reason', '')
+        using = kwargs.get('using') or router.db_for_write(type(self), instance=self)
+        if kwargs.get('update_fields') is not None and not kwargs['update_fields']:
+            return
+        with transaction.atomic(using=using):
+            previous = None
+            if self.pk and not self._state.adding:
+                previous = type(self).objects.using(using).select_for_update().filter(pk=self.pk).first()
+            old_data = record_snapshot(previous) if previous else {}
+            super().save(*args, **kwargs)
+            # Read persisted values: update_fields may omit other in-memory changes.
+            current = type(self).objects.using(using).get(pk=self.pk)
+            new_data = record_snapshot(current)
+            if old_data != new_data:
+                FinancialRecordHistory.objects.using(using).create(
+                    **{self._meta.model_name: self},
+                    action='updated' if previous else 'created',
+                    old_data=old_data, new_data=new_data,
+                    actor=actor or (getattr(self, 'created_by', None) if not previous else None), reason=reason,
+                )
 
 
 class ImportType(models.Model):
@@ -192,7 +222,11 @@ class Debt(models.Model):
         return self.contract_number
 
 
-class Expense(models.Model):
+class Expense(AuditedFinancialRecord):
+    audit_fields = (
+        'debt', 'state_duty', 'representative_expenses', 'notary_expenses',
+        'postal_expenses', 'claim_security', 'additional_expenses', 'expense_date',
+    )
     MONEY = {'max_digits': 20, 'decimal_places': 2, 'default': 0}
 
     debt = models.ForeignKey(
@@ -223,7 +257,8 @@ class Expense(models.Model):
         return f'{self.debt} — {self.expense_date}'
 
 
-class Payment(models.Model):
+class Payment(AuditedFinancialRecord):
+    audit_fields = ('debt', 'amount', 'status', 'payment_date', 'refunded_amount', 'refund_status')
     class Status(models.TextChoices):
         CHSI = 'chsi', 'ЧСИ'
         INDIVIDUAL = 'individual', 'Физическое лицо'
@@ -292,7 +327,8 @@ class Payment(models.Model):
         return self.effective_amount
 
 
-class WriteOff(models.Model):
+class WriteOff(AuditedFinancialRecord):
+    audit_fields = ('debt', 'writeoff_date', 'kind', 'category', 'amount')
     class Kind(models.TextChoices):
         FULL = 'full', 'Полное списание'
         PARTIAL = 'partial', 'Частичное списание'
@@ -342,6 +378,39 @@ class WriteOff(models.Model):
 
     def __str__(self):
         return f'{self.debt} — {self.get_kind_display()} {self.amount}'
+
+
+class FinancialRecordHistory(models.Model):
+    class Action(models.TextChoices):
+        CREATED = 'created', 'Создание'
+        UPDATED = 'updated', 'Изменение'
+        SNAPSHOT = 'snapshot', 'Значения на момент включения истории'
+
+    payment = models.ForeignKey(Payment, on_delete=models.PROTECT, related_name='value_history', null=True, blank=True)
+    expense = models.ForeignKey(Expense, on_delete=models.PROTECT, related_name='value_history', null=True, blank=True)
+    writeoff = models.ForeignKey(WriteOff, on_delete=models.PROTECT, related_name='value_history', null=True, blank=True)
+    action = models.CharField('Событие', max_length=20, choices=Action.choices)
+    old_data = models.JSONField('Было', default=dict)
+    new_data = models.JSONField('Стало')
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT, null=True, blank=True, related_name='financial_value_history')
+    reason = models.TextField('Основание', blank=True)
+    created_at = models.DateTimeField('Дата изменения', auto_now_add=True)
+
+    class Meta:
+        ordering = ('-created_at', '-id')
+        verbose_name = 'история значений финансовой записи'
+        verbose_name_plural = 'история значений финансовых записей'
+        constraints = [models.CheckConstraint(
+            condition=(
+                models.Q(payment__isnull=False, expense__isnull=True, writeoff__isnull=True)
+                | models.Q(payment__isnull=True, expense__isnull=False, writeoff__isnull=True)
+                | models.Q(payment__isnull=True, expense__isnull=True, writeoff__isnull=False)
+            ), name='financial_history_has_one_record',
+        )]
+
+    @property
+    def record(self):
+        return self.payment or self.expense or self.writeoff
 
 
 class FinancialChangeRequest(models.Model):

@@ -15,6 +15,7 @@ urlpatterns = [
     path('expenses/', views.expense_list, name='expenses'),
     path('writeoffs/', views.writeoff_list, name='writeoffs'),
     path('writeoffs/new/', views.writeoff_create, name='writeoff_new'),
+    path('writeoffs/<int:record_id>/history/', views.writeoff_history, name='writeoff_history'),
     path('expenses/<int:record_id>/edit/', views.expense_edit, name='expense_edit'),
     path('expenses/<int:record_id>/history/', views.expense_history, name='expense_history'),
     path('refunds/', views.refund_list, name='refunds'),

@@ -8,6 +8,7 @@ from django.utils import timezone
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 
+from .audit import audit_user
 from .models import (
     Debt, Debtor, Expense, FinancialChangeRequest, Import, ImportItem,
     Payment, PaymentRefund, WriteOff,
@@ -221,7 +222,7 @@ def _active_refund_total(payment_id):
     ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
 
 
-def recalculate_payment(payment):
+def recalculate_payment(payment, *, actor=None, reason=''):
     """Synchronize cached refund data from the immutable refund history."""
     refunded_amount = _active_refund_total(payment.pk)
     if refunded_amount <= 0:
@@ -231,12 +232,9 @@ def recalculate_payment(payment):
     else:
         refund_status = Payment.RefundStatus.PARTIALLY_REFUNDED
 
-    Payment.objects.filter(pk=payment.pk).update(
-        refunded_amount=refunded_amount,
-        refund_status=refund_status,
-    )
     payment.refunded_amount = refunded_amount
     payment.refund_status = refund_status
+    payment.save(update_fields=('refunded_amount', 'refund_status'), audit_actor=actor, audit_reason=reason)
     return payment
 
 
@@ -417,9 +415,9 @@ def review_financial_change(*, change_id, reviewer, approve, comment=''):
                     f'Сумма платежа меньше уже возвращённой суммы {active_refunds:.2f}.'
                 )
         record.full_clean(exclude=('refunded_amount', 'refund_status'))
-        record.save(update_fields=tuple(change.new_data))
+        record.save(update_fields=tuple(change.new_data), audit_actor=reviewer, audit_reason=change.reason)
         if isinstance(record, Payment):
-            recalculate_payment(record)
+            recalculate_payment(record, actor=reviewer, reason=change.reason)
             recalculate_debt(old_debt_id)
             if record.debt_id != old_debt_id:
                 recalculate_debt(record.debt_id)
@@ -464,13 +462,13 @@ def create_payment_refund(*, payment_id, amount, refund_date, reason, created_by
         payment_category=payment.status,
         created_by=created_by,
     )
-    recalculate_payment(payment)
+    recalculate_payment(payment, actor=created_by, reason=f'Возврат #{refund.pk}: {reason}')
     recalculate_debt(payment.debt_id)
     return refund
 
 
 @transaction.atomic
-def cancel_payment_refund(refund_id):
+def cancel_payment_refund(refund_id, *, cancelled_by=None):
     refund = PaymentRefund.objects.select_for_update().select_related(
         'payment',
     ).get(pk=refund_id)
@@ -480,7 +478,7 @@ def cancel_payment_refund(refund_id):
         refund.status = PaymentRefund.Status.CANCELLED
         refund.cancelled_at = timezone.now()
         refund.save(update_fields=('status', 'cancelled_at'))
-        recalculate_payment(refund.payment)
+        recalculate_payment(refund.payment, actor=cancelled_by, reason=f'Отмена возврата #{refund.pk}')
         recalculate_debt(refund.payment.debt_id)
     return refund
 
@@ -606,8 +604,12 @@ def process_xlsx_import(import_record, uploaded_file):
 
         with transaction.atomic():
             ImportItem.objects.bulk_create(items, batch_size=500)
-            for record in records:
-                save_func(record)
+            audit_token = audit_user.set(import_record.created_by)
+            try:
+                for record in records:
+                    save_func(record)
+            finally:
+                audit_user.reset(audit_token)
             import_record.status = Import.Status.COMPLETED
             import_record.total_items = len(items)
             import_record.processed_items = len(items)

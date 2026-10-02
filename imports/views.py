@@ -1,3 +1,5 @@
+from datetime import date
+
 from django.core.paginator import Paginator
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
@@ -272,11 +274,21 @@ def _change_rows(change):
         old_value = change.old_data.get(field)
         if old_value == new_value:
             continue
-        label = record._meta.get_field(field).verbose_name
+        model_field = record._meta.get_field(field)
+        label = model_field.verbose_name
         if field == 'debt':
             debts = Debt.objects.in_bulk([old_value, new_value])
             old_value = debts.get(old_value, old_value)
             new_value = debts.get(new_value, new_value)
+        elif model_field.choices:
+            choices = dict(model_field.flatchoices)
+            old_value = choices.get(old_value, old_value)
+            new_value = choices.get(new_value, new_value)
+        elif model_field.get_internal_type() == 'DateField':
+            old_value = date.fromisoformat(old_value).strftime('%d.%m.%Y') if old_value else None
+            new_value = date.fromisoformat(new_value).strftime('%d.%m.%Y') if new_value else None
+        if old_value is None:
+            old_value = '—'
         rows.append({'label': label, 'old': old_value, 'new': new_value})
     return rows
 
@@ -287,11 +299,14 @@ def _financial_history(request, *, model, record_id, kind, title):
     if not request.user.has_perm(f'imports.view_{model._meta.model_name}'):
         raise PermissionDenied
     record = get_object_or_404(model.objects.select_related('debt'), pk=record_id)
-    changes = list(record.change_requests.select_related('requested_by', 'reviewed_by'))
+    changes = list(record.change_requests.select_related('requested_by', 'reviewed_by')) if kind != 'writeoff' else []
     for change in changes:
         change.changed_rows = _change_rows(change)
+    history_page = Paginator(record.value_history.select_related('actor', kind), 25).get_page(request.GET.get('page'))
+    for event in history_page:
+        event.changed_rows = _change_rows(event)
     return render(request, 'imports/financial_history.html', {
-        'record': record, 'changes': changes, 'kind': kind, 'title': title,
+        'record': record, 'changes': changes, 'history_page': history_page, 'kind': kind, 'title': title,
     })
 
 
@@ -306,6 +321,13 @@ def expense_history(request, record_id):
     return _financial_history(
         request, model=Expense, record_id=record_id,
         kind='expense', title='История расхода',
+    )
+
+
+def writeoff_history(request, record_id):
+    return _financial_history(
+        request, model=WriteOff, record_id=record_id,
+        kind='writeoff', title='История списания',
     )
 
 

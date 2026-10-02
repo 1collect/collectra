@@ -19,7 +19,7 @@
     </div>
     <div class="p-0 table-container">
         <table class="table table-bordered table-compact">
-            <thead><tr><th scope="col">Договор</th><th scope="col">Тип списания</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма</th><th scope="col">Дата списания</th><th scope="col">Создал</th></tr></thead>
+            <thead><tr><th scope="col">Договор</th><th scope="col">Тип списания</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма</th><th scope="col">Дата списания</th><th scope="col">Создал</th><th scope="col">Действия</th></tr></thead>
             <tbody>{% for item in page_obj %}
                 <tr>
                     <td class="cell-text"><strong class="font-mono">{{ item.debt.contract_number }}</strong><br><span class="text-muted">{{ item.debt.debtor.full_name }}</span></td>
@@ -28,8 +28,9 @@
                     <td class="cell-number">{{ item.amount|floatformat:2 }}</td>
                     <td class="cell-date">{{ item.writeoff_date|date:'d.m.Y' }}</td>
                     <td>{{ item.created_by.get_full_name|default:item.created_by.username }}</td>
+                    <td><a class="btn btn-sm" href="{% url 'imports:writeoff_history' item.pk %}">История</a></td>
                 </tr>
-            {% empty %}<tr><td colspan="6"><div class="empty-state"><h3>Списания не найдены</h3></div></td></tr>{% endfor %}</tbody>
+            {% empty %}<tr><td colspan="7"><div class="empty-state"><h3>Списания не найдены</h3></div></td></tr>{% endfor %}</tbody>
         </table>
     </div>
     {% if page_obj.paginator.num_pages > 1 %}

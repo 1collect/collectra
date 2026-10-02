@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from .models import (
     Counterparty, Debt, Debtor, Expense, FinancialChangeRequest, Import,
-    ImportItem, ImportType, Payment, PaymentRefund, WriteOff,
+    ImportItem, ImportType, Payment, PaymentRefund, WriteOff, FinancialRecordHistory,
 )
 
 
@@ -127,6 +127,23 @@ class WriteOffAdmin(admin.ModelAdmin):
     readonly_fields = ('debt', 'kind', 'category', 'amount', 'writeoff_date', 'created_by', 'created_at')
 
     def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(FinancialRecordHistory)
+class FinancialRecordHistoryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'payment', 'expense', 'writeoff', 'action', 'actor', 'created_at')
+    list_filter = ('action', 'created_at')
+    readonly_fields = ('payment', 'expense', 'writeoff', 'action', 'old_data', 'new_data', 'actor', 'reason', 'created_at')
+    list_select_related = ('payment', 'expense', 'writeoff', 'actor')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
         return False
 
     def has_delete_permission(self, request, obj=None):
