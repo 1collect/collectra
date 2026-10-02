@@ -15,5 +15,4 @@ urlpatterns = [
     path('counterparties/new/', views.counterparty_edit, name='counterparty_new'),
     path('counterparties/<int:counterparty_id>/edit/', views.counterparty_edit, name='counterparty_edit'),
     path('counterparties/<int:counterparty_id>/delete/', views.counterparty_delete, name='counterparty_delete'),
-    path('types/', views.import_type_list, name='types'),
 ]

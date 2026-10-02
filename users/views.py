@@ -29,7 +29,6 @@ def dashboard(request):
         ('imports.view_debt', 'imports:debts'),
         ('imports.view_counterparty', 'imports:counterparties'),
         ('imports.view_import', 'imports:list'),
-        ('imports.view_importtype', 'imports:types'),
     )
     for permission, route_name in destinations:
         if request.user.has_perm(permission):

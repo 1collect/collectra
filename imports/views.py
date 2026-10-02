@@ -1,12 +1,12 @@
 from django.core.paginator import Paginator
 from django.contrib import messages
 from django.db.models.deletion import ProtectedError
-from django.db.models import Count
+from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .forms import CounterpartyForm, ImportUploadForm, PaymentRefundForm
-from .models import Counterparty, Debt, Import, ImportItem, ImportType, PaymentRefund
+from .models import Counterparty, Debt, Import, ImportItem, PaymentRefund
 from .services import RefundValidationError, create_payment_refund, process_xlsx_import
 from users.views import permission_required
 
@@ -17,6 +17,13 @@ def add_progress(import_record):
         if import_record.total_items else 0
     )
     return import_record
+
+
+def list_query_string(request):
+    """Keep active list filters when moving between result pages."""
+    query = request.GET.copy()
+    query.pop('page', None)
+    return query.urlencode()
 
 
 def import_workspace_context(request, selected_import_id=None):
@@ -115,21 +122,32 @@ def import_upload(request):
     return render(request, 'imports/import_upload.html', {'form': form})
 
 
-@permission_required('imports.view_importtype')
-def import_type_list(request):
-    import_types = ImportType.objects.all()
-    return render(request, 'imports/import_type_list.html', {'import_types': import_types})
-
-
 @permission_required('imports.view_debt')
 def debt_list(request):
     debts = Debt.objects.select_related(
         'debtor',
         'counterparty',
     ).order_by('contract_number')
+    query = request.GET.get('q', '').strip()
+    status = request.GET.get('status', '').strip()
+    if query:
+        debts = debts.filter(
+            Q(contract_number__icontains=query)
+            | Q(debtor__full_name__icontains=query)
+            | Q(debtor__iin__icontains=query)
+        )
+    if status in Debt.Status.values:
+        debts = debts.filter(status=status)
+    else:
+        status = ''
     page_obj = Paginator(debts, 25).get_page(request.GET.get('page'))
 
-    return render(request, 'imports/debt_list.html', {'page_obj': page_obj})
+    return render(request, 'imports/debt_list.html', {
+        'page_obj': page_obj, 'query': query, 'status': status,
+        'status_choices': Debt.Status.choices,
+        'query_string': list_query_string(request),
+        'filters_active': bool(query or status),
+    })
 
 
 @permission_required('imports.add_paymentrefund')
@@ -139,8 +157,27 @@ def refund_list(request):
         'payment__debt',
         'created_by',
     )
+    query = request.GET.get('q', '').strip()
+    status = request.GET.get('status', '').strip()
+    if query:
+        refunds = refunds.filter(
+            Q(payment__debt__contract_number__icontains=query)
+            | Q(reason__icontains=query)
+            | Q(created_by__username__icontains=query)
+            | Q(created_by__first_name__icontains=query)
+            | Q(created_by__last_name__icontains=query)
+        )
+    if status in PaymentRefund.Status.values:
+        refunds = refunds.filter(status=status)
+    else:
+        status = ''
     page_obj = Paginator(refunds, 25).get_page(request.GET.get('page'))
-    return render(request, 'imports/refund_list.html', {'page_obj': page_obj})
+    return render(request, 'imports/refund_list.html', {
+        'page_obj': page_obj, 'query': query, 'status': status,
+        'status_choices': PaymentRefund.Status.choices,
+        'query_string': list_query_string(request),
+        'filters_active': bool(query or status),
+    })
 
 
 @permission_required('imports.add_paymentrefund')
@@ -172,10 +209,19 @@ def counterparty_list(request):
     counterparties = Counterparty.objects.annotate(
         debt_count=Count('debts'),
     )
+    query = request.GET.get('q', '').strip()
+    if query:
+        counterparties = counterparties.filter(
+            Q(full_name__icontains=query) | Q(iin__icontains=query)
+        )
     page_obj = Paginator(counterparties.order_by('full_name'), 25).get_page(
         request.GET.get('page')
     )
-    return render(request, 'imports/counterparty_list.html', {'page_obj': page_obj})
+    return render(request, 'imports/counterparty_list.html', {
+        'page_obj': page_obj, 'query': query,
+        'query_string': list_query_string(request),
+        'filters_active': bool(query),
+    })
 
 
 def counterparty_edit(request, counterparty_id=None):

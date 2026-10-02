@@ -7,7 +7,6 @@
 <div class="page-header">
     <div><div class="page-eyebrow">Данные</div><h1>Импорты</h1></div>
     <div class="page-actions">
-        {% if perms.imports.view_importtype %}<a class="btn" href="{% url 'imports:types' %}">Типы импорта</a>{% endif %}
         {% if perms.imports.add_import %}<button class="btn btn-primary" data-modal-open="import-upload-modal" type="button"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Новый импорт</button>{% endif %}
     </div>
 </div>

@@ -70,11 +70,17 @@ class DebtListTests(TestCase):
         self.assertContains(response, 'DBZ-ACTIVE')
         self.assertContains(response, 'DBZ-REPAID')
 
-    def test_page_has_no_filters(self):
-        response = self.client.get(reverse('imports:debts'))
+    def test_page_filters_by_search_and_status(self):
+        response = self.client.get(reverse('imports:debts'), {
+            'q': 'Иванов',
+            'status': Debt.Status.ACTIVE,
+        })
 
-        self.assertNotContains(response, 'table-advanced')
-        self.assertNotContains(response, 'debt-search')
+        self.assertContains(response, 'debt-search')
+        self.assertContains(response, 'DBZ-ACTIVE')
+        self.assertNotContains(response, 'DBZ-REPAID')
+        self.assertEqual(response.context['query'], 'Иванов')
+        self.assertEqual(response.context['status'], Debt.Status.ACTIVE)
 
     def test_user_without_permission_gets_403(self):
         other_user = User.objects.create_user('no-access', password='test-password')
