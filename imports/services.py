@@ -44,8 +44,15 @@ PAYMENT_IMPORT_COLUMNS = ('ДБЗ', 'Платеж', 'Статус платежа
 
 TEXT_COLUMNS = {'ДБЗ', 'ИИН', 'ФИО'}
 CONTRACT_REQUIRED_COLUMNS = ('ДБЗ', 'ИИН', 'ФИО')
-EXPENSE_REQUIRED_COLUMNS = ('ДБЗ', 'Дата расхода')
+EXPENSE_REQUIRED_COLUMNS = tuple(
+    column for column in EXPENSE_IMPORT_COLUMNS if column != 'Дополнительные расходы'
+)
 PAYMENT_REQUIRED_COLUMNS = ('ДБЗ', 'Платеж', 'Статус платежа', 'Дата платежа')
+
+FINANCIAL_HEADER_ALIASES = {
+    'payments': {'Сумма платежа': 'Платеж', 'От кого': 'Статус платежа'},
+    'expenses': {'Обесечение иска': 'Обеспечение иска'},
+}
 
 DEBT_COLUMN_FIELDS = {
     'Основной долг (выкуп)': 'purchase_principal',
@@ -154,6 +161,10 @@ def payment_values(data):
         label.casefold(): value
         for value, label in Payment.Status.choices
     }
+    statuses_by_label.update({
+        'физ лицо': Payment.Status.INDIVIDUAL,
+        'физ. лицо': Payment.Status.INDIVIDUAL,
+    })
     try:
         status = statuses_by_label[data['Статус платежа'].strip().casefold()]
     except KeyError as error:
@@ -476,13 +487,21 @@ def process_xlsx_import(import_record, uploaded_file):
         if not header_row:
             raise ImportValidationError('Файл не содержит строк.')
 
-        header_positions = {
-            normalize_header(value): index
-            for index, value in enumerate(header_row)
-            if normalize_header(value)
-        }
+        aliases = FINANCIAL_HEADER_ALIASES.get(import_record.import_type.code, {})
+        header_positions = {}
+        for index, value in enumerate(header_row):
+            header = normalize_header(value)
+            header = aliases.get(header, header)
+            if not header:
+                continue
+            if import_record.import_type.code in FINANCIAL_HEADER_ALIASES and header in columns and header in header_positions:
+                raise ImportValidationError(f'Колонка «{header}» указана несколько раз.')
+            header_positions[header] = index
+        # Contract imports retain their existing full-column format. Financial
+        # imports need only their required columns; optional amounts default to 0.
+        header_columns = columns if import_record.import_type.code == 'contracts' else required_columns
         missing_columns = [
-            column for column in columns
+            column for column in header_columns
             if column not in header_positions
         ]
         if missing_columns:
@@ -500,7 +519,7 @@ def process_xlsx_import(import_record, uploaded_file):
                 column: serialize_value(
                     column,
                     row[header_positions[column]]
-                    if header_positions[column] < len(row) else None,
+                    if column in header_positions and header_positions[column] < len(row) else None,
                 )
                 for column in columns
             }
@@ -550,7 +569,7 @@ def process_xlsx_import(import_record, uploaded_file):
             import_record.completed_at = timezone.now()
             import_record.metadata = {
                 'sheet': worksheet.title,
-                'columns': list(columns),
+                'columns': [column for column in columns if column in header_positions],
             }
             import_record.save(update_fields=(
                 'status',
