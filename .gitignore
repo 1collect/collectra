@@ -19,3 +19,6 @@ Thumbs.db
 circuit-admin/
 *.zip
 *.xlsx
+
+# Local visual review outputs
+artifacts/
