@@ -53,6 +53,8 @@ class ImportType(models.Model):
 class Import(models.Model):
     class Status(models.TextChoices):
         NEW = 'new', 'Новый'
+        REVIEW = 'review', 'Ожидает подтверждения'
+        CANCELLED = 'cancelled', 'Отменён'
         PROCESSING = 'processing', 'Обрабатывается'
         COMPLETED = 'completed', 'Завершён'
         FAILED = 'failed', 'Ошибка'

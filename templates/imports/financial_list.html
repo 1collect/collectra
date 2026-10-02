@@ -3,7 +3,10 @@
 {% block page_name %}{{ kind }}s{% endblock %}
 {% block heading %}{{ title }}{% endblock %}
 {% block content %}
-<div class="page-header"><div><div class="page-eyebrow">Данные / Финансы</div><h1>{{ title }}</h1></div></div>
+<div class="page-header"><div><div class="page-eyebrow">Данные / Финансы</div><h1>{{ title }}</h1></div>
+    {% if kind == 'payment' and perms.imports.add_payment %}<a class="btn btn-primary" href="{% url 'imports:payment_new' %}">Создать платёж</a>{% endif %}
+    {% if kind == 'expense' and perms.imports.add_expense %}<a class="btn btn-primary" href="{% url 'imports:expense_new' %}">Создать расход</a>{% endif %}
+</div>
 <section class="panel">
     <div class="panel-header"><h2>Реестр <span class="badge">{{ page_obj.paginator.count }}</span></h2></div>
     <div class="p-0 table-container"><table class="table table-bordered table-compact">

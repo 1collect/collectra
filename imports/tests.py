@@ -44,6 +44,18 @@ def xlsx_file(headers, rows, name='contracts.xlsx'):
     )
 
 
+def upload_and_confirm(test, data):
+    response = test.client.post(reverse('imports:new'), data)
+    if response.status_code == 302:
+        record = Import.objects.latest('pk')
+        if record.status == Import.Status.REVIEW:
+            test.assertRedirects(response, reverse('imports:preview', args=[record.pk]))
+            response = test.client.post(reverse('imports:preview', args=[record.pk]), {
+                'action': 'confirm' if record.successful_items else 'cancel', 'reviewed': 'yes',
+            })
+    return response
+
+
 class DebtListTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('debt-reader', password='test-password')
@@ -360,7 +372,7 @@ class ExpensePaymentImportTests(TestCase):
         self.client.force_login(self.user)
 
     def upload_financial_file(self, import_type, headers, rows):
-        response = self.client.post(reverse('imports:new'), {
+        response = upload_and_confirm(self, {
             'import_type': import_type.pk,
             'file': xlsx_file(headers, rows, 'finance.xlsx'),
         })
@@ -499,7 +511,7 @@ class ExpensePaymentImportTests(TestCase):
             'DBZ-FINANCE', 1200, 300, 200, 100, 50, 25, date(2026, 10, 2),
         ]
 
-        response = self.client.post(reverse('imports:new'), {
+        response = upload_and_confirm(self, {
             'import_type': self.expense_type.pk,
             'file': xlsx_file(EXPENSE_IMPORT_COLUMNS, [values], 'expenses.xlsx'),
         })
@@ -521,7 +533,7 @@ class ExpensePaymentImportTests(TestCase):
             ['DBZ-UNKNOWN', 1500, 'Физическое лицо', '03.10.2026'],
         ]
 
-        self.client.post(reverse('imports:new'), {
+        upload_and_confirm(self, {
             'import_type': self.payment_type.pk,
             'file': xlsx_file(PAYMENT_IMPORT_COLUMNS, values, 'payments.xlsx'),
         })
@@ -542,7 +554,7 @@ class ExpensePaymentImportTests(TestCase):
         self.assertIn('DBZ-UNKNOWN', failed_item.error_message)
 
     def test_xlsx_rejects_payment_with_unknown_status(self):
-        self.client.post(reverse('imports:new'), {
+        upload_and_confirm(self, {
             'import_type': self.payment_type.pk,
             'file': xlsx_file(
                 PAYMENT_IMPORT_COLUMNS,
@@ -553,7 +565,7 @@ class ExpensePaymentImportTests(TestCase):
 
         import_record = Import.objects.get(import_type=self.payment_type)
         item = import_record.items.get()
-        self.assertEqual(import_record.status, Import.Status.COMPLETED)
+        self.assertEqual(import_record.status, Import.Status.CANCELLED)
         self.assertEqual(import_record.successful_items, 0)
         self.assertEqual(import_record.failed_items, 1)
         self.assertFalse(Payment.objects.exists())
@@ -661,7 +673,7 @@ class XlsxImportTests(TestCase):
             'не импортировать',
         ]
 
-        response = self.client.post(reverse('imports:new'), {
+        response = upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': xlsx_file(headers, [values]),
         })
@@ -696,11 +708,11 @@ class XlsxImportTests(TestCase):
             250, 0, 0, 0, 0, 0, 0, 0, 250,
         ]
 
-        self.client.post(reverse('imports:new'), {
+        upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': xlsx_file(headers, [first_values]),
         })
-        self.client.post(reverse('imports:new'), {
+        upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': xlsx_file(headers, [updated_values]),
         })
@@ -719,7 +731,7 @@ class XlsxImportTests(TestCase):
             ['DBZ-002', 900101300001, 'Иванов Иван', 200, 0, 0, 0, 0, 0, 0, 0, 200],
         ]
 
-        self.client.post(reverse('imports:new'), {
+        upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': xlsx_file(headers, rows),
         })
@@ -734,14 +746,14 @@ class XlsxImportTests(TestCase):
             100, 0, 0, 0, 0, 0, 0, 0, 100,
         ]
 
-        self.client.post(reverse('imports:new'), {
+        upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, [values]),
         })
 
         import_record = Import.objects.get()
         item = ImportItem.objects.get(import_record=import_record)
-        self.assertEqual(import_record.status, Import.Status.COMPLETED)
+        self.assertEqual(import_record.status, Import.Status.CANCELLED)
         self.assertEqual(import_record.successful_items, 0)
         self.assertEqual(import_record.failed_items, 1)
         self.assertEqual(item.status, ImportItem.Status.FAILED)
@@ -759,11 +771,11 @@ class XlsxImportTests(TestCase):
             'не число', 0, 0, 0, 0, 0, 0, 0, 999,
         ]
 
-        self.client.post(reverse('imports:new'), {
+        upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, [valid_values]),
         })
-        self.client.post(reverse('imports:new'), {
+        upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, [invalid_values]),
         })
@@ -783,7 +795,7 @@ class XlsxImportTests(TestCase):
             'NaN', 0, 0, 0, 0, 0, 0, 0, 100,
         ]
 
-        response = self.client.post(reverse('imports:new'), {
+        response = upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, [values]),
         })
@@ -801,7 +813,7 @@ class XlsxImportTests(TestCase):
             ['DBZ-INVALID', 123, 'Петров Пётр', 200, 0, 0, 0, 0, 0, 0, 0, 200],
         ]
 
-        self.client.post(reverse('imports:new'), {
+        upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, rows),
         })
@@ -815,7 +827,7 @@ class XlsxImportTests(TestCase):
         self.assertFalse(Debt.objects.filter(contract_number='DBZ-INVALID').exists())
 
     def test_header_only_file_is_rejected(self):
-        self.client.post(reverse('imports:new'), {
+        upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, []),
         })
@@ -833,7 +845,7 @@ class XlsxImportTests(TestCase):
             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         )
 
-        response = self.client.post(reverse('imports:new'), {
+        response = upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': corrupted_file,
         })
@@ -856,7 +868,7 @@ class XlsxImportTests(TestCase):
         ]
 
         for values in (first_values, corrected_values):
-            self.client.post(reverse('imports:new'), {
+            upload_and_confirm(self, {
                 'import_type': self.import_type.pk,
                 'file': xlsx_file(CONTRACT_IMPORT_COLUMNS, [values]),
             })
@@ -870,7 +882,7 @@ class XlsxImportTests(TestCase):
         headers = list(CONTRACT_IMPORT_COLUMNS[:-1])
         values = ['value'] * len(headers)
 
-        response = self.client.post(reverse('imports:new'), {
+        response = upload_and_confirm(self, {
             'import_type': self.import_type.pk,
             'file': xlsx_file(headers, [values]),
         })

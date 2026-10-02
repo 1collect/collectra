@@ -5,13 +5,16 @@ from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from .forms import (
     CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
     ImportUploadForm, PaymentChangeForm, PaymentRefundForm, WriteOffForm,
+    PaymentCreateForm, ExpenseCreateForm,
 )
+from .balances import apply_balance, calculate_balance, filter_by_current_status
 from .models import (
     Counterparty, Debt, Expense, FinancialChangeRequest, Import, ImportItem,
     Payment, PaymentRefund, WriteOff,
@@ -20,6 +23,8 @@ from .services import (
     FinancialChangeError, RefundValidationError, create_financial_change_request,
     create_payment_refund, process_xlsx_import, review_financial_change,
     create_writeoff, WriteOffValidationError,
+    confirm_import, import_preview_summary, ImportValidationError,
+    recalculate_debt,
 )
 from users.views import permission_required
 
@@ -82,7 +87,7 @@ def import_workspace_context(request, selected_import_id=None):
         'selected_import': selected_import,
         'page_obj': page_obj,
         'rows': rows,
-        'upload_form': ImportUploadForm(),
+        'upload_form': ImportUploadForm(user=request.user),
         'open_upload_modal': False,
     }
 
@@ -107,7 +112,7 @@ def import_items(request, import_id):
 
 @permission_required('imports.add_import')
 def import_upload(request):
-    form = ImportUploadForm(request.POST or None, request.FILES or None)
+    form = ImportUploadForm(request.POST or None, request.FILES or None, user=request.user)
     if request.method == 'POST' and form.is_valid():
         uploaded_file = form.cleaned_data['file']
         import_record = Import.objects.create(
@@ -116,14 +121,10 @@ def import_upload(request):
             file_size=uploaded_file.size,
             created_by=request.user,
         )
-        process_xlsx_import(import_record, uploaded_file)
-        if import_record.status == Import.Status.COMPLETED:
-            messages.success(
-                request,
-                f'Импорт завершён. Загружено строк: {import_record.successful_items}.',
-            )
-        else:
-            messages.error(request, import_record.error_message)
+        process_xlsx_import(import_record, uploaded_file, preview_only=True)
+        if import_record.status == Import.Status.REVIEW:
+            return redirect('imports:preview', import_id=import_record.pk)
+        messages.error(request, import_record.error_message)
         return redirect('imports:list')
 
     if request.user.has_perm('imports.view_import'):
@@ -133,6 +134,44 @@ def import_upload(request):
         return render(request, 'imports/import_list.html', context)
 
     return render(request, 'imports/import_upload.html', {'form': form})
+
+
+@permission_required('imports.add_import')
+def import_preview(request, import_id):
+    import_record = get_object_or_404(
+        Import.objects.select_related('import_type'), pk=import_id, created_by=request.user,
+    )
+    preview_error = ''
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action not in ('confirm', 'cancel'):
+            preview_error = 'Выберите действие: подтвердить или отменить импорт.'
+        elif action == 'confirm' and request.POST.get('reviewed') != 'yes':
+            preview_error = 'Подтвердите, что проверили строки и итоговые суммы.'
+        else:
+            try:
+                result = confirm_import(import_id, user=request.user, cancel=action == 'cancel')
+            except ImportValidationError as error:
+                preview_error = str(error)
+            else:
+                if action == 'cancel':
+                    messages.success(request, 'Импорт отменён. Данные не были сохранены.')
+                else:
+                    messages.success(request, f'Импорт завершён. Загружено строк: {result.successful_items}. Пропущено: {result.failed_items}.')
+                if request.user.has_perm('imports.view_import'):
+                    return redirect('imports:list')
+                return redirect('imports:new')
+    columns = import_record.metadata.get('columns', [])
+    page_obj = Paginator(import_record.items.order_by('row_number'), 50).get_page(request.GET.get('page'))
+    return render(request, 'imports/import_preview.html', {
+        'import_record': import_record,
+        'summary': import_preview_summary(import_record),
+        'columns': columns,
+        'page_obj': page_obj,
+        'rows': [{'item': item, 'values': [item.data.get(column) for column in columns]} for item in page_obj],
+        'can_confirm': import_record.status == Import.Status.REVIEW,
+        'preview_error': preview_error,
+    })
 
 
 @permission_required('imports.view_debt')
@@ -150,10 +189,13 @@ def debt_list(request):
             | Q(debtor__iin__icontains=query)
         )
     if status in Debt.Status.values:
-        debts = debts.filter(status=status)
+        debts = filter_by_current_status(debts, status)
     else:
         status = ''
     page_obj = Paginator(debts, 25).get_page(request.GET.get('page'))
+    page_obj.object_list = list(page_obj.object_list.prefetch_related('payments', 'expenses', 'writeoffs'))
+    for debt in page_obj.object_list:
+        apply_balance(debt, calculate_balance(debt))
 
     return render(request, 'imports/debt_list.html', {
         'page_obj': page_obj, 'query': query, 'status': status,
@@ -186,6 +228,35 @@ def _financial_list(request, *, model, title, kind):
 
 def payment_list(request):
     return _financial_list(request, model=Payment, title='Платежи', kind='payment')
+
+
+def _financial_create(request, *, form_class, kind, title):
+    form = form_class(
+        request.POST if request.method == 'POST' else None,
+        initial={f'{kind}_date': timezone.localdate()},
+    )
+    if request.method == 'POST' and form.is_valid():
+        with transaction.atomic():
+            Debt.objects.select_for_update().get(pk=form.cleaned_data['debt'].pk)
+            record = form.save()
+            recalculate_debt(record.debt_id)
+        messages.success(request, 'Платёж создан.' if kind == 'payment' else 'Расход создан.')
+        if request.user.has_perm(f'imports.view_{kind}'):
+            return redirect(f'imports:{kind}s')
+        return redirect(f'imports:{kind}_new')
+    return render(request, 'imports/financial_create.html', {
+        'form': form, 'kind': kind, 'title': title,
+    })
+
+
+@permission_required('imports.add_payment')
+def payment_create(request):
+    return _financial_create(request, form_class=PaymentCreateForm, kind='payment', title='Новый платёж')
+
+
+@permission_required('imports.add_expense')
+def expense_create(request):
+    return _financial_create(request, form_class=ExpenseCreateForm, kind='expense', title='Новый расход')
 
 
 def expense_list(request):

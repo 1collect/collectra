@@ -8,6 +8,6 @@
     <section class="panel"><div class="panel-header"><h2>Загрузка файла</h2></div><div class="panel-body">{{ form.non_field_errors }}<div class="form-grid">
         <div class="form-field"><label class="form-label" for="{{ form.import_type.id_for_label }}">{{ form.import_type.label }}</label>{{ form.import_type }}{% for error in form.import_type.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
         <div class="form-field"><label class="form-label" for="{{ form.file.id_for_label }}">{{ form.file.label }}</label>{{ form.file }}{% for error in form.file.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
-    </div></div><div class="panel-footer"><a class="btn" href="{% url 'imports:list' %}">Отмена</a><button class="btn btn-primary" type="submit">Загрузить</button></div></section>
+    </div></div><div class="panel-footer"><a class="btn" href="{% url 'imports:list' %}">Отмена</a><button class="btn btn-primary" type="submit">Проверить импорт</button></div></section>
 </form>
 {% endblock %}
