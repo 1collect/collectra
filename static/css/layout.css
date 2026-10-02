@@ -2,12 +2,9 @@
 .skip-link { position: fixed; left: 12px; top: -50px; z-index: 500; padding: 8px 12px; background: var(--bg-panel); border: 1px solid var(--primary); }
 .skip-link:focus { top: 8px; }
 .sidebar { position: fixed; inset: 0 auto 0 0; z-index: 80; width: var(--sidebar-width); background: var(--bg-sidebar); color: var(--sidebar-text); display: flex; flex-direction: column; border-right: 1px solid #ffffff08; }
-.brand { height: var(--topbar-height); flex-shrink: 0; display: flex; align-items: center; gap: 10px; padding: 0 17px; color: #f7f9fd; border-bottom: 1px solid #ffffff0c; }
+.brand { height: var(--topbar-height); flex-shrink: 0; display: flex; align-items: center; padding: 0 17px; color: #f7f9fd; border-bottom: 1px solid #ffffff0c; }
 .brand:hover { text-decoration: none; }
-.brand-mark { width: 24px; height: 24px; display: inline-grid; grid-template-columns: repeat(2, 7px); grid-template-rows: repeat(2, 7px); gap: 3px; place-content: center; background: #5066dd; border-radius: 4px; flex-shrink: 0; }
-.brand-mark i { display: block; border: 1px solid #e5eaff; border-radius: 1px; }
-.brand-mark i:last-child { background: #e5eaff; }
-.brand-title { font-size: 12px; font-weight: 700; letter-spacing: 2px; }
+.brand-logo { display: block; width: 82px; max-width: 100%; height: 20px; overflow: hidden; }
 .brand-version { margin-left: auto; font: 9px var(--font-mono); color: #98a8c0; }
 .workspace { display: flex; gap: 9px; align-items: center; padding: 15px 16px 13px; }
 .workspace-icon { height: 28px; width: 28px; border: 1px solid #46546a; border-radius: 4px; display: grid; place-items: center; font-size: 11px; color: #e0e7f3; }
@@ -54,7 +51,7 @@
 .sidebar-collapsed .sidebar { width: var(--sidebar-collapsed-width); }
 .sidebar-collapsed .shell-main { margin-left: var(--sidebar-collapsed-width); }
 .sidebar-collapsed .brand { padding: 0 16px; }
-.sidebar-collapsed .brand-title, .sidebar-collapsed .brand-version, .sidebar-collapsed .workspace,
+.sidebar-collapsed .brand-logo, .sidebar-collapsed .brand-version, .sidebar-collapsed .workspace,
 .sidebar-collapsed .nav-group-title, .sidebar-collapsed .nav-link > span, .sidebar-collapsed .nav-link .chevron,
 .sidebar-collapsed .sidebar-status, .sidebar-collapsed .submenu { display: none; }
 .sidebar-collapsed .sidebar-nav { padding-top: 12px; }

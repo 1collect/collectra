@@ -81,8 +81,7 @@
 .theme-preview.system .theme-preview-surface::after { background: linear-gradient(90deg, #f3f5f8 50%, #111822 50%); }
 .auth-page { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
 .auth-wrapper { width: min(350px, 100%); }
-.auth-brand { display: flex; justify-content: center; align-items: center; gap: 9px; margin-bottom: 20px; }
-.auth-brand .brand-title { color: var(--text-primary); }
+.auth-brand { display: flex; justify-content: center; align-items: center; margin-bottom: 20px; color: var(--text-primary); }
 .auth-card .panel-body { padding: 22px; }
 .auth-card h1 { font-size: 17px; margin-bottom: 3px; }
 .auth-card p { font-size: 11px; color: var(--text-secondary); }

@@ -5,7 +5,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="description" content="Панель управления платежами">
-    <title>{% block title %}Панель управления{% endblock %} — TEST APP</title>
+    <title>{% block title %}Панель управления{% endblock %} — Collectra</title>
     <link href="{% static 'assets/icons/favicon.svg' %}" rel="icon" type="image/svg+xml">
     <link href="{% static 'css/main.css' %}" rel="stylesheet">
 </head>
@@ -13,8 +13,7 @@
     <a class="skip-link" href="#main-content">Перейти к содержимому</a>
     <aside aria-label="Основная навигация" class="sidebar" id="sidebar">
         <a class="brand" href="{% url 'dashboard' %}">
-            <span aria-hidden="true" class="brand-mark"><i></i><i></i><i></i><i></i></span>
-            <span class="brand-title">TEST APP</span>
+            {% include "partials/collectra_logo.svg" %}
         </a>
         <div class="workspace">
             <div class="workspace-icon">ПЛ</div>
@@ -62,7 +61,7 @@
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M9 7H4v-5M4 7a9 9 0 1 1-1 7m6-3h7m-7 4h5"></path></svg>
                 <span>Возвраты</span>
             </a>{% endif %}
-            {% if perms.imports.view_import %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:list' or request.resolver_match.view_name == 'imports:items' or request.resolver_match.view_name == 'imports:new' or request.resolver_match.view_name == 'imports:types' %}active{% endif %}" href="{% url 'imports:list' %}" title="Импорты">
+            {% if perms.imports.view_import %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:list' or request.resolver_match.view_name == 'imports:items' or request.resolver_match.view_name == 'imports:new' %}active{% endif %}" href="{% url 'imports:list' %}" title="Импорты">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8ZM14 3v6h5M8 13h8m-8 4h6"></path></svg>
                 <span>Импорты</span>
             </a>{% endif %}
@@ -110,7 +109,7 @@
             {% if messages %}{% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} mb-3">{{ message }}</div>{% endfor %}{% endif %}
             {% block content %}{% endblock %}
         </main>
-        <footer class="statusbar"><span>TEST APP / Компактный режим</span></footer>
+        <footer class="statusbar"><span>Collectra / Компактный режим</span></footer>
     </div>
     <script defer src="{% static 'js/core.js' %}"></script>
     <script defer src="{% static 'js/sidebar.js' %}"></script>

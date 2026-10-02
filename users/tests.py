@@ -15,7 +15,7 @@ class AccessControlTests(TestCase):
         response = self.client.get(reverse('login'))
 
         self.assertContains(response, 'Вход в систему')
-        self.assertContains(response, 'TEST APP')
+        self.assertContains(response, 'Collectra')
         self.assertContains(response, 'css/main.css')
         self.assertNotContains(response, 'data-theme-toggle')
         self.assertNotContains(response, 'Введите данные своей учётной записи.')
@@ -111,7 +111,7 @@ class SidebarNavigationTests(TestCase):
     def test_users_list_is_the_only_active_sidebar_link(self):
         response = self.client.get(reverse('users:list'))
 
-        self.assertContains(response, '<span class="brand-title">TEST APP</span>', html=True)
+        self.assertContains(response, 'aria-label="Collectra"')
         self.assertNotContains(response, 'brand-version')
         self.assertContains(response, f'class="nav-link active" href="{reverse("users:list")}"')
         self.assertEqual(response.content.count(b'class="nav-link active"'), 1)

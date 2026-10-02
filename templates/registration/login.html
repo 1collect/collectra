@@ -4,7 +4,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Вход — TEST APP</title>
+    <title>Вход — Collectra</title>
     <link href="{% static 'assets/icons/favicon.svg' %}" rel="icon" type="image/svg+xml">
     <link href="{% static 'css/main.css' %}" rel="stylesheet">
 </head>
@@ -12,8 +12,7 @@
     <main class="auth-page">
         <div class="auth-wrapper">
             <a class="auth-brand" href="{% url 'login' %}">
-                <span aria-hidden="true" class="brand-mark"><i></i><i></i><i></i><i></i></span>
-                <span class="brand-title">TEST APP</span>
+                {% include "partials/collectra_logo.svg" %}
             </a>
             <section class="panel auth-card">
                 <div class="panel-body">
