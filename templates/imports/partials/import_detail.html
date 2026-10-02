@@ -18,7 +18,7 @@
     <div class="master-detail__section-header"><div><h3>Результат обработки</h3><span class="text-xs text-muted">Данные каждой строки импортированного файла</span></div>{% if page_obj %}<span class="badge">{{ page_obj.paginator.count }}</span>{% endif %}</div>
     <div class="table-container master-detail__scroll" tabindex="0" role="region" aria-label="Результат обработки импорта">
         <table class="table table-bordered table-compact master-detail__table">
-            <thead><tr><th class="master-detail__index-column">#</th><th>Полезная нагрузка</th><th class="master-detail__status-column">Статус</th><th class="master-detail__error-column">Ошибка</th></tr></thead>
+            <thead><tr><th scope="col" class="master-detail__index-column">#</th><th scope="col">Полезная нагрузка</th><th scope="col" class="master-detail__status-column">Статус</th><th scope="col" class="master-detail__error-column">Ошибка</th></tr></thead>
             <tbody>
                 {% for row in rows %}
                 <tr><td class="font-mono">{{ row.item.row_number }}</td><td>{% for field in row.payload %}<div class="key-value-line"><strong>{{ field.name }}:</strong> {{ field.value|default:'—' }}</div>{% empty %}—{% endfor %}</td><td><span class="badge {% if row.item.status == 'processed' %}badge-success{% elif row.item.status == 'failed' %}badge-danger{% else %}badge-neutral{% endif %}">{{ row.item.get_status_display }}</span></td><td>{% if row.item.error_message %}<span class="text-danger">{{ row.item.error_message }}</span>{% else %}—{% endif %}</td></tr>

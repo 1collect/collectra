@@ -11,16 +11,16 @@
     <div class="panel-header"><h2>История возвратов <span class="badge">{{ page_obj.paginator.count }}</span></h2></div>
     <div class="p-0 table-container">
         <table class="table table-bordered table-compact">
-            <thead><tr><th>Договор</th><th>Исходный платёж</th><th>Категория</th><th>Сумма возврата</th><th>Дата</th><th>Основание</th><th>Статус</th><th>Создал</th></tr></thead>
+            <thead><tr><th scope="col">Договор</th><th scope="col">Исходный платёж</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма возврата</th><th scope="col">Дата</th><th scope="col">Основание</th><th scope="col">Статус</th><th scope="col">Создал</th></tr></thead>
             <tbody>
             {% for refund in page_obj %}
                 <tr>
                     <td><strong class="font-mono">{{ refund.payment.debt.contract_number }}</strong></td>
-                    <td>{{ refund.payment.amount|floatformat:2 }} от {{ refund.payment.payment_date|date:'d.m.Y' }}<br><span class="text-muted">Действует: {{ refund.payment.effective_amount|floatformat:2 }}</span></td>
+                    <td class="cell-number">{{ refund.payment.amount|floatformat:2 }} от {{ refund.payment.payment_date|date:'d.m.Y' }}<br><span class="text-muted">Действует: {{ refund.payment.effective_amount|floatformat:2 }}</span></td>
                     <td>{{ refund.get_payment_category_display }}</td>
-                    <td><strong>{{ refund.amount|floatformat:2 }}</strong></td>
-                    <td>{{ refund.refund_date|date:'d.m.Y' }}</td>
-                    <td>{{ refund.reason }}</td>
+                    <td class="cell-number"><strong>{{ refund.amount|floatformat:2 }}</strong></td>
+                    <td class="cell-date">{{ refund.refund_date|date:'d.m.Y' }}</td>
+                    <td class="cell-text">{{ refund.reason }}</td>
                     <td><span class="badge {% if refund.status == 'active' %}badge-success{% else %}badge-neutral{% endif %}">{{ refund.get_status_display }}</span></td>
                     <td>{{ refund.created_by.get_full_name|default:refund.created_by.username }}</td>
                 </tr>

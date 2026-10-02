@@ -10,13 +10,13 @@
 <section class="panel">
     <div class="panel-header"><h2>Реестр контрагентов <span class="badge">{{ page_obj.paginator.count }}</span></h2><span class="badge badge-neutral">По 25 записей</span></div>
     <div class="p-0 table-container"><table class="table table-bordered table-compact">
-        <thead><tr><th>ID</th><th>Наименование / ФИО</th><th>ИИН</th><th>Договоров</th><th>Действия</th></tr></thead>
+        <thead><tr><th scope="col">ID</th><th scope="col">Наименование / ФИО</th><th scope="col">ИИН</th><th scope="col" class="cell-number">Договоров</th><th scope="col" class="cell-actions">Действия</th></tr></thead>
         <tbody>{% for counterparty in page_obj %}<tr>
             <td class="font-mono">{{ counterparty.id }}</td>
-            <td><strong>{{ counterparty.full_name }}</strong></td>
+            <td class="cell-text"><strong>{{ counterparty.full_name }}</strong></td>
             <td class="font-mono">{{ counterparty.iin }}</td>
-            <td><span class="badge {% if counterparty.debt_count %}badge-info{% else %}badge-neutral{% endif %}">{{ counterparty.debt_count }}</span></td>
-            <td><div class="flex gap-2">
+            <td class="cell-number"><span class="badge {% if counterparty.debt_count %}badge-info{% else %}badge-neutral{% endif %}">{{ counterparty.debt_count }}</span></td>
+            <td class="cell-actions"><div class="flex gap-2">
                 {% if perms.imports.change_counterparty %}<a class="btn btn-sm" href="{% url 'imports:counterparty_edit' counterparty.id %}">Изменить</a>{% endif %}
                 {% if perms.imports.delete_counterparty %}{% if counterparty.debt_count %}<span aria-disabled="true" class="btn btn-sm" title="Есть привязанные договоры">Удалить</span>{% else %}<a class="btn btn-sm btn-danger" href="{% url 'imports:counterparty_delete' counterparty.id %}">Удалить</a>{% endif %}{% endif %}
             </div></td>

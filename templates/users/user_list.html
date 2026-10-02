@@ -10,17 +10,17 @@
     <div class="panel-header"><h2>Учётные записи <span class="badge">{{ users|length }}</span></h2></div>
     <div class="p-0 table-container">
         <table class="table table-bordered table-compact">
-            <thead><tr><th>Пользователь</th><th>Роли</th><th>Статус</th><th>Доступ</th><th>Действия</th></tr></thead>
+            <thead><tr><th scope="col">Пользователь</th><th scope="col">Роли</th><th scope="col">Статус</th><th scope="col">Доступ</th><th scope="col" class="cell-actions">Действия</th></tr></thead>
             <tbody>
             {% for user_obj in users %}
                 <tr>
-                    <td><strong>{{ user_obj.get_full_name|default:user_obj.username }}</strong><div class="text-xs text-muted">{{ user_obj.username }}</div></td>
-                    <td>{% for role in user_obj.roles.all %}<span class="badge badge-info">{{ role.name }}</span> {% empty %}<span class="text-muted">Без роли</span>{% endfor %}</td>
+                    <td class="cell-text"><strong>{{ user_obj.get_full_name|default:user_obj.username }}</strong><div class="text-xs text-muted">{{ user_obj.username }}</div></td>
+                    <td class="cell-text">{% for role in user_obj.roles.all %}<span class="badge badge-info">{{ role.name }}</span> {% empty %}<span class="text-muted">Без роли</span>{% endfor %}</td>
                     <td>{% if user_obj.is_active %}<span class="badge badge-success"><span class="status-dot"></span>Активен</span>{% else %}<span class="badge badge-danger"><span class="status-dot"></span>Заблокирован</span>{% endif %}</td>
                     <td>{% if user_obj.is_superuser %}Суперпользователь{% elif user_obj.is_staff %}Панель управления{% else %}Обычный пользователь{% endif %}</td>
-                    <td>
+                    <td class="cell-actions">
                         {% if perms.auth.change_user %}
-                        <div class="flex gap-2">
+                        <div class="flex gap-2 justify-end">
                             <a class="btn btn-sm" href="{% url 'users:edit' user_obj.id %}">Изменить</a>
                             {% if user_obj != request.user %}<form method="post" action="{% url 'users:toggle_active' user_obj.id %}">{% csrf_token %}<button class="btn btn-sm {% if user_obj.is_active %}btn-danger{% endif %}" type="submit">{% if user_obj.is_active %}Заблокировать{% else %}Восстановить{% endif %}</button></form>{% endif %}
                         </div>

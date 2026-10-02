@@ -42,6 +42,7 @@ with sync_playwright() as p:
     page.wait_for_url('**/users/')
     def capture(name):
         page.screenshot(path=str(out / (name + '.png')), full_page=True)
+        page.screenshot(path=str(out / (name + '-viewport.png')))
         metrics = page.evaluate('''() => ({width: innerWidth, scroll: document.documentElement.scrollWidth,
           smallText: [...document.querySelectorAll('main *')].filter(e => e.checkVisibility() && e.childNodes.length && [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()) && parseFloat(getComputedStyle(e).fontSize) < 12).length,
           title: document.title})''')

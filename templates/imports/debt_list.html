@@ -10,27 +10,27 @@
     <div class="panel-header"><h2>Реестр договоров <span class="badge">{{ page_obj.paginator.count }}</span></h2><span class="badge badge-neutral">По 25 записей</span></div>
     <div class="p-0 table-container">
         <table class="table table-bordered table-compact">
-            <thead><tr><th>ДБЗ</th><th>ФИО</th><th>ИИН</th><th>Основной долг</th><th>Вознаграждение</th><th>Пеня/Штрафы</th><th>Дебиторская задолженность</th><th>Гос.пошлина</th><th>Представительские расходы</th><th>Нотариальные расходы</th><th>Почтовые расходы</th><th>Общая сумма задолженности</th><th>Оплачено</th><th>Остаток</th><th>Переплата</th><th>Статус</th><th>Дата закрытия</th></tr></thead>
+            <thead><tr><th scope="col" class="record-key">ДБЗ</th><th scope="col">ФИО</th><th scope="col">ИИН</th><th scope="col" class="cell-number">Основной долг</th><th scope="col" class="cell-number">Вознаграждение</th><th scope="col" class="cell-number">Пеня/Штрафы</th><th scope="col" class="cell-number">Дебиторская задолженность</th><th scope="col" class="cell-number">Гос.пошлина</th><th scope="col" class="cell-number">Представительские расходы</th><th scope="col" class="cell-number">Нотариальные расходы</th><th scope="col" class="cell-number">Почтовые расходы</th><th scope="col" class="cell-number">Общая сумма задолженности</th><th scope="col" class="cell-number">Оплачено</th><th scope="col" class="cell-number">Остаток</th><th scope="col" class="cell-number">Переплата</th><th scope="col">Статус</th><th scope="col">Дата закрытия</th></tr></thead>
             <tbody>
             {% for debt in page_obj %}
                 <tr>
-                    <td><strong class="font-mono">{{ debt.contract_number }}</strong></td>
-                    <td>{{ debt.debtor.full_name }}</td>
+                    <td class="record-key"><strong class="font-mono">{{ debt.contract_number }}</strong></td>
+                    <td class="cell-text">{{ debt.debtor.full_name }}</td>
                     <td class="font-mono">{{ debt.debtor.iin }}</td>
-                    <td>{{ debt.purchase_principal|floatformat:2 }}</td>
-                    <td>{{ debt.purchase_interest|floatformat:2 }}</td>
-                    <td>{{ debt.purchase_penalties|floatformat:2 }}</td>
-                    <td>{{ debt.purchase_receivable|floatformat:2 }}</td>
-                    <td>{{ debt.purchase_state_duty|floatformat:2 }}</td>
-                    <td>{{ debt.purchase_representative_expenses|floatformat:2 }}</td>
-                    <td>{{ debt.purchase_notary_expenses|floatformat:2 }}</td>
-                    <td>{{ debt.purchase_postal_expenses|floatformat:2 }}</td>
-                    <td><strong>{{ debt.purchase_total_debt|floatformat:2 }}</strong></td>
-                    <td>{{ debt.paid_amount|floatformat:2 }}</td>
-                    <td>{{ debt.outstanding_amount|floatformat:2 }}</td>
-                    <td>{{ debt.overpayment_amount|floatformat:2 }}</td>
+                    <td class="cell-number">{{ debt.purchase_principal|floatformat:2 }}</td>
+                    <td class="cell-number">{{ debt.purchase_interest|floatformat:2 }}</td>
+                    <td class="cell-number">{{ debt.purchase_penalties|floatformat:2 }}</td>
+                    <td class="cell-number">{{ debt.purchase_receivable|floatformat:2 }}</td>
+                    <td class="cell-number">{{ debt.purchase_state_duty|floatformat:2 }}</td>
+                    <td class="cell-number">{{ debt.purchase_representative_expenses|floatformat:2 }}</td>
+                    <td class="cell-number">{{ debt.purchase_notary_expenses|floatformat:2 }}</td>
+                    <td class="cell-number">{{ debt.purchase_postal_expenses|floatformat:2 }}</td>
+                    <td class="cell-number"><strong>{{ debt.purchase_total_debt|floatformat:2 }}</strong></td>
+                    <td class="cell-number">{{ debt.paid_amount|floatformat:2 }}</td>
+                    <td class="cell-number">{{ debt.outstanding_amount|floatformat:2 }}</td>
+                    <td class="cell-number">{{ debt.overpayment_amount|floatformat:2 }}</td>
                     <td><span class="badge {% if debt.status == 'closed' %}badge-success{% else %}badge-warning{% endif %}">{{ debt.get_status_display }}</span></td>
-                    <td>{{ debt.closed_at|date:'d.m.Y'|default:'—' }}</td>
+                    <td class="cell-date">{{ debt.closed_at|date:'d.m.Y'|default:'—' }}</td>
                 </tr>
             {% empty %}<tr><td colspan="17"><div class="empty-state"><h3>Договоры не найдены</h3></div></td></tr>{% endfor %}
             </tbody>
