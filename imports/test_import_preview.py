@@ -22,6 +22,8 @@ class ImportPreviewTests(TestCase):
     def upload(self, code='payments', rows=None):
         columns = {'payments': PAYMENT_IMPORT_COLUMNS, 'expenses': EXPENSE_IMPORT_COLUMNS,
                    'contracts': CONTRACT_IMPORT_COLUMNS, 'writeoffs': WRITEOFF_IMPORT_COLUMNS}[code]
+        if code == 'writeoffs' and rows:
+            rows = [list(row) + [None, 'Основание тестового списания'] for row in rows]
         response = self.client.post(reverse('imports:new'), {
             'import_type': ImportType.objects.get(code=code).pk,
             'file': xlsx_file(columns, rows or [['PREVIEW-1', '100.25', 'ЧСИ', '02.10.2026']]),
@@ -95,7 +97,7 @@ class ImportPreviewTests(TestCase):
         self.assertEqual(response.context['summary']['total'], Decimal('5.10'))
         self.assertEqual(response.context['summary']['dates'][0]['count'], 51)
 
-    def test_contract_update_happens_only_after_confirmation(self):
+    def test_duplicate_contract_is_skipped_without_changing_existing_data(self):
         self.upload('contracts', [['PREVIEW-1', '900101300001', 'Обновлённое имя',
                                    200, 0, 0, 0, 0, 0, 0, 0, 200]])
         self.debt.refresh_from_db()
@@ -103,8 +105,9 @@ class ImportPreviewTests(TestCase):
         self.assertEqual(Debtor.objects.get().full_name, 'Иванов Иван')
         self.confirm()
         self.debt.refresh_from_db()
-        self.assertEqual(self.debt.purchase_total_debt, 200)
-        self.assertEqual(Debtor.objects.get().full_name, 'Обновлённое имя')
+        self.assertEqual(self.debt.purchase_total_debt, 1000)
+        self.assertEqual(Debtor.objects.get().full_name, 'Иванов Иван')
+        self.assertFalse(self.debt.payments.exists())
 
     def test_expense_summary_includes_all_amount_columns(self):
         self.upload('expenses', [['PREVIEW-1', 10, 20, 30, 40, 50, 60, '02.10.2026']])
@@ -197,7 +200,7 @@ class ImportPreviewTests(TestCase):
         self.confirm()
         self.assertEqual(WriteOff.objects.get(kind='full').amount, Decimal('850'))
         self.debt.refresh_from_db()
-        self.assertEqual(self.debt.status, Debt.Status.CLOSED)
+        self.assertEqual(self.debt.status, Debt.Status.CLOSED_WRITTEN_OFF)
 
     def test_changed_balance_blocks_full_writeoff_confirmation(self):
         record = self.upload('writeoffs', [['PREVIEW-1', 'Полное', '', '', '03.10.2026']])

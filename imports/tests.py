@@ -18,6 +18,7 @@ from .services import (
     EXPENSE_IMPORT_COLUMNS,
     EXPENSE_REQUIRED_COLUMNS,
     PAYMENT_IMPORT_COLUMNS,
+    PAYMENT_REQUIRED_COLUMNS,
     RefundValidationError,
     FinancialChangeError,
     cancel_payment_refund,
@@ -404,7 +405,7 @@ class ExpensePaymentImportTests(TestCase):
 
     def test_every_payment_column_is_required(self):
         values = ['DBZ-FINANCE', 100, 'ЧСИ', '03.10.2026']
-        for index, column in enumerate(PAYMENT_IMPORT_COLUMNS):
+        for index, column in enumerate(PAYMENT_REQUIRED_COLUMNS):
             with self.subTest(column=column):
                 record = self.upload_financial_file(self.payment_type,
                     PAYMENT_IMPORT_COLUMNS[:index] + PAYMENT_IMPORT_COLUMNS[index + 1:],
@@ -415,7 +416,7 @@ class ExpensePaymentImportTests(TestCase):
                 self.assertFalse(Payment.objects.exists())
 
     def test_every_payment_value_is_required(self):
-        for index, column in enumerate(PAYMENT_IMPORT_COLUMNS):
+        for index, column in enumerate(PAYMENT_REQUIRED_COLUMNS):
             with self.subTest(column=column):
                 values = ['DBZ-FINANCE', 100, 'ЧСИ', '03.10.2026']
                 values[index] = None
@@ -670,6 +671,7 @@ class XlsxImportTests(TestCase):
             500,
             600,
             114150.75,
+            *([None] * (len(CONTRACT_IMPORT_COLUMNS) - 12)),
             'не импортировать',
         ]
 
@@ -697,7 +699,7 @@ class XlsxImportTests(TestCase):
         self.assertEqual(debt.purchase_principal, 100000.25)
         self.assertEqual(debt.purchase_total_debt, 114150.75)
 
-    def test_reimport_updates_existing_contract_instead_of_duplicating_it(self):
+    def test_reimport_skips_existing_contract_without_overwriting_it(self):
         headers = list(CONTRACT_IMPORT_COLUMNS)
         first_values = [
             'DBZ-001', 900101300001, 'Иванов Иван',
@@ -721,8 +723,9 @@ class XlsxImportTests(TestCase):
         self.assertEqual(Debtor.objects.count(), 1)
         self.assertEqual(Debt.objects.count(), 1)
         debt = Debt.objects.get(contract_number='DBZ-001')
-        self.assertEqual(debt.purchase_principal, 250)
-        self.assertEqual(debt.debtor.full_name, 'Иванов Иван Обновлённый')
+        self.assertEqual(debt.purchase_principal, 100)
+        self.assertEqual(debt.debtor.full_name, 'Иванов Иван')
+        self.assertEqual(Import.objects.latest('pk').failed_items, 1)
 
     def test_same_iin_reuses_debtor_for_multiple_contracts(self):
         headers = list(CONTRACT_IMPORT_COLUMNS)
@@ -857,7 +860,7 @@ class XlsxImportTests(TestCase):
         self.assertFalse(ImportItem.objects.exists())
         self.assertFalse(Debt.objects.exists())
 
-    def test_reimport_can_move_contract_to_another_debtor(self):
+    def test_reimport_cannot_move_contract_to_another_debtor(self):
         first_values = [
             'DBZ-MOVED', 900101300001, 'Иванов Иван',
             100, 0, 0, 0, 0, 0, 0, 0, 100,
@@ -874,12 +877,12 @@ class XlsxImportTests(TestCase):
             })
 
         debt = Debt.objects.get(contract_number='DBZ-MOVED')
-        self.assertEqual(debt.debtor.iin, '910202300002')
-        self.assertEqual(debt.debtor.full_name, 'Петров Пётр')
+        self.assertEqual(debt.debtor.iin, '900101300001')
+        self.assertEqual(debt.debtor.full_name, 'Иванов Иван')
         self.assertEqual(Debt.objects.count(), 1)
 
     def test_missing_column_creates_failed_import(self):
-        headers = list(CONTRACT_IMPORT_COLUMNS[:-1])
+        headers = list(CONTRACT_IMPORT_COLUMNS[1:])
         values = ['value'] * len(headers)
 
         response = upload_and_confirm(self, {
@@ -890,7 +893,7 @@ class XlsxImportTests(TestCase):
         self.assertRedirects(response, reverse('imports:list'))
         import_record = Import.objects.get()
         self.assertEqual(import_record.status, Import.Status.FAILED)
-        self.assertIn('Общая сумма задолженности (выкуп)', import_record.error_message)
+        self.assertIn('ДБЗ', import_record.error_message)
         self.assertFalse(ImportItem.objects.exists())
 
     def test_upload_requires_add_import_permission(self):
@@ -906,6 +909,7 @@ class PaymentRefundTests(TestCase):
         self.user = User.objects.create_user('coordinator', password='test-password')
         self.user.user_permissions.add(
             Permission.objects.get(codename='add_paymentrefund'),
+            Permission.objects.get(codename='view_paymentrefund'),
         )
         debtor = Debtor.objects.create(
             full_name='Возвратов Тест',
@@ -951,7 +955,7 @@ class PaymentRefundTests(TestCase):
         self.assertEqual(self.debt.paid_amount, Decimal('1000.00'))
         self.assertEqual(self.debt.outstanding_amount, Decimal('0.00'))
         self.assertEqual(self.debt.overpayment_amount, Decimal('0.00'))
-        self.assertEqual(self.debt.status, Debt.Status.CLOSED)
+        self.assertEqual(self.debt.status, Debt.Status.CLOSED_PAID)
         self.assertEqual(self.debt.closed_at, date(2026, 9, 20))
 
     def test_full_refund_reopens_contract(self):

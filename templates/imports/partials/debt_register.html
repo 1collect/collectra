@@ -22,7 +22,7 @@
                     <td class="cell-number">{{ debt.written_off_amount|floatformat:2 }}</td>
                     <td class="cell-number">{{ debt.outstanding_amount|floatformat:2 }}</td>
                     <td class="cell-number">{{ debt.overpayment_amount|floatformat:2 }}</td>
-                    <td><span class="badge {% if debt.status == 'closed' %}badge-success{% else %}badge-warning{% endif %}">{{ debt.get_status_display }}</span></td>
+                    <td><span class="badge {% if debt.status == 'closed' or debt.status == 'closed_paid' or debt.status == 'closed_written_off' or debt.status == 'closed_mixed' %}badge-success{% else %}badge-warning{% endif %}">{{ debt.get_status_display }}</span></td>
                     <td class="cell-date">{{ debt.closed_at|date:'d.m.Y'|default:'—' }}</td>
                 </tr>
             {% empty %}<tr><td colspan="20"><div class="empty-state"><h3>Договоры не найдены</h3></div></td></tr>{% endfor %}

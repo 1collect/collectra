@@ -4,6 +4,7 @@
 {% block page_name %}imports{% endblock %}
 {% block heading %}Импорты{% endblock %}
 {% block content %}
+{% if perms.imports.add_import %}<section class="panel"><div class="panel-body">Шаблоны Excel: <a class="btn" href="{% url 'imports:import_template' 'contracts' %}">Договоры</a><a class="btn" href="{% url 'imports:import_template' 'payments' %}">Платежи</a><a class="btn" href="{% url 'imports:import_template' 'writeoffs' %}">Списания</a><a class="btn" href="{% url 'imports:import_template' 'expenses' %}">Расходы</a></div></section>{% endif %}
 <div class="page-header">
     <div><div class="page-eyebrow">Данные</div><h1>Импорты</h1></div>
     <div class="page-actions">

@@ -66,7 +66,7 @@
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2m2-10h4m-2-2v4"></path></svg>
                 <span>Контрагенты</span>
             </a>{% endif %}
-            {% if perms.imports.add_paymentrefund %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:refunds' or request.resolver_match.view_name == 'imports:refund_new' %}active{% endif %}" href="{% url 'imports:refunds' %}" title="Возвраты платежей">
+            {% if perms.imports.view_paymentrefund %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:refunds' or request.resolver_match.view_name == 'imports:refund_new' %}active{% endif %}" href="{% url 'imports:refunds' %}" title="Возвраты платежей">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M9 7H4v-5M4 7a9 9 0 1 1-1 7m6-3h7m-7 4h5"></path></svg>
                 <span>Возвраты</span>
             </a>{% endif %}
@@ -81,6 +81,14 @@
                 <span>Коллекторские агентства</span>
             </a>
             {% endif %}
+        <div class="nav-group-title">&#1059;&#1063;&#1025;&#1058; &#1048; &#1054;&#1058;&#1063;&#1025;&#1058;&#1067;</div>
+            {% if perms.imports.view_debtor %}<a class="nav-link" href="{% url 'imports:catalog' 'debtors' %}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8m-8 4h8m-8 4h5"></path></svg><span>Заёмщики</span></a>{% endif %}
+            {% if perms.imports.view_creditor %}<a class="nav-link" href="{% url 'imports:catalog' 'creditors' %}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8m-8 4h8m-8 4h5"></path></svg><span>Первичные кредиторы</span></a>{% endif %}
+            {% if perms.imports.view_cession %}<a class="nav-link" href="{% url 'imports:catalog' 'cessions' %}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8m-8 4h8m-8 4h5"></path></svg><span>Договоры цессии</span></a>{% endif %}
+            {% if perms.imports.view_companyaccount %}<a class="nav-link" href="{% url 'imports:catalog' 'accounts' %}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8m-8 4h8m-8 4h5"></path></svg><span>Счета компаний</span></a>{% endif %}
+            {% if perms.imports.view_referencevalue %}<a class="nav-link" href="{% url 'imports:catalog' 'references' %}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8m-8 4h8m-8 4h5"></path></svg><span>Справочники</span></a>{% endif %}
+            {% if perms.imports.view_debt %}<a class="nav-link" href="{% url 'imports:reports' %}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8m-8 4h8m-8 4h5"></path></svg><span>Отчёты</span></a><a class="nav-link" href="{% url 'imports:analytics' %}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8m-8 4h8m-8 4h5"></path></svg><span>Аналитика</span></a>{% endif %}
+            {% if perms.imports.view_actionlog %}<a class="nav-link" href="{% url 'imports:action_log' %}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8m-8 4h8m-8 4h5"></path></svg><span>Журнал действий</span></a>{% endif %}
         </nav>
     </aside>
     <button aria-label="Закрыть навигацию" class="sidebar-overlay" data-sidebar-close tabindex="-1"></button>

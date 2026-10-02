@@ -1,0 +1,5 @@
+{% if page_obj.has_other_pages %}<nav class="pagination" aria-label="Страницы">
+{% if page_obj.has_previous %}<a class="btn" href="?{{ query_string }}&page={{ page_obj.previous_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}">Назад</a>{% endif %}
+<span>{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+{% if page_obj.has_next %}<a class="btn" href="?{{ query_string }}&page={{ page_obj.next_page_number }}{% if query %}&q={{ query|urlencode }}{% endif %}">Далее</a>{% endif %}
+</nav>{% endif %}

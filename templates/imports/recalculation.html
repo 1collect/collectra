@@ -1,0 +1,3 @@
+{% extends 'base.html' %}
+{% block heading %}Полный перерасчёт{% endblock %}
+{% block content %}<section class="panel"><div class="panel-body"><h1>Полный перерасчёт</h1><p>Обновляет остатки, распределения, статусы и снимки всех действующих ДБЗ. Ручные распределения и даты закрытия сохраняются. Ошибки попадут в журнал.</p><form method="post">{% csrf_token %}<button class="btn btn-primary">Пересчитать все ДБЗ</button></form></div></section>{% endblock %}

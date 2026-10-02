@@ -216,16 +216,18 @@ def debt_detail(request, debt_id):
     )
     balance = calculate_balance(debt)
     apply_balance(debt, balance)
+    labels = dict(CATEGORY_LABELS)
+    if 'additional_expenses' in balance['current']: labels['additional_expenses'] = 'Дополнительные расходы (ранее внесённые)'
     categories = [{
         'label': label,
         'initial': balance['opening'][field] + balance['own'].get(field, 0),
         'current': balance['current'][field],
-    } for field, label in CATEGORY_LABELS.items()]
+    } for field, label in labels.items()]
     source_rows = [{'label': Debt._meta.get_field(field).verbose_name, 'amount': getattr(debt, field)}
                    for field in PURCHASE_FIELDS]
     for operation in balance['operations']:
-        operation['label'] = {'payment': 'Платёж', 'writeoff': 'Списание', 'expense': 'Расход'}[operation['kind']]
-        operation['parts'] = [{'label': CATEGORY_LABELS[field], 'amount': value}
+        operation['label'] = {'payment': 'Платёж', 'writeoff': 'Списание', 'expense': 'Расход', 'refund': 'Возврат'}[operation['kind']]
+        operation['parts'] = [{'label': labels[field], 'amount': value}
                               for field, value in operation['allocation'].items() if value]
     template = 'imports/partials/debt_balance.html' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'imports/debt_detail.html'
     response = render(request, template, {
@@ -321,6 +323,7 @@ def writeoff_create(request):
                 kind=form.cleaned_data['kind'], category=form.cleaned_data['category'],
                 amount=form.cleaned_data['amount'],
                 writeoff_date=form.cleaned_data['writeoff_date'], created_by=request.user,
+                distribution=form.cleaned_data.get('distribution'), reason=form.cleaned_data['reason'],
             )
         except WriteOffValidationError as error:
             form.add_error(None, str(error))
@@ -378,8 +381,8 @@ def _change_rows(change):
             continue
         model_field = record._meta.get_field(field)
         label = model_field.verbose_name
-        if field == 'debt':
-            debts = Debt.objects.in_bulk([old_value, new_value])
+        if model_field.is_relation:
+            debts = model_field.remote_field.model.objects.in_bulk([v for v in (old_value, new_value) if v is not None])
             old_value = debts.get(old_value, old_value)
             new_value = debts.get(new_value, new_value)
         elif model_field.choices:
@@ -477,7 +480,7 @@ def financial_change_review(request, change_id):
     })
 
 
-@permission_required('imports.add_paymentrefund')
+@permission_required('imports.view_paymentrefund')
 def refund_list(request):
     refunds = PaymentRefund.objects.select_related(
         'payment',

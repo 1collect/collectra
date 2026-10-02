@@ -3,3 +3,8 @@ __pycache__
 *.pyc
 .git
 db.sqlite3
+artifacts/
+media/
+circuit-admin/
+*.xlsx
+*.zip

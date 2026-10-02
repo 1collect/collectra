@@ -76,7 +76,7 @@ class DynamicBalanceTests(TestCase):
         Payment.objects.create(debt=self.debt, amount=1000, status='individual', payment_date=date(2026, 10, 1))
         response = self.client.get(reverse('imports:debts'), {'status': 'closed'})
         self.assertEqual(response.context['page_obj'].paginator.count, 1)
-        self.assertEqual(response.context['page_obj'][0].status, 'closed')
+        self.assertEqual(response.context['page_obj'][0].status, 'closed_paid')
         Expense.objects.create(debt=self.debt, state_duty=100, expense_date=date(2026, 10, 2))
         response = self.client.get(reverse('imports:debts'), {'status': 'closed'})
         self.assertEqual(response.context['page_obj'].paginator.count, 0)

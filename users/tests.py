@@ -144,7 +144,8 @@ class ContractImportSchemaTests(TestCase):
         import_type = ImportType.objects.get(code='contracts')
 
         self.assertEqual(import_type.name, 'Импорт договоров')
-        self.assertEqual(len(import_type.expected_columns), 12)
+        from imports.services import CONTRACT_IMPORT_COLUMNS
+        self.assertEqual(import_type.expected_columns, list(CONTRACT_IMPORT_COLUMNS))
         self.assertEqual(import_type.expected_columns[:3], ['ДБЗ', 'ИИН', 'ФИО'])
 
     def test_one_debtor_can_have_multiple_debts(self):

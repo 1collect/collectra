@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models, router, transaction
+from django.utils import timezone
 
 from .audit import audit_user, record_snapshot
 
@@ -32,6 +33,9 @@ class AuditedFinancialRecord(models.Model):
                     old_data=old_data, new_data=new_data,
                     actor=actor or (getattr(self, 'created_by', None) if not previous else None), reason=reason,
                 )
+                from .audit import log_action
+                log_action('corrected' if previous else 'created', self, actor=actor, reason=reason,
+                           details={'old': old_data, 'new': new_data})
 
 
 class ImportType(models.Model):
@@ -170,6 +174,14 @@ class CollectionAgency(models.Model):
 
 
 class Debtor(models.Model):
+    birth_date = models.DateField('Дата рождения', null=True, blank=True)
+    gender = models.CharField('Пол', max_length=40, blank=True)
+    document_type = models.CharField('Тип документа', max_length=100, blank=True)
+    document_issue_date = models.DateField('Дата выдачи документа', null=True, blank=True)
+    document_issuer = models.CharField('Орган выдачи', max_length=200, blank=True)
+    residential_address = models.CharField('Адрес проживания', max_length=500, blank=True)
+    region = models.CharField('Регион', max_length=150, blank=True)
+    kato = models.CharField('КАТО', max_length=20, blank=True)
     full_name = models.CharField('ФИО', max_length=255)
     iin = models.CharField(
         'ИИН',
@@ -192,6 +204,30 @@ class Debt(models.Model):
     class Status(models.TextChoices):
         ACTIVE = 'active', 'Активен'
         CLOSED = 'closed', 'Закрыт'
+        CLOSED_PAID = 'closed_paid', 'Закрыт платежами'
+        CLOSED_WRITTEN_OFF = 'closed_written_off', 'Закрыт списанием'
+        CLOSED_MIXED = 'closed_mixed', 'Закрыт платежами и списаниями'
+        CANCELLED = 'cancelled', 'Отменён'
+
+    collection_agency = models.ForeignKey(CollectionAgency, on_delete=models.PROTECT, null=True, blank=True, verbose_name='Коллекторское агентство')
+    original_creditor = models.ForeignKey('Creditor', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Первичный кредитор')
+    cession = models.ForeignKey('Cession', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Договор цессии')
+    registry_number = models.CharField('Номер реестра', max_length=100, blank=True)
+    registry_date = models.DateField('Дата реестра', null=True, blank=True)
+    dbz_start_date = models.DateField('Начало ДБЗ', null=True, blank=True)
+    dbz_end_date = models.DateField('Окончание ДБЗ', null=True, blank=True)
+    issued_credit_amount = models.DecimalField('Выданный кредит', max_digits=20, decimal_places=2, default=0)
+    overdue_days_at_registry_date = models.PositiveIntegerField('Дни просрочки на дату реестра', default=0)
+    manual_closed_at = models.DateField('Ручная дата закрытия', null=True, blank=True)
+    needs_manual_review = models.BooleanField('Требуется проверка', default=False)
+    recalculation_error_message = models.TextField('Ошибка перерасчёта', blank=True)
+    has_overpayment = models.BooleanField('Есть переплата', default=False)
+
+    @property
+    def overdue_days(self):
+        from django.utils import timezone
+        end = self.closed_at or timezone.localdate()
+        return self.overdue_days_at_registry_date + max((end - self.registry_date).days, 0) if self.registry_date else self.overdue_days_at_registry_date
 
     MONEY = {'max_digits': 20, 'decimal_places': 2, 'default': 0}
 
@@ -239,15 +275,17 @@ class Debt(models.Model):
         ordering = ['contract_number']
         verbose_name = 'задолженность'
         verbose_name_plural = 'задолженности'
+        permissions = [('recalculate_debt', 'Запуск полного перерасчёта'), ('export_debt', 'Выгрузка данных и отчётов')]
 
     def __str__(self):
         return self.contract_number
 
 
 class Expense(AuditedFinancialRecord):
+    operation_status = models.CharField('Состояние', max_length=20, default='active', choices=[('active', 'Действует'), ('corrected', 'Скорректирован'), ('cancelled', 'Отменён')])
     audit_fields = (
         'debt', 'state_duty', 'representative_expenses', 'notary_expenses',
-        'postal_expenses', 'claim_security', 'additional_expenses', 'expense_date',
+        'postal_expenses', 'claim_security', 'additional_expenses', 'expense_date', 'operation_status',
     )
     MONEY = {'max_digits': 20, 'decimal_places': 2, 'default': 0}
 
@@ -280,7 +318,14 @@ class Expense(AuditedFinancialRecord):
 
 
 class Payment(AuditedFinancialRecord):
-    audit_fields = ('debt', 'amount', 'status', 'payment_date', 'refunded_amount', 'refund_status')
+    operation_status = models.CharField('Состояние', max_length=20, default='active', choices=[('active', 'Действует'), ('corrected', 'Скорректирован'), ('cancelled', 'Отменён')])
+    account = models.ForeignKey('CompanyAccount', on_delete=models.PROTECT, null=True, blank=True, verbose_name='Счёт компании')
+    transfer_date = models.DateField('Дата перевода', null=True, blank=True)
+    distribution_mode = models.CharField('Распределение', max_length=20, default='automatic', choices=[('automatic', 'Автоматическое'), ('manual', 'Ручное')])
+    manual_comment = models.TextField('Причина ручного распределения', blank=True)
+    distribution = models.JSONField('Ручное распределение', default=dict, blank=True)
+    created_at = models.DateTimeField(default=timezone.now, editable=False)
+    audit_fields = ('debt', 'amount', 'status', 'payment_date', 'refunded_amount', 'refund_status', 'account', 'transfer_date', 'operation_status', 'distribution_mode', 'manual_comment', 'distribution')
     class Status(models.TextChoices):
         CHSI = 'chsi', 'ЧСИ'
         INDIVIDUAL = 'individual', 'Физическое лицо'
@@ -345,12 +390,19 @@ class Payment(AuditedFinancialRecord):
         return max(self.amount - self.refunded_amount, 0)
 
     @property
+    def payment_state(self):
+        if self.operation_status == 'cancelled': return 'cancelled'
+        return {'refunded': 'returned', 'partially_refunded': 'partially_returned'}.get(self.refund_status, 'active')
+
+    @property
     def refundable_amount(self):
         return self.effective_amount
 
 
 class WriteOff(AuditedFinancialRecord):
-    audit_fields = ('debt', 'writeoff_date', 'kind', 'category', 'amount', 'distribution')
+    operation_status = models.CharField('Состояние', max_length=20, default='active', choices=[('active', 'Действует'), ('corrected', 'Скорректирован'), ('cancelled', 'Отменён')])
+    reason = models.TextField('Основание списания', blank=True)
+    audit_fields = ('debt', 'writeoff_date', 'kind', 'category', 'amount', 'distribution', 'reason', 'operation_status')
     class Kind(models.TextChoices):
         FULL = 'full', 'Полное списание'
         PARTIAL = 'partial', 'Частичное списание'
@@ -396,6 +448,7 @@ class WriteOff(AuditedFinancialRecord):
             models.CheckConstraint(
                 condition=(
                     models.Q(kind='full', category='')
+                    | models.Q(kind='partial', category='')
                     | models.Q(kind='partial', category__in=(
                         'purchase_principal',
                         'purchase_interest', 'purchase_penalties', 'purchase_receivable',
@@ -581,3 +634,92 @@ class PaymentRefund(models.Model):
             raise ValidationError({'amount': 'Сумма возврата должна быть больше нуля.'})
         if not (self.reason or '').strip():
             raise ValidationError({'reason': 'Укажите основание возврата.'})
+
+
+class Creditor(models.Model):
+    name = models.CharField('Наименование', max_length=255, unique=True)
+    bin = models.CharField('БИН', max_length=12, blank=True, validators=[RegexValidator(r'^\d{12}$', 'БИН должен содержать 12 цифр.')])
+    class Meta:
+        ordering = ('name',)
+        verbose_name_plural = 'Первичные кредиторы'
+    def __str__(self):
+        return self.name
+
+
+class Cession(models.Model):
+    number = models.CharField('Номер договора', max_length=100)
+    date = models.DateField('Дата договора')
+    creditor = models.ForeignKey(Creditor, on_delete=models.PROTECT, verbose_name='Первичный кредитор')
+    class Meta:
+        ordering = ('number',)
+        constraints = [models.UniqueConstraint(fields=('number', 'date', 'creditor'), name='unique_cession')]
+        verbose_name_plural = 'Договоры цессии'
+    def __str__(self):
+        return f'{self.number} от {self.date:%d.%m.%Y} — {self.creditor}'
+
+
+class CompanyAccount(models.Model):
+    number = models.CharField('Номер счёта', max_length=100, unique=True)
+    agency = models.ForeignKey(CollectionAgency, on_delete=models.PROTECT, verbose_name='КА')
+    class Meta:
+        ordering = ('number',)
+        verbose_name_plural = 'Счета компаний'
+    def __str__(self):
+        return f'{self.number} — {self.agency}'
+
+
+class ReferenceValue(models.Model):
+    kind = models.CharField('Справочник', max_length=50, choices=[('region', 'Регионы'), ('kato', 'КАТО'), ('gender', 'Пол'), ('document_type', 'Тип документа'), ('document_issuer', 'Орган выдачи'), ('writeoff_reason', 'Основания списания'), ('cancellation_reason', 'Основания отмены/удаления')])
+    name = models.CharField('Значение', max_length=255)
+    code = models.CharField('Код', max_length=50, blank=True)
+    class Meta:
+        ordering = ('kind', 'name')
+        constraints = [models.UniqueConstraint(fields=('kind', 'name'), name='unique_reference_value')]
+    def __str__(self):
+        return self.name
+
+
+class ActionLog(models.Model):
+    actor = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    action = models.CharField('Действие', max_length=60)
+    object_type = models.CharField('Тип объекта', max_length=80, blank=True)
+    object_id = models.CharField('ID', max_length=80, blank=True)
+    reason = models.TextField('Основание', blank=True)
+    details = models.JSONField('Было / стало / результат', default=dict, blank=True)
+    created_at = models.DateTimeField('Дата', auto_now_add=True)
+    class Meta:
+        ordering = ('-created_at', '-id')
+
+
+class BalanceSnapshot(models.Model):
+    debt = models.ForeignKey(Debt, on_delete=models.CASCADE, related_name='balance_snapshots')
+    snapshot_date = models.DateField('На дату')
+    balances = models.JSONField(default=dict)
+    outstanding_amount = models.DecimalField(max_digits=20, decimal_places=2)
+    overpayment_amount = models.DecimalField(max_digits=20, decimal_places=2)
+    status = models.CharField(max_length=20)
+    closed_at = models.DateField(null=True, blank=True)
+    paid_amount = models.DecimalField(max_digits=20, decimal_places=2, default=0)
+    written_off_amount = models.DecimalField(max_digits=20, decimal_places=2, default=0)
+    calculation_source = models.CharField(max_length=60, default='recalculation')
+    created_at = models.DateTimeField(auto_now=True)
+    class Meta:
+        ordering = ('snapshot_date',)
+        constraints = [models.UniqueConstraint(fields=('debt', 'snapshot_date'), name='unique_balance_snapshot')]
+
+
+class PaymentDistribution(models.Model):
+    payment = models.OneToOneField(Payment, on_delete=models.CASCADE, related_name='calculated_distribution')
+    amounts = models.JSONField(default=dict)
+    overpayment_amount = models.DecimalField(max_digits=20, decimal_places=2, default=0)
+    mode = models.CharField(max_length=20)
+    updated_at = models.DateTimeField(auto_now=True)
+
+
+class CaseDocument(models.Model):
+    debt = models.ForeignKey(Debt, on_delete=models.CASCADE, related_name='documents')
+    title = models.CharField('Название', max_length=255)
+    kind = models.CharField('Вид', max_length=30, choices=[('court', 'Решение суда'), ('enforcement', 'Исполнительный документ'), ('payment', 'Подтверждение платежа'), ('writeoff', 'Документ списания'), ('refund', 'Документ возврата'), ('registry', 'Реестр'), ('other', 'Другой')])
+    file = models.FileField('Файл', upload_to='case_documents/%Y/%m/')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
+    created_at = models.DateTimeField(auto_now_add=True)

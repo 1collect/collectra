@@ -7,6 +7,7 @@ from .models import CollectionAgency, Counterparty, Debt, Expense, ImportType, P
 
 
 class WriteOffForm(forms.ModelForm):
+    reason = forms.CharField(label='Основание списания', widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
     amount = forms.DecimalField(
         label='Сумма списания', max_digits=20, decimal_places=2,
         min_value=Decimal('0.01'), required=False,
@@ -29,16 +30,23 @@ class WriteOffForm(forms.ModelForm):
         self.fields['debt'].empty_label = 'Выберите договор'
         self.fields['category'].choices = [('', 'Выберите категорию'), *WriteOff.Category.choices]
         self.fields['category'].help_text = 'Для частичного списания выберите одну категорию.'
+        from .balances import CATEGORY_LABELS
+        for key, label in CATEGORY_LABELS.items():
+            self.fields['part_' + key] = forms.DecimalField(label=label, min_value=0, max_digits=20, decimal_places=2, required=False, widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '.01'}))
 
     def clean(self):
         data = super().clean()
-        if data.get('kind') == WriteOff.Kind.PARTIAL and not data.get('category'):
+        parts = {name.removeprefix('part_'): str(value) for name, value in data.items() if name.startswith('part_') and value}
+        data['distribution'] = parts
+        if data.get('kind') == WriteOff.Kind.PARTIAL and not data.get('category') and not parts:
             self.add_error('category', 'Выберите категорию частичного списания.')
         if data.get('kind') == WriteOff.Kind.PARTIAL and data.get('amount') is None:
             self.add_error('amount', 'Укажите сумму частичного списания.')
         if data.get('kind') == WriteOff.Kind.FULL:
             data['category'] = ''
             data['amount'] = None
+        if data.get('kind') == WriteOff.Kind.PARTIAL and parts and sum((Decimal(v) for v in parts.values()), Decimal('0')) != data.get('amount'):
+            self.add_error('amount', 'Сумма по категориям должна равняться сумме списания.')
         return data
 
 
@@ -59,9 +67,19 @@ class ChangeReasonMixin(forms.ModelForm):
 
 
 class PaymentChangeForm(ChangeReasonMixin, forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['account'].widget.attrs['class'] = 'form-control'
+        self.fields['transfer_date'].widget = forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'})
+    def clean(self):
+        data = forms.ModelForm.clean(self)
+        account, debt = data.get('account'), data.get('debt')
+        if account and debt and debt.collection_agency_id and account.agency_id != debt.collection_agency_id:
+            self.add_error('account', 'Счёт принадлежит другому КА.')
+        return data
     class Meta:
         model = Payment
-        fields = ('debt', 'amount', 'status', 'payment_date')
+        fields = ('debt', 'amount', 'status', 'payment_date', 'account', 'transfer_date')
         widgets = {
             'debt': forms.Select(attrs={'class': 'form-control'}),
             'amount': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
@@ -81,6 +99,12 @@ class PaymentChangeForm(ChangeReasonMixin, forms.ModelForm):
 
 
 class ExpenseChangeForm(ChangeReasonMixin, forms.ModelForm):
+    def clean(self):
+        data = super().clean()
+        for field in self.Meta.fields:
+            if field not in ('debt', 'expense_date') and data.get(field) is not None and data[field] < 0:
+                self.add_error(field, 'Сумма расхода не может быть отрицательной.')
+        return data
     class Meta:
         model = Expense
         fields = (
@@ -100,6 +124,11 @@ class ExpenseChangeForm(ChangeReasonMixin, forms.ModelForm):
 
 
 class PaymentCreateForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['account'].widget.attrs['class'] = 'form-control'
+        self.fields['transfer_date'].widget = forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'})
+    clean = PaymentChangeForm.clean
     class Meta(PaymentChangeForm.Meta):
         widgets = {
             **PaymentChangeForm.Meta.widgets,
@@ -122,6 +151,9 @@ class ExpenseCreateForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['additional_expenses'].widget = forms.HiddenInput()
+        self.fields['additional_expenses'].disabled = True
+        self.fields['additional_expenses'].initial = 0
         for name in self.Meta.fields:
             if name not in ('debt', 'expense_date'):
                 self.fields[name].required = False
@@ -260,6 +292,7 @@ class PaymentRefundForm(forms.ModelForm):
             'debt',
         ).filter(
             amount__gt=F('refunded_amount'),
+            operation_status__in=('active', 'corrected'),
         ).order_by('-payment_date', '-id')
 
     def clean(self):

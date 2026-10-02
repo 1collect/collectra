@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+{% block content %}
+<div class="page-header"><h1>{{ title }}</h1>{% if can_add %}<a class="btn btn-primary" href="{% url 'imports:catalog_new' kind %}">Добавить</a>{% endif %}</div>
+<form method="get" class="panel-body"><input class="form-control" name="q" value="{{ query }}" placeholder="Поиск"><button class="btn">Найти</button></form>
+<section class="panel"><div class="table-container"><table class="table"><thead><tr>{% for field in fields %}<th>{{ field.verbose_name }}</th>{% endfor %}<th>Действия</th></tr></thead><tbody>{% for row in rows %}<tr>{% for value in row.values %}<td>{{ value|default_if_none:'—' }}</td>{% endfor %}<td>{% if can_edit %}<a class="btn btn-sm" href="{% url 'imports:catalog_edit' kind row.obj.pk %}">Изменить</a>{% endif %}{% if can_delete %}<a class="btn btn-sm" href="{% url 'imports:catalog_delete' kind row.obj.pk %}">Удалить</a>{% endif %}</td></tr>{% empty %}<tr><td>Нет записей</td></tr>{% endfor %}</tbody></table></div></section>
+{% include 'imports/project_pagination.html' %}
+{% endblock %}

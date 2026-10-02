@@ -33,12 +33,12 @@ class FixedDebtTotalTests(TestCase):
                     response = self.client.get(url, **headers)
                     self.assertEqual(response.status_code, 200)
                     shown = response.context['debt'] if url_name == 'debt_detail' else response.context['page_obj'][0]
-                    self.assertEqual(shown.total_amount, 1000)
+                    self.assertEqual(shown.total_amount, accrued)
                     self.assertEqual(shown.accrued_amount, accrued)
                     self.assertEqual(shown.outstanding_amount, outstanding)
                     self.assertEqual(sum(shown.current.values()), outstanding)
                     if url_name == 'debts':
-                        self.assertContains(response, '<strong>1000,00</strong>', html=True)
+                        self.assertContains(response, f'<strong>{accrued},00</strong>', html=True)
                     else:
                         self.assertContains(response, 'Общая сумма задолженности:')
         self.debt.refresh_from_db()
@@ -67,5 +67,5 @@ class FixedDebtTotalTests(TestCase):
         self.debt.purchase_principal = Decimal('700')
         self.debt.save(update_fields=['purchase_principal'])
         balance = calculate_balance(self.debt)
-        self.assertEqual(balance['total_amount'], 1000)
+        self.assertEqual(balance['total_amount'], 1100)
         self.assertEqual(balance['opening_difference'], -100)

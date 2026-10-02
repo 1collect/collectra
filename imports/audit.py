@@ -6,6 +6,14 @@ from decimal import Decimal
 audit_user = ContextVar('financial_audit_user', default=None)
 
 
+def log_action(action, obj=None, *, actor=None, reason='', details=None):
+    from .models import ActionLog
+    return ActionLog.objects.create(actor=actor or audit_user.get(), action=action,
+        object_type=obj._meta.model_name if obj is not None else '',
+        object_id=str(obj.pk) if obj is not None else '', reason=reason,
+        details=details or {})
+
+
 class FinancialAuditMiddleware:
     def __init__(self, get_response):
         self.get_response = get_response

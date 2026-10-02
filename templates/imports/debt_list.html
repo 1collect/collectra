@@ -6,11 +6,13 @@
 {% block content %}
 <div class="page-header">
     <div><div class="page-eyebrow">Данные / Задолженности</div><h1>Договоры</h1></div>
+    {% if perms.imports.add_debt %}<a class="btn btn-primary" href="{% url 'imports:debt_new' %}">Добавить ДБЗ</a>{% endif %}
+    <a class="btn" href="{% url 'imports:reports' %}">Отчёты и выгрузки</a>
 </div>
 <section class="panel">
     <div class="panel-header"><h2>Реестр договоров <span class="badge">{{ page_obj.paginator.count }}</span></h2><span class="badge badge-neutral">По 25 записей</span></div>
     <div class="panel-body">
-        <p class="text-muted">Общая сумма задолженности сохраняется из исходных данных договора. Текущие остатки учитывают платежи, расходы, списания и возвраты. Откройте ДБЗ, чтобы сравнить их с исходными суммами. <span data-balance-status role="status">Автообновление включено.</span></p>
+        <p class="text-muted">Общая сумма включает задолженность по выкупу и наши расходы. Текущий остаток учитывает платежи, списания и возвраты. <span data-balance-status role="status">Автообновление включено.</span></p>
         <form method="get" class="form-inline">
             <input id="debt-search" class="form-control" type="search" name="q" value="{{ query }}" placeholder="ДБЗ, ФИО или ИИН" aria-label="Поиск договоров">
             <select class="form-control" name="status" aria-label="Статус договора">
