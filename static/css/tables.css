@@ -1,5 +1,5 @@
 /* Scroll is scoped to tables; the page itself never needs horizontal scroll. */
-.table-container { overflow: auto; max-width: 100%; scrollbar-width: thin; }
+.table-container { overflow: auto; max-width: 100%; scrollbar-width: thin; container-type: inline-size; }
 .table { width: 100%; border-collapse: separate; border-spacing: 0; text-align: left; font-family: var(--font-sans); font-size: var(--text-small); line-height: 1.5; white-space: nowrap; }
 .table th { position: sticky; top: 0; z-index: 1; background: var(--bg-subtle); color: var(--text-primary); font-weight: 600; height: var(--row-height); padding: var(--space-3); border-bottom: 2px solid var(--border-strong); white-space: normal; vertical-align: middle; }
 .table td { height: var(--row-height); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-color); vertical-align: middle; }
@@ -51,6 +51,7 @@
 .column-menu .check { display: flex; padding: 4px 7px; min-height: 26px; }
 .table-result-info { min-height: 15px; }
 .table .empty-state { white-space: normal; }
+.table td[colspan] .empty-state { position: sticky; left: 0; width: calc(100cqw - var(--space-5)); max-width: 100%; }
 
 /* Import history: keep the record key visible while the wide table scrolls. */
 .import-table { width: max-content; min-width: 100%; table-layout: fixed; }

@@ -12,6 +12,7 @@ a:hover { text-decoration: underline; }
 img, svg { vertical-align: middle; }
 img { max-width: 100%; }
 h1, h2, h3, h4, h5, h6, p { margin: 0; }
+strong, b { font-weight: 600; }
 h1 { font-size: var(--text-heading); font-weight: 600; letter-spacing: -.4px; line-height: 1.4; }
 h2 { font-size: var(--text-section); font-weight: 600; } h3 { font-size: var(--text-body); font-weight: 600; }
 h4 { font-size: var(--text-body); } h5 { font-size: var(--text-small); } h6 { font-size: var(--text-caption); text-transform: uppercase; letter-spacing: .5px; }

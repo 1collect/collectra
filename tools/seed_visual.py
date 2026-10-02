@@ -17,6 +17,12 @@ User = get_user_model()
 admin, _ = User.objects.get_or_create(username='visual-review', defaults={'is_staff': True, 'is_superuser': True, 'first_name': 'Анна', 'last_name': 'Смирнова'})
 admin.set_password('visual-review-local')
 admin.save()
+for username, permission in [('visual-no-access', None), ('visual-upload-only', 'add_import')]:
+    review_user, _ = User.objects.get_or_create(username=username)
+    review_user.set_password('visual-review-local')
+    review_user.save()
+    if permission:
+        review_user.user_permissions.add(Permission.objects.get(codename=permission, content_type__app_label='imports'))
 role, _ = Role.objects.get_or_create(name='Специалист по платежам')
 role.permissions.set(Permission.objects.filter(content_type__app_label='imports'))
 group, _ = PermissionGroup.objects.get_or_create(name='Работа с реестрами')
@@ -33,6 +39,7 @@ for n in range(1, 29):
         PaymentRefund.objects.get_or_create(payment=payment, defaults={'amount': '1250', 'refund_date': '2026-10-02', 'reason': 'Возврат излишне перечисленных средств по заявлению плательщика с уточнением реквизитов договора.', 'payment_category': payment.status, 'created_by': admin})
         FinancialChangeRequest.objects.get_or_create(payment=payment, defaults={'old_data': {'amount': '125000.50'}, 'new_data': {'amount': '120000.50'}, 'reason': 'Уточнение суммы после сверки с банковской выпиской. Длинное основание для проверки переноса текста.', 'requested_by': admin})
 kind = ImportType.objects.get(code='contracts')
+Import.objects.get_or_create(file_name='', defaults={'import_type': kind, 'created_by': None})
 for n, status in enumerate(['completed', 'failed', 'processing', 'new'], 1):
     record, _ = Import.objects.get_or_create(file_name=f'Реестр_договоров_с_длинным_названием_сверка_за_октябрь_2026_{n}.xlsx', defaults={'import_type': kind, 'created_by': admin, 'status': status, 'total_items': 60, 'successful_items': 58, 'failed_items': 2, 'error_message': 'Не удалось обработать строки: проверьте ИИН и номер договора.' if status == 'failed' else '', 'metadata': {'columns': ['Договор', 'ФИО', 'Сумма']}})
     for row in range(1, 61):

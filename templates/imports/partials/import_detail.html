@@ -6,7 +6,7 @@
     </div>
     <div class="master-detail__meta">
         <span><strong>Тип:</strong> {{ selected_import.import_type.name }}</span>
-        <span><strong>Автор:</strong> {{ selected_import.created_by.get_full_name|default:selected_import.created_by.username|default:'—' }}</span>
+        <span><strong>Автор:</strong> {% if selected_import.created_by %}{{ selected_import.created_by.get_full_name|default:selected_import.created_by.username }}{% else %}—{% endif %}</span>
         <span><strong>Загружен:</strong> {{ selected_import.created_at|date:'d.m.Y H:i' }}</span>
     </div>
     <div class="master-detail__summary">
