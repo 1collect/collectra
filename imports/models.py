@@ -78,6 +78,8 @@ class Import(models.Model):
         related_name='imports',
     )
     file_name = models.CharField(max_length=255, blank=True)
+    check_file = models.FileField(upload_to='import_checks/%Y/%m/', blank=True, editable=False)
+    check_heartbeat = models.DateTimeField(null=True, blank=True, editable=False)
     status = models.CharField(
         max_length=20,
         choices=Status.choices,
@@ -724,12 +726,3 @@ class PaymentDistribution(models.Model):
     overpayment_amount = models.DecimalField(max_digits=20, decimal_places=2, default=0)
     mode = models.CharField(max_length=20)
     updated_at = models.DateTimeField(auto_now=True)
-
-
-class CaseDocument(models.Model):
-    debt = models.ForeignKey(Debt, on_delete=models.CASCADE, related_name='documents')
-    title = models.CharField('Название', max_length=255)
-    kind = models.CharField('Вид', max_length=30, choices=[('court', 'Решение суда'), ('enforcement', 'Исполнительный документ'), ('payment', 'Подтверждение платежа'), ('writeoff', 'Документ списания'), ('refund', 'Документ возврата'), ('registry', 'Реестр'), ('other', 'Другой')])
-    file = models.FileField('Файл', upload_to='case_documents/%Y/%m/')
-    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.PROTECT)
-    created_at = models.DateTimeField(auto_now_add=True)

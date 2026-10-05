@@ -6,7 +6,7 @@ services:
       - .:/app
     ports:
       - "8765:8000"
-    environment:
+    environment: &app_environment
       DJANGO_DEBUG: "1"
       DJANGO_SECRET_KEY: dev-secret-key
       POSTGRES_DB: payments
@@ -31,6 +31,19 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+
+  import-worker:
+    build: .
+    command: python manage.py import_worker
+    restart: unless-stopped
+    volumes:
+      - .:/app
+    environment: *app_environment
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
 
 volumes:
   postgres_data:

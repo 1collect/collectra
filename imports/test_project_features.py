@@ -1,15 +1,13 @@
 from datetime import date
 from decimal import Decimal
 from io import BytesIO
-from tempfile import TemporaryDirectory
 from unittest.mock import patch
 from django.contrib.auth.models import Permission, User
-from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase, override_settings
+from django.test import TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 from .balances import calculate_balance
-from .models import ActionLog, BalanceSnapshot, Debt, Debtor, Payment, PaymentRefund, PaymentDistribution, Expense, WriteOff, CollectionAgency, Creditor, Cession, CompanyAccount, CaseDocument, Import, ImportType
+from .models import ActionLog, BalanceSnapshot, Debt, Debtor, Payment, PaymentRefund, PaymentDistribution, Expense, WriteOff, CollectionAgency, Creditor, Cession, CompanyAccount, Import, ImportType
 from .operations import cancel_record, delete_record, balance_on
 from .services import recalculate_debt, create_payment_refund, create_writeoff, process_xlsx_import, CONTRACT_IMPORT_COLUMNS, WRITEOFF_IMPORT_COLUMNS
 from .reports import period_bounds, report_rows
@@ -25,6 +23,23 @@ class ProjectFeaturesTests(TestCase):
 
     def payment(self, amount=500, day=date(2026, 10, 1)):
         return Payment.objects.create(debt=self.debt, amount=amount, status='individual', payment_date=day)
+
+    def test_contract_documents_are_removed(self):
+        response = self.client.get(reverse('imports:debt_detail', args=[self.debt.pk]))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Добавить документ')
+        self.assertNotContains(response, '/documents/')
+        for path in (
+            f'/imports/contracts/{self.debt.pk}/documents/new/',
+            '/imports/documents/1/download/',
+            '/imports/documents/1/delete/',
+        ):
+            for method in (self.client.get, self.client.post):
+                with self.subTest(path=path, method=method.__name__):
+                    self.assertEqual(method(path).status_code, 404)
+        self.assertFalse(Permission.objects.filter(
+            content_type__app_label='imports', content_type__model='casedocument',
+        ).exists())
 
     def test_manual_payment_does_not_follow_automatic_queue(self):
         payment = self.payment(300)
@@ -200,16 +215,6 @@ class ProjectFeaturesTests(TestCase):
         for kind in ('debtors', 'creditors', 'cessions', 'accounts', 'references'):
             self.assertEqual(self.client.get(reverse('imports:catalog', args=[kind])).status_code, 200)
             self.assertEqual(self.client.get(reverse('imports:catalog_new', args=[kind])).status_code, 200)
-
-    def test_document_upload_download_and_access(self):
-        with TemporaryDirectory() as root, override_settings(MEDIA_ROOT=root):
-            response = self.client.post(reverse('imports:document_add', args=[self.debt.pk]), {'title': 'Решение', 'kind': 'court', 'file': SimpleUploadedFile('decision.pdf', b'%PDF-test')})
-            self.assertEqual(response.status_code, 302)
-            document = CaseDocument.objects.get()
-            response = self.client.get(reverse('imports:document_download', args=[document.pk]))
-            self.assertEqual(b''.join(response.streaming_content), b'%PDF-test')
-            self.client.force_login(User.objects.create_user('no-document-access'))
-            self.assertEqual(self.client.get(reverse('imports:document_download', args=[document.pk])).status_code, 403)
 
     def test_template_download_has_expanded_columns(self):
         response = self.client.get(reverse('imports:import_template', args=['contracts']))

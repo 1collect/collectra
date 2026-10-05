@@ -5,6 +5,9 @@
     if (!sidebar) return;
     const media = window.matchMedia('(max-width: 800px)');
     const toggle = A.$('[data-sidebar-toggle]');
+    try {
+      document.documentElement.classList.toggle('sidebar-collapsed', localStorage.getItem('circuit.sidebar') === 'collapsed');
+    } catch (_) {}
     let returnFocus = null;
     const setMobile = open => {
       if (open) returnFocus = document.activeElement;
@@ -18,7 +21,8 @@
     const sync = () => {
       if (!media.matches) {
         document.body.classList.remove('sidebar-open');
-        sidebar.inert = false; A.$('.shell-main').inert = false;
+        sidebar.inert = document.documentElement.classList.contains('sidebar-collapsed');
+        A.$('.shell-main').inert = false;
         toggle.setAttribute('aria-expanded', String(!document.documentElement.classList.contains('sidebar-collapsed')));
       } else setMobile(false);
     };
@@ -28,6 +32,7 @@
         const collapsed = document.documentElement.classList.toggle('sidebar-collapsed');
         toggle.setAttribute('aria-expanded', String(!collapsed));
         try { localStorage.setItem('circuit.sidebar', collapsed ? 'collapsed' : 'expanded'); } catch (_) {}
+        sync();
       }
     });
     A.$('[data-sidebar-close]').addEventListener('click', () => setMobile(false));

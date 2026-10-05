@@ -4,8 +4,8 @@ from .models import (
     CollectionAgency, Counterparty, Debt, Debtor, Expense, FinancialChangeRequest, Import,
     ImportItem, ImportType, Payment, PaymentRefund, WriteOff, FinancialRecordHistory,
 )
-from .models import Creditor, Cession, CompanyAccount, ReferenceValue, CaseDocument, ActionLog, BalanceSnapshot, PaymentDistribution
-admin.site.register([Creditor, Cession, CompanyAccount, ReferenceValue, CaseDocument])
+from .models import Creditor, Cession, CompanyAccount, ReferenceValue, ActionLog, BalanceSnapshot, PaymentDistribution
+admin.site.register([Creditor, Cession, CompanyAccount, ReferenceValue])
 
 @admin.register(ActionLog, BalanceSnapshot, PaymentDistribution)
 class LedgerReadOnlyAdmin(admin.ModelAdmin):

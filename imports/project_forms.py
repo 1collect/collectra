@@ -1,6 +1,6 @@
 from decimal import Decimal
 from django import forms
-from .models import Debtor, Debt, Creditor, Cession, CompanyAccount, ReferenceValue, CaseDocument, Payment, PaymentRefund, WriteOff
+from .models import Debtor, Debt, Creditor, Cession, CompanyAccount, ReferenceValue, Payment, PaymentRefund, WriteOff
 from .balances import CATEGORY_LABELS, PURCHASE_FIELDS
 from .ledger import allocation_values
 
@@ -125,16 +125,6 @@ class RefundEditForm(StyledForm):
         if data.get('amount') is not None and (data['amount'] <= 0 or data['amount'] + others > self.instance.payment.amount): self.add_error('amount', 'Возврат превышает доступную сумму или не положителен.')
         if data.get('refund_date') and data['refund_date'] < self.instance.payment.payment_date: self.add_error('refund_date', 'Возврат не может быть раньше платежа.')
         return data
-
-
-class DocumentForm(StyledForm):
-    class Meta:
-        model = CaseDocument
-        fields = ('title', 'kind', 'file')
-    def clean_file(self):
-        file = self.cleaned_data['file']
-        if file.size > 20 * 1024 * 1024: raise forms.ValidationError('Размер файла не должен превышать 20 МБ.')
-        return file
 
 
 class ReasonForm(forms.Form):

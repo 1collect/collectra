@@ -96,7 +96,6 @@
 .command-hint { padding: 8px 12px; font-size: var(--text-caption); color: var(--text-muted); border-top: 1px solid var(--border-color); }
 .permission-table td:not(:first-child), .permission-table th:not(:first-child) { text-align: center; }
 .import-preview__stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; padding: 12px; background: var(--bg-subtle); }
-.import-preview__rows { max-height: 520px; }
 .import-preview__check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
 .import-preview__check input { margin-top: 3px; flex-shrink: 0; }
 .import-preview .panel-header { flex-wrap: wrap; overflow-wrap: anywhere; }

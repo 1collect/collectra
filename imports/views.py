@@ -6,7 +6,8 @@ from django.core.exceptions import PermissionDenied
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
 from django.db import transaction
-from django.http import FileResponse
+from django.http import FileResponse, JsonResponse
+from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.urls import reverse
@@ -150,6 +151,10 @@ def import_upload(request):
             file_size=uploaded_file.size,
             created_by=request.user,
         )
+        if request.headers.get('X-Import-Async') == '1':
+            from .background import queue_check
+            queue_check(import_record, uploaded_file)
+            return JsonResponse({'import_id': import_record.pk, 'status_url': reverse('imports:status')}, status=202)
         process_xlsx_import(import_record, uploaded_file, preview_only=True)
         if import_record.status == Import.Status.REVIEW:
             return redirect('imports:preview', import_id=import_record.pk)
@@ -163,6 +168,21 @@ def import_upload(request):
         return render(request, 'imports/import_list.html', context)
 
     return render(request, 'imports/import_upload.html', {'form': form})
+
+
+@permission_required('imports.view_import')
+@require_GET
+def import_status(request):
+    records = list(Import.objects.select_related('import_type', 'created_by'))
+    for record in records:
+        add_progress(record)
+    response = JsonResponse({
+        'html': render_to_string('imports/partials/import_rows.html', {'imports': records}, request=request),
+        'pending': any(record.status in (Import.Status.NEW, Import.Status.PROCESSING) for record in records),
+        'count': len(records),
+    })
+    response['Cache-Control'] = 'no-store'
+    return response
 
 
 @permission_required('imports.add_import')
@@ -186,21 +206,26 @@ def import_preview(request, import_id):
                 if action == 'cancel':
                     messages.success(request, 'Импорт отменён. Данные не были сохранены.')
                 else:
-                    messages.success(request, f'Импорт завершён. Загружено строк: {result.successful_items}. Пропущено: {result.failed_items}.')
+                    messages.success(request, f'Импорт завершён. Загружено строк: {result.successful_items}.')
                 if request.user.has_perm('imports.view_import'):
                     return redirect('imports:list')
                 return redirect('imports:new')
-    columns = import_record.metadata.get('columns', [])
-    page_obj = Paginator(import_record.items.order_by('row_number'), 50).get_page(request.GET.get('page'))
-    return render(request, 'imports/import_preview.html', {
+    context = {
         'import_record': import_record,
         'summary': import_preview_summary(import_record),
-        'columns': columns,
-        'page_obj': page_obj,
-        'rows': [{'item': item, 'values': [item.data.get(column) for column in columns]} for item in page_obj],
         'can_confirm': import_record.status == Import.Status.REVIEW,
+        'has_errors': bool(import_record.failed_items) or import_record.items.filter(status=ImportItem.Status.FAILED).exists(),
         'preview_error': preview_error,
-    })
+    }
+    if request.headers.get('X-Import-Modal') == '1':
+        response = render(request, 'imports/partials/import_preview.html', context)
+    else:
+        workspace = import_workspace_context(request) if request.user.has_perm('imports.view_import') else {
+            'imports': [], 'upload_form': ImportUploadForm(user=request.user),
+        }
+        response = render(request, 'imports/import_preview.html', workspace | context)
+    response['Cache-Control'] = 'no-store'
+    return response
 
 
 @permission_required('imports.view_debt')

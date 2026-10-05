@@ -1,0 +1,14 @@
+
+                {% for item in imports %}
+                <tr data-import-id="{{ item.pk }}" data-import-status="{{ item.status }}">
+                    <td class="font-mono import-id-column">{{ forloop.counter }}</td>
+                    <td><a class="font-semibold" href="{% url 'imports:download' item.pk %}" title="Скачать XLSX из данных импорта">{{ item.file_name|default:'Файл не указан' }}</a></td>
+                    <td>{{ item.import_type.name }}</td>
+                    <td><span class="badge {% if item.status == 'completed' %}badge-success{% elif item.status == 'failed' or item.status == 'cancelled' %}badge-danger{% elif item.status == 'new' or item.status == 'processing' or item.status == 'review' %}badge-warning{% else %}badge-neutral{% endif %}"><span class="status-dot"></span>{% if item.status == 'new' or item.status == 'processing' %}Проверка: {{ item.progress_percentage|default:0 }}%{% else %}{{ item.get_status_display }}{% endif %}</span></td>
+                    <td class="cell-text">{% if item.created_by %}{{ item.created_by.get_full_name|default:item.created_by.username }}{% else %}—{% endif %}</td>
+                    <td><time datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:'d.m.Y H:i' }}</time></td>
+                    <td class="import-action">{% if item.status == 'new' or item.status == 'processing' %}<span class="text-xs text-muted">Проверка файла</span>{% elif item.status == 'review' and item.created_by_id == request.user.pk and perms.imports.add_import %}<a class="btn btn-sm btn-primary" data-import-preview aria-haspopup="dialog" href="{% url 'imports:preview' item.pk %}">Проверить</a>{% else %}<a class="btn btn-sm" href="{% url 'imports:items' item.pk %}">Открыть</a>{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="7"><div class="empty-state"><strong>Импортов пока нет</strong><p>Загрузите первый XLSX-файл, чтобы увидеть результат обработки.</p></div></td></tr>
+                {% endfor %}

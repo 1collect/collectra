@@ -377,8 +377,12 @@ class ExpensePaymentImportTests(TestCase):
             'import_type': import_type.pk,
             'file': xlsx_file(headers, rows, 'finance.xlsx'),
         })
-        self.assertRedirects(response, reverse('imports:list'))
-        return Import.objects.latest('pk')
+        record = Import.objects.latest('pk')
+        if record.status == Import.Status.REVIEW and record.failed_items:
+            self.assertContains(response, 'Импорт всего файла заблокирован')
+        else:
+            self.assertRedirects(response, reverse('imports:list'))
+        return record
 
     def test_payments_need_only_four_fields_and_accept_all_categories(self):
         record = self.upload_financial_file(self.payment_type, PAYMENT_IMPORT_COLUMNS, [
@@ -474,7 +478,7 @@ class ExpensePaymentImportTests(TestCase):
         self.assertEqual(record.successful_items, 1)
         self.assertEqual(Expense.objects.get().additional_expenses, Decimal('0.00'))
 
-    def test_invalid_financial_rows_do_not_block_valid_rows(self):
+    def test_invalid_financial_rows_block_entire_file(self):
         scenarios = [
             (self.payment_type, PAYMENT_IMPORT_COLUMNS, ['DBZ-FINANCE', 100, 'ЧСИ', '03.10.2026'], Payment),
             (self.expense_type, EXPENSE_REQUIRED_COLUMNS, ['DBZ-FINANCE', 10, 20, 30, 40, 50, '03.10.2026'], Expense),
@@ -488,11 +492,11 @@ class ExpensePaymentImportTests(TestCase):
                 bad_date = valid.copy()
                 bad_date[-1] = '31.02.2026'
                 record = self.upload_financial_file(import_type, headers, [valid, unknown, bad_number, bad_date])
-                self.assertEqual(record.status, Import.Status.COMPLETED)
+                self.assertEqual(record.status, Import.Status.REVIEW)
                 self.assertEqual(record.total_items, 4)
                 self.assertEqual(record.successful_items, 1)
                 self.assertEqual(record.failed_items, 3)
-                self.assertEqual(model.objects.count(), 1)
+                self.assertEqual(model.objects.count(), 0)
                 errors = list(record.items.filter(status=ImportItem.Status.FAILED).values_list('error_message', flat=True))
                 self.assertIn('не найден', errors[0])
                 self.assertIn('число', errors[1])
@@ -528,7 +532,7 @@ class ExpensePaymentImportTests(TestCase):
         self.assertEqual(expense.additional_expenses, 25)
         self.assertEqual(expense.expense_date, date(2026, 10, 2))
 
-    def test_xlsx_creates_payment_and_rejects_unknown_contract(self):
+    def test_unknown_contract_blocks_entire_payment_file(self):
         values = [
             ['DBZ-FINANCE', 5000, 'ЧСИ', '03.10.2026'],
             ['DBZ-UNKNOWN', 1500, 'Физическое лицо', '03.10.2026'],
@@ -540,18 +544,16 @@ class ExpensePaymentImportTests(TestCase):
         })
 
         import_record = Import.objects.get(import_type=self.payment_type)
-        payment = Payment.objects.get()
         failed_item = ImportItem.objects.get(
             import_record=import_record,
             status=ImportItem.Status.FAILED,
         )
-        self.assertEqual(import_record.status, Import.Status.COMPLETED)
+        self.assertEqual(import_record.status, Import.Status.REVIEW)
         self.assertEqual(import_record.successful_items, 1)
         self.assertEqual(import_record.failed_items, 1)
-        self.assertEqual(payment.debt, self.debt)
-        self.assertEqual(payment.amount, 5000)
-        self.assertEqual(payment.status, Payment.Status.CHSI)
-        self.assertEqual(payment.payment_date, date(2026, 10, 3))
+        self.assertFalse(Payment.objects.exists())
+        self.debt.refresh_from_db()
+        self.assertEqual(self.debt.paid_amount, 0)
         self.assertIn('DBZ-UNKNOWN', failed_item.error_message)
 
     def test_xlsx_rejects_payment_with_unknown_status(self):
@@ -810,7 +812,7 @@ class XlsxImportTests(TestCase):
         self.assertEqual(item.status, ImportItem.Status.FAILED)
         self.assertFalse(Debt.objects.exists())
 
-    def test_mixed_rows_import_only_valid_contracts(self):
+    def test_mixed_rows_block_entire_contract_file(self):
         rows = [
             ['DBZ-VALID', 900101300001, 'Иванов Иван', 100, 0, 0, 0, 0, 0, 0, 0, 100],
             ['DBZ-INVALID', 123, 'Петров Пётр', 200, 0, 0, 0, 0, 0, 0, 0, 200],
@@ -822,11 +824,11 @@ class XlsxImportTests(TestCase):
         })
 
         import_record = Import.objects.get()
-        self.assertEqual(import_record.status, Import.Status.COMPLETED)
+        self.assertEqual(import_record.status, Import.Status.REVIEW)
         self.assertEqual(import_record.total_items, 2)
         self.assertEqual(import_record.successful_items, 1)
         self.assertEqual(import_record.failed_items, 1)
-        self.assertTrue(Debt.objects.filter(contract_number='DBZ-VALID').exists())
+        self.assertFalse(Debt.objects.filter(contract_number='DBZ-VALID').exists())
         self.assertFalse(Debt.objects.filter(contract_number='DBZ-INVALID').exists())
 
     def test_header_only_file_is_rejected(self):

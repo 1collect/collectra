@@ -12,25 +12,10 @@
 </div>
 <section class="panel" aria-label="Список импортов">
     <div class="panel-header"><h2>История импорта</h2><span class="badge" title="Количество импортов">{{ imports|length }}</span></div>
-    <div class="p-0 table-container import-table-container" tabindex="0" role="region" aria-label="История импорта">
+    <div class="p-0 table-container import-table-container" data-import-status-url="{% url 'imports:status' %}" tabindex="0" role="region" aria-label="История импорта">
         <table class="table table-bordered table-compact import-table">
-            <thead><tr><th scope="col" class="import-id-column">№</th><th scope="col" class="import-file-column">Файл</th><th scope="col" class="import-type-column">Тип</th><th scope="col" class="import-status-column">Статус</th><th scope="col" class="import-number-column">Статистика</th><th scope="col" class="import-author-column">Автор</th><th scope="col" class="import-date-column">Дата</th><th scope="col" class="import-action-column">Действие</th></tr></thead>
-            <tbody>
-                {% for item in imports %}
-                <tr>
-                    <td class="font-mono import-id-column">{{ forloop.counter }}</td>
-                    <td><a class="font-semibold" href="{% url 'imports:download' item.pk %}" title="Скачать XLSX из данных импорта">{{ item.file_name|default:'Файл не указан' }}</a>{% if item.error_message %}<div class="text-xs text-danger">{{ item.error_message }}</div>{% endif %}</td>
-                    <td>{{ item.import_type.name }}</td>
-                    <td><span class="badge {% if item.status == 'completed' %}badge-success{% elif item.status == 'failed' %}badge-danger{% elif item.status == 'processing' or item.status == 'review' %}badge-warning{% else %}badge-neutral{% endif %}"><span class="status-dot"></span>{{ item.get_status_display }}</span></td>
-                    <td><div>Всего: <strong>{{ item.total_items }}</strong></div><div class="{% if item.successful_items %}text-success{% else %}text-muted{% endif %}">Успешно: <strong>{{ item.successful_items }}</strong></div><div class="{% if item.failed_items %}text-danger{% else %}text-muted{% endif %}">Ошибок: <strong>{{ item.failed_items }}</strong></div></td>
-                    <td class="cell-text">{% if item.created_by %}{{ item.created_by.get_full_name|default:item.created_by.username }}{% else %}—{% endif %}</td>
-                    <td><time datetime="{{ item.created_at|date:'c' }}">{{ item.created_at|date:'d.m.Y H:i' }}</time></td>
-                    <td class="import-action">{% if item.status == 'review' and item.created_by_id == request.user.pk and perms.imports.add_import %}<a class="btn btn-sm btn-primary" href="{% url 'imports:preview' item.pk %}">Проверить</a>{% else %}<a class="btn btn-sm" href="{% url 'imports:items' item.pk %}">Открыть</a>{% endif %}</td>
-                </tr>
-                {% empty %}
-                <tr><td colspan="8"><div class="empty-state"><strong>Импортов пока нет</strong><p>Загрузите первый XLSX-файл, чтобы увидеть результат обработки.</p></div></td></tr>
-                {% endfor %}
-            </tbody>
+            <thead><tr><th scope="col" class="import-id-column">№</th><th scope="col" class="import-file-column">Файл</th><th scope="col" class="import-type-column">Тип</th><th scope="col" class="import-status-column">Статус</th><th scope="col" class="import-author-column">Автор</th><th scope="col" class="import-date-column">Дата</th><th scope="col" class="import-action-column">Действие</th></tr></thead>
+            <tbody>{% include 'imports/partials/import_rows.html' %}</tbody>
         </table>
     </div>
 </section>
@@ -47,5 +32,11 @@
     </form>
 </dialog>
 {% endif %}
+<dialog class="modal import-preview-modal" id="import-preview-modal" aria-labelledby="import-preview-title"{% if import_record %} open data-auto-open{% endif %}>
+    {% if import_record %}{% include 'imports/partials/import_preview.html' %}{% else %}
+    <div class="modal-header"><h2 id="import-preview-title">Подтверждение импорта</h2><button type="button" class="btn btn-icon btn-ghost" data-modal-close aria-label="Закрыть">×</button></div>
+    <div class="modal-body" data-preview-loading role="status">Загрузка проверки…</div>
+    {% endif %}
+</dialog>
 {% endblock %}
-{% block scripts %}<script defer src="{% static 'js/imports.js' %}"></script>{% endblock %}
+{% block scripts %}<script defer src="{% static 'js/imports.js' %}?v=20261005-8"></script>{% endblock %}

@@ -5,7 +5,7 @@ from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
 from django.db.models.deletion import ProtectedError
-from django.http import FileResponse, Http404
+from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -169,42 +169,6 @@ def action_log(request):
     objects = m.ActionLog.objects.select_related('actor')
     if request.GET.get('q'): objects = objects.filter(Q(action__icontains=request.GET['q']) | Q(reason__icontains=request.GET['q']) | Q(object_id=request.GET['q']) | Q(actor__username__icontains=request.GET['q']))
     return render(request, 'imports/action_log.html', {'page_obj': Paginator(objects, 50).get_page(request.GET.get('page'))})
-
-
-@permission_required('imports.add_casedocument')
-def document_add(request, debt_id):
-    debt = get_object_or_404(m.Debt, pk=debt_id)
-    check(request, 'imports.view_debt')
-    form = f.DocumentForm(request.POST if request.method == 'POST' else None, request.FILES or None)
-    if request.method == 'POST' and form.is_valid():
-        obj = form.save(commit=False)
-        obj.debt, obj.created_by = debt, request.user
-        obj.save()
-        log_action('document_uploaded', obj)
-        return redirect('imports:debt_detail', debt_id=debt.pk)
-    return render(request, 'imports/project_form.html', {'form': form, 'title': 'Добавить документ'})
-
-
-@permission_required('imports.view_casedocument')
-def document_download(request, pk):
-    obj = get_object_or_404(m.CaseDocument, pk=pk)
-    check(request, 'imports.view_debt')
-    log_action('document_downloaded', obj)
-    return FileResponse(obj.file.open('rb'), as_attachment=True, filename=obj.file.name.rsplit('/', 1)[-1])
-
-
-@permission_required('imports.delete_casedocument')
-def document_delete(request, pk):
-    obj = get_object_or_404(m.CaseDocument, pk=pk)
-    form = f.ReasonForm(request.POST if request.method == 'POST' else None)
-    if request.method == 'POST' and form.is_valid():
-        debt_id, file = obj.debt_id, obj.file
-        with transaction.atomic():
-            log_action('deleted', obj, reason=form.cleaned_data['reason'])
-            obj.delete()
-            transaction.on_commit(lambda: file.delete(save=False))
-        return redirect('imports:debt_detail', debt_id=debt_id)
-    return render(request, 'imports/project_form.html', {'form': form, 'title': 'Удалить документ'})
 
 
 @permission_required('imports.add_import')

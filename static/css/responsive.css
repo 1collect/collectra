@@ -23,14 +23,6 @@
 @media (max-width: 800px) {
   .sidebar, .sidebar-collapsed .sidebar { width: var(--sidebar-width); transform: translateX(-100%); z-index: 180; }
   .shell-main, .sidebar-collapsed .shell-main { margin-left: 0; }
-  .sidebar-collapsed .brand { padding: 0 17px; }
-  .sidebar-collapsed .brand-logo, .sidebar-collapsed .brand-version, .sidebar-collapsed .nav-group-title { display: block; }
-  .sidebar-collapsed .nav-link > span { display: inline; }
-  .sidebar-collapsed .nav-link .chevron { display: block; }
-  .sidebar-collapsed .sidebar-status { display: flex; }
-  .sidebar-collapsed .submenu:not([hidden]) { display: block; }
-  .sidebar-collapsed .nav-link { justify-content: flex-start; padding: var(--space-2) var(--space-3); height: auto; min-height: var(--control-height); }
-  .sidebar-collapsed .sidebar-nav { padding-top: 0; }
   .sidebar-open .sidebar { transform: translateX(0); }
   .sidebar-open .sidebar-overlay { display: block; position: fixed; inset: 0; z-index: 170; background: var(--overlay); border: 0; }
   body.sidebar-open { overflow: hidden; }

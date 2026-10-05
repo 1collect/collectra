@@ -2,7 +2,7 @@
     {% if selected_import %}
     <div class="panel-header master-detail__detail-header">
         <h2 class="truncate" title="{{ selected_import.file_name|default:'Файл не указан' }}">{{ selected_import.file_name|default:'Файл не указан' }}</h2>
-        <div class="inline-flex items-center gap-2"><span class="text-xs text-secondary">Статус импорта:</span><span class="badge {% if selected_import.status == 'completed' %}badge-success{% elif selected_import.status == 'failed' %}badge-danger{% elif selected_import.status == 'processing' or selected_import.status == 'review' %}badge-warning{% else %}badge-neutral{% endif %}"><span class="status-dot"></span>{{ selected_import.get_status_display }}</span></div>
+        <div class="inline-flex items-center gap-2"><span class="text-xs text-secondary">Статус импорта:</span><span class="badge {% if selected_import.status == 'completed' %}badge-success{% elif selected_import.status == 'failed' or selected_import.status == 'cancelled' %}badge-danger{% elif selected_import.status == 'processing' or selected_import.status == 'review' %}badge-warning{% else %}badge-neutral{% endif %}"><span class="status-dot"></span>{{ selected_import.get_status_display }}</span></div>
     </div>
     <div class="table-container" tabindex="0" role="region" aria-label="Сведения об импорте">
         <table class="table table-bordered table-compact">

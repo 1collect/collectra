@@ -62,9 +62,8 @@
 .import-table th:nth-child(2), .import-table td:nth-child(2) { width: 32%; min-width: 12rem; white-space: normal; overflow-wrap: anywhere; }
 .import-table th:nth-child(3), .import-table td:nth-child(3) { width: 12%; white-space: normal; }
 .import-table th:nth-child(4), .import-table td:nth-child(4) { width: 1%; }
-.import-table .import-number-column, .import-table .import-number { width: 1%; font-variant-numeric: tabular-nums; }
-.import-table th:nth-child(6), .import-table td:nth-child(6) { width: 18%; min-width: 9rem; max-width: none; white-space: normal; overflow-wrap: anywhere; }
-.import-table th:nth-child(7), .import-table td:nth-child(7) { width: 1%; font-variant-numeric: tabular-nums; }
-.import-table th:nth-child(8), .import-table td:nth-child(8) { width: 1%; text-align: right; }
+.import-table th:nth-child(5), .import-table td:nth-child(5) { width: 18%; min-width: 9rem; max-width: none; white-space: normal; overflow-wrap: anywhere; }
+.import-table th:nth-child(6), .import-table td:nth-child(6) { width: 1%; font-variant-numeric: tabular-nums; }
+.import-table th:nth-child(7), .import-table td:nth-child(7) { width: 1%; text-align: right; }
 .import-table .import-action { white-space: nowrap; }
 .import-table-container:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }

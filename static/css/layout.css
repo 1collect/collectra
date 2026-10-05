@@ -42,13 +42,6 @@
 .breadcrumbs > :last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-primary); }
 .breadcrumbs a { color: var(--text-secondary); }
 .breadcrumbs .icon { width: 12px; height: 12px; color: var(--text-muted); }
-.sidebar-collapsed .sidebar { width: var(--sidebar-collapsed-width); }
-.sidebar-collapsed .shell-main { margin-left: var(--sidebar-collapsed-width); }
-.sidebar-collapsed .brand { padding: 0 16px; }
-.sidebar-collapsed .brand-logo, .sidebar-collapsed .brand-version,
-.sidebar-collapsed .nav-group-title, .sidebar-collapsed .nav-link > span, .sidebar-collapsed .nav-link .chevron,
-.sidebar-collapsed .sidebar-status, .sidebar-collapsed .submenu { display: none; }
-.sidebar-collapsed .sidebar-nav { padding-top: 12px; }
-.sidebar-collapsed .nav-link { justify-content: center; padding: 0; height: var(--control-height); }
-.sidebar-collapsed .sidebar-nav > .nav-link { margin-bottom: 5px; }
+.sidebar-collapsed .sidebar { transform: translateX(-100%); }
+.sidebar-collapsed .shell-main { margin-left: 0; }
 .sidebar-overlay { display: none; }

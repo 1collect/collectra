@@ -181,7 +181,7 @@ def payment_values(data):
 @transaction.atomic
 def save_contract(contract_number, iin, full_name, debt_values, *, import_item=None):
     if Debt.objects.filter(contract_number=contract_number).exists():
-        raise ImportValidationError('ДБЗ уже существует. Повторная строка пропущена.')
+        raise ImportValidationError('ДБЗ уже существует. Импорт файла невозможен.')
     debt_values = dict(debt_values)
     borrower_values = debt_values.pop('_borrower', {})
     own_expenses = debt_values.pop('_own_expenses', {})
@@ -205,7 +205,7 @@ def save_contract(contract_number, iin, full_name, debt_values, *, import_item=N
         },
     )
     if not debt_created:
-        raise ImportValidationError('ДБЗ уже существует. Повторная строка пропущена.')
+        raise ImportValidationError('ДБЗ уже существует. Импорт файла невозможен.')
     if any(own_expenses.values()):
         Expense.objects.create(debt=debt, import_item=import_item, expense_date=debt.registry_date or timezone.localdate(), **own_expenses)
     recalculate_debt(debt)
@@ -611,11 +611,17 @@ IMPORT_HANDLERS = {
 }
 
 
-def process_xlsx_import(import_record, uploaded_file, *, preview_only=False):
+def process_xlsx_import(import_record, uploaded_file, *, preview_only=False, progress=None, check_token=None):
     started_at = timezone.now()
     import_record.status = Import.Status.PROCESSING
     import_record.started_at = started_at
-    import_record.save(update_fields=('status', 'started_at'))
+    if check_token:
+        if not Import.objects.filter(pk=import_record.pk, metadata__check_token=check_token).update(
+            status=Import.Status.PROCESSING, started_at=started_at,
+        ):
+            return import_record
+    else:
+        import_record.save(update_fields=('status', 'started_at'))
 
     workbook = None
     try:
@@ -656,6 +662,9 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False):
                 'В файле отсутствуют колонки: ' + ', '.join(missing_columns)
             )
 
+        if progress:
+            progress(0, max((worksheet.max_row or 1) - 1, 1))
+
         items = []
         records = []
         successful_items = 0
@@ -664,6 +673,8 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False):
         writeoff_balances = {}
         seen_contracts = set()
         for row_number, row in enumerate(rows, start=2):
+            if progress and (row_number == 2 or row_number % 25 == 0):
+                progress(row_number - 2, max((worksheet.max_row or row_number) - 1, 1))
             data = {
                 column: serialize_value(
                     column,
@@ -687,7 +698,7 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False):
                     values = values_func(data)
                     if import_record.import_type.code == 'contracts':
                         if values[0] in seen_contracts or Debt.objects.filter(contract_number=values[0]).exists():
-                            raise ImportValidationError('ДБЗ уже существует или повторяется в файле. Строка пропущена.')
+                            raise ImportValidationError('ДБЗ уже существует или повторяется в файле.')
                         seen_contracts.add(values[0])
                         data['Общая сумма задолженности (выкуп)'] = format(values[3]['purchase_total_debt'], '.2f')
                     if import_record.import_type.code == 'writeoffs':
@@ -715,19 +726,32 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False):
         if not items:
             raise ImportValidationError('В файле нет строк с данными.')
 
+        blocked = failed_items > 0
+        if blocked:
+            for item in items:
+                if item.status == ImportItem.Status.PROCESSED:
+                    item.status = ImportItem.Status.NEW
+                item.processed_at = None
+
         with transaction.atomic():
+            if check_token and not Import.objects.select_for_update().filter(
+                pk=import_record.pk, metadata__check_token=check_token, status=Import.Status.PROCESSING,
+            ).exists():
+                return import_record
             ImportItem.objects.bulk_create(items, batch_size=500)
             audit_token = audit_user.set(import_record.created_by)
             try:
-                if not preview_only:
+                if not preview_only and not blocked:
                     accepted_items = [item for item in items if item.status == ImportItem.Status.PROCESSED]
                     for item, record in zip(accepted_items, records, strict=True):
                         save_func(record, import_item=item)
             finally:
                 audit_user.reset(audit_token)
-            import_record.status = Import.Status.REVIEW if preview_only else Import.Status.COMPLETED
+            import_record.status = Import.Status.REVIEW if preview_only else (
+                Import.Status.FAILED if blocked else Import.Status.COMPLETED)
+            import_record.error_message = 'В файле есть ошибки. Импорт всего файла заблокирован. Исправьте файл и загрузите его заново.' if blocked else ''
             import_record.total_items = len(items)
-            import_record.processed_items = 0 if preview_only else len(items)
+            import_record.processed_items = 0 if preview_only or blocked else len(items)
             import_record.successful_items = successful_items
             import_record.failed_items = failed_items
             import_record.completed_at = None if preview_only else timezone.now()
@@ -741,6 +765,7 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False):
                 'processed_items',
                 'successful_items',
                 'failed_items',
+                'error_message',
                 'completed_at',
                 'metadata',
             ))
@@ -751,6 +776,8 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False):
         OSError,
         ValueError,
     ) as error:
+        if check_token and not Import.objects.filter(pk=import_record.pk, metadata__check_token=check_token).exists():
+            return import_record
         import_record.status = Import.Status.FAILED
         import_record.error_message = str(error) or 'Не удалось прочитать файл.'
         import_record.completed_at = timezone.now()
@@ -839,6 +866,8 @@ def confirm_import(import_id, *, user, cancel=False):
         import_record.completed_at = timezone.now()
         import_record.save(update_fields=('status', 'completed_at'))
         return import_record
+    if import_record.failed_items or import_record.items.filter(status=ImportItem.Status.FAILED).exists():
+        raise ImportValidationError('В файле есть ошибки. Импорт всего файла заблокирован. Исправьте файл и загрузите его заново.')
     if import_record.import_type.code == 'writeoffs' and not user.has_perm('imports.add_writeoff'):
         raise ImportValidationError('Нет права на добавление списаний.')
     _, _, values_func, save_func = IMPORT_HANDLERS[import_record.import_type.code]

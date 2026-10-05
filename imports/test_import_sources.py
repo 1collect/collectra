@@ -30,23 +30,20 @@ class ImportSourceTests(TestCase):
         record.refresh_from_db()
         return record
 
-    def test_failed_and_blank_rows_do_not_shift_payment_sources(self):
+    def test_blank_rows_do_not_shift_payment_sources(self):
         record = self.upload('payments', [
-            ['UNKNOWN', 10, 'ЧСИ', '02.10.2026'],
             [None] * 4,
             ['SOURCE-1', 20, 'ЧСИ', '02.10.2026'],
             ['SOURCE-1', 30, 'ЧСИ', '03.10.2026'],
         ])
         self.assertEqual(record.status, Import.Status.COMPLETED)
         self.assertEqual(list(Payment.objects.order_by('amount').values_list(
-            'amount', 'import_item__row_number')), [(20, 4), (30, 5)])
-        self.assertFalse(record.items.get(row_number=2).payment_records.exists())
+            'amount', 'import_item__row_number')), [(20, 3), (30, 4)])
         self.debt.refresh_from_db()
         self.assertIsNone(self.debt.import_item_id)
 
-    def test_confirmation_links_only_accepted_rows_and_is_idempotent(self):
-        record = self.upload('payments', [['UNKNOWN', 10, 'ЧСИ', '02.10.2026'],
-                                         ['SOURCE-1', 20, 'ЧСИ', '02.10.2026']], preview=True)
+    def test_confirmation_links_rows_and_is_idempotent(self):
+        record = self.upload('payments', [[None] * 4, ['SOURCE-1', 20, 'ЧСИ', '02.10.2026']], preview=True)
         self.assertFalse(Payment.objects.exists())
         confirm_import(record.pk, user=self.user)
         with self.assertRaises(ImportValidationError):
@@ -99,6 +96,18 @@ class ImportSourceTests(TestCase):
         expense = Expense.objects.create(debt=self.debt, state_duty=10, expense_date=date.today())
         self.assertIsNone(payment.import_item_id)
         self.assertIsNone(expense.import_item_id)
+
+    def test_direct_import_with_one_error_saves_no_payments_or_links(self):
+        record = self.upload('payments', [['SOURCE-1', 20, 'ЧСИ', '02.10.2026'],
+                                         ['UNKNOWN', 10, 'ЧСИ', '02.10.2026']])
+        self.assertEqual(record.status, Import.Status.FAILED)
+        self.assertEqual(record.processed_items, 0)
+        self.assertEqual(record.successful_items, 1)
+        self.assertEqual(record.failed_items, 1)
+        self.assertFalse(Payment.objects.exists())
+        self.assertFalse(record.items.filter(status=ImportItem.Status.PROCESSED).exists())
+        self.debt.refresh_from_db()
+        self.assertEqual(self.debt.paid_amount, 0)
 
     def test_source_history_cannot_be_deleted(self):
         record = self.upload('payments', [['SOURCE-1', 20, 'ЧСИ', '02.10.2026']])

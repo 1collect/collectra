@@ -17,7 +17,7 @@ def create_project_roles(sender, using='default', **kwargs):
             'add_import', 'add_debtor', 'change_debtor', 'add_debt',
             'add_payment', 'change_payment', 'add_expense', 'change_expense',
             'add_writeoff', 'change_writeoff', 'add_paymentrefund', 'change_paymentrefund',
-            'add_financialchangerequest', 'add_casedocument',
+            'add_financialchangerequest',
         ]
         coordinator_permissions = permissions.filter(content_type__app_label='imports', codename__in=coordinator_codes)
         defaults = [('Администратор', permissions), ('Координатор', readonly | export | coordinator_permissions), ('Аналитик', readonly | export)]
