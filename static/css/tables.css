@@ -46,6 +46,7 @@
 .page-btn { height: var(--control-compact); min-width: var(--control-compact); display: inline-flex; align-items: center; justify-content: center; background: var(--bg-panel); border: 1px solid var(--border-strong); border-radius: var(--radius); color: var(--text-primary); font-size: var(--text-small); padding: var(--space-1) var(--space-2); }
 .page-btn:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
 .page-btn[aria-current="page"] { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
+.page-btn[aria-current="page"]:hover:not(:disabled) { background: var(--primary); border-color: var(--primary); color: var(--on-primary); }
 .page-btn .icon { width: 12px; height: 12px; }
 .page-ellipsis { font-size: 10px; padding: 0 3px; }
 .column-menu .check { display: flex; padding: 4px 7px; min-height: 26px; }
