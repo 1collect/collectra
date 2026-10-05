@@ -60,7 +60,7 @@ def period_bounds(data):
 
 def report_rows(data):
     start, end = period_bounds(data)
-    debts = Debt.objects.select_related('debtor', 'collection_agency', 'original_creditor', 'cession').prefetch_related('payments__refunds', 'expenses', 'writeoffs', 'balance_snapshots').order_by('contract_number')
+    debts = Debt.objects.select_related('debtor', 'collection_agency', 'original_creditor', 'cession').prefetch_related('payments__refunds', 'expenses', 'writeoffs').order_by('contract_number')
     for key, field in [('agency', 'collection_agency'), ('creditor', 'original_creditor'), ('dbz', 'contract_number__icontains'), ('iin', 'debtor__iin__icontains'), ('cession_number', 'cession__number__icontains'), ('cession_date', 'cession__date'), ('registry_date', 'registry_date')]:
         if data.get(key): debts = debts.filter(**{field: data[key]})
     rows = []

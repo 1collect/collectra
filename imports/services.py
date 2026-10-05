@@ -282,12 +282,15 @@ def recalculate_debt(debt_or_id, *, source='recalculation', actor=None):
                 outstanding_amount=snapshot['outstanding_amount'], overpayment_amount=snapshot['overpayment_amount'],
                 status=snapshot['status'], closed_at=snapshot['closed_at'],
                 paid_amount=snapshot['paid_amount'], written_off_amount=snapshot['written_off_amount'], calculation_source=source)
-    for operation in balance['operations']:
-        if operation['kind'] == 'payment':
-            payment = Payment.objects.get(pk=operation['id'])
-            PaymentDistribution.objects.update_or_create(payment=payment, defaults={
-                'amounts': {f: str(v) for f, v in operation['allocation'].items()},
-                'overpayment_amount': operation['surplus'], 'mode': payment.distribution_mode})
+    # Remove cancelled operations and allocations omitted by a failed replay.
+    PaymentDistribution.objects.filter(payment__debt=debt).exclude(
+        payment_id__in=balance['payment_allocations'],
+    ).delete()
+    for payment_id, allocation in balance['payment_allocations'].items():
+        payment = Payment.objects.get(pk=payment_id)
+        PaymentDistribution.objects.update_or_create(payment=payment, defaults={
+            'amounts': {f: str(v) for f, v in allocation['allocation'].items()},
+            'overpayment_amount': allocation['surplus'], 'mode': payment.distribution_mode})
     log_action('recalculation_error' if balance['needs_manual_review'] else 'recalculated', debt,
                actor=actor, details={'source': source, 'error': balance['recalculation_error_message']})
     return debt
@@ -378,6 +381,8 @@ def financial_record_snapshot(record):
 
 def create_financial_change_request(*, record, cleaned_data, reason, requested_by):
     record = record.__class__.objects.get(pk=record.pk)
+    if record.operation_status == 'cancelled':
+        raise FinancialChangeError('Нельзя изменить отменённую операцию.')
     pending = record.change_requests.filter(status=FinancialChangeRequest.Status.PENDING)
     if pending.exists():
         raise FinancialChangeError('Для этой записи уже есть заявка на подтверждении.')
@@ -421,6 +426,8 @@ def review_financial_change(*, change_id, reviewer, approve, comment=''):
     if approve:
         record = change.record
         record = record.__class__.objects.select_for_update().get(pk=record.pk)
+        if record.operation_status == 'cancelled':
+            raise FinancialChangeError('Нельзя подтвердить изменение отменённой операции.')
         if financial_record_snapshot(record) != change.old_data:
             raise FinancialChangeError(
                 'Запись изменилась после создания заявки. Отклоните заявку и создайте новую.'
@@ -429,6 +436,8 @@ def review_financial_change(*, change_id, reviewer, approve, comment=''):
         for field, value in change.new_data.items():
             setattr(record, field, _restore_value(record, field, value))
         if isinstance(record, Payment):
+            if record.refunds.filter(refund_date__lt=record.payment_date).exists():
+                raise FinancialChangeError('Дата платежа не может быть позже уже оформленного возврата.')
             active_refunds = _active_refund_total(record.pk)
             if record.amount < active_refunds:
                 raise FinancialChangeError(

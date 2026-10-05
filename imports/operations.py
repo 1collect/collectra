@@ -10,8 +10,9 @@ from users.access import is_system_administrator
 
 
 def balance_on(debt, day):
-    cached = getattr(debt, '_prefetched_objects_cache', {}).get('balance_snapshots')
-    snapshot = max((s for s in cached if s.snapshot_date <= day), key=lambda s: s.snapshot_date, default=None) if cached is not None else debt.balance_snapshots.filter(snapshot_date__lte=day).order_by('-snapshot_date').first()
+    # Invalidation deletes database rows but cannot clear caches on other
+    # in-memory Debt instances. Always read the current snapshot from storage.
+    snapshot = debt.balance_snapshots.filter(snapshot_date__lte=day).order_by('-snapshot_date').first()
     if snapshot and not debt.needs_manual_review:
         # Snapshots exist on every event date, so no ledger events lie between
         # the closest snapshot and this date after service-based mutations.
