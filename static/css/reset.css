@@ -1,5 +1,5 @@
 *, *::before, *::after { box-sizing: border-box; }
-html { zoom: var(--ui-scale); scroll-behavior: smooth; scroll-padding-top: 110px; }
+html { scroll-behavior: smooth; scroll-padding-top: 110px; }
 body { margin: 0; font: var(--text-body)/1.5 var(--font-sans); color: var(--text-primary); background: var(--bg-body); }
 button, input, select, textarea { font: inherit; }
 button, a, input, select, textarea, summary { -webkit-tap-highlight-color: transparent; }

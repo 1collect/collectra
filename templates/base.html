@@ -7,7 +7,7 @@
     <meta name="description" content="Панель управления платежами">
     <title>{% block title %}Панель управления{% endblock %} — Collectra</title>
     <link href="{% static 'assets/icons/favicon.svg' %}" rel="icon" type="image/svg+xml">
-    <link href="{% static 'css/main.css' %}" rel="stylesheet">
+    <link href="{% static 'css/main.css' %}?v=20261005-4" rel="stylesheet">
 </head>
 <body data-page="{% block page_name %}dashboard{% endblock %}">
     <a class="skip-link" href="#main-content">Перейти к содержимому</a>
@@ -140,8 +140,8 @@
     </dialog>
     {% endif %}
     <script defer src="{% static 'js/core.js' %}"></script>
-    <script defer src="{% static 'js/sidebar.js' %}"></script>
-    <script defer src="{% static 'js/dropdown.js' %}"></script>
+    <script defer src="{% static 'js/sidebar.js' %}?v=20261005-2"></script>
+    <script defer src="{% static 'js/dropdown.js' %}?v=20261005-2"></script>
     <script defer src="{% static 'js/modal.js' %}"></script>
     <script defer src="{% static 'js/distribution.js' %}"></script>
     <script defer src="{% static 'js/writeoffs.js' %}"></script>

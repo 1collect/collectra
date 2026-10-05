@@ -54,17 +54,17 @@
 .table td[colspan] .empty-state { position: sticky; left: 0; width: calc(100cqw - var(--space-5)); max-width: 100%; }
 
 /* Import history: keep the record key visible while the wide table scrolls. */
-.import-table { width: max-content; min-width: 100%; table-layout: fixed; }
+.import-table { width: 100%; table-layout: auto; }
 .import-table th, .import-table td { text-align: left; }
-.import-table .import-id-column { position: sticky; left: 0; z-index: 2; width: 76px; min-width: 76px; max-width: 76px; background: var(--bg-panel); }
+.import-table .import-id-column { position: sticky; left: 0; z-index: 2; width: 1%; background: var(--bg-panel); }
 .import-table thead .import-id-column { z-index: 4; background: var(--bg-subtle); }
 .import-table tbody tr:hover .import-id-column { background: var(--bg-subtle); }
-.import-table th:nth-child(2), .import-table td:nth-child(2) { width: 280px; min-width: 220px; white-space: normal; overflow-wrap: anywhere; }
-.import-table th:nth-child(3), .import-table td:nth-child(3) { width: 150px; min-width: 130px; }
-.import-table th:nth-child(4), .import-table td:nth-child(4) { width: 130px; min-width: 125px; }
-.import-table .import-number-column, .import-table .import-number { width: 105px; min-width: 95px; text-align: right; font-variant-numeric: tabular-nums; }
-.import-table th:nth-child(6), .import-table td:nth-child(6) { width: 160px; min-width: 140px; }
-.import-table th:nth-child(7), .import-table td:nth-child(7) { width: 160px; min-width: 160px; font-variant-numeric: tabular-nums; }
-.import-table th:nth-child(8), .import-table td:nth-child(8) { width: 105px; min-width: 105px; text-align: right; }
+.import-table th:nth-child(2), .import-table td:nth-child(2) { width: 32%; min-width: 12rem; white-space: normal; overflow-wrap: anywhere; }
+.import-table th:nth-child(3), .import-table td:nth-child(3) { width: 12%; white-space: normal; }
+.import-table th:nth-child(4), .import-table td:nth-child(4) { width: 1%; }
+.import-table .import-number-column, .import-table .import-number { width: 1%; font-variant-numeric: tabular-nums; }
+.import-table th:nth-child(6), .import-table td:nth-child(6) { width: 18%; min-width: 9rem; max-width: none; white-space: normal; overflow-wrap: anywhere; }
+.import-table th:nth-child(7), .import-table td:nth-child(7) { width: 1%; font-variant-numeric: tabular-nums; }
+.import-table th:nth-child(8), .import-table td:nth-child(8) { width: 1%; text-align: right; }
 .import-table .import-action { white-space: nowrap; }
 .import-table-container:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }

@@ -108,7 +108,7 @@ dialog.import-preview-modal { width: min(1100px, calc(var(--viewport-width) - 28
 .import-preview__actions { position: sticky; bottom: -20px; z-index: 1; box-shadow: var(--shadow-float); }
 .import-preview__actions .panel-footer { flex-wrap: wrap; }
 .import-preview__actions .panel-footer > span { margin-right: auto; align-self: center; }
-@media (max-width: 660px) {
+@media (max-width: 600px) {
   .import-preview-modal .modal-body { padding: 12px; }
   .import-preview__stats { grid-template-columns: 1fr; }
   .import-preview__actions { bottom: -12px; }

@@ -1,14 +1,13 @@
 /* Circuit design tokens. Override these values to brand the entire template. */
 :root {
-  --ui-scale: 1.1;
-  --viewport-width: calc(100vw / var(--ui-scale));
-  --viewport-height: calc(100vh / var(--ui-scale));
-  --viewport-dynamic-height: calc(100dvh / var(--ui-scale));
+  --viewport-width: 100vw;
+  --viewport-height: 100vh;
+  --viewport-dynamic-height: 100dvh;
   color-scheme: light;
   --font-sans: "Segoe UI", sans-serif;
-  --text-caption: .8125rem;
-  --text-small: .875rem;
-  --text-body: .9375rem;
+  --text-caption: .75rem;
+  --text-small: .8125rem;
+  --text-body: .875rem;
   --text-section: 1rem;
   --text-heading: 1.375rem;
   --space-1: .25rem;
@@ -51,7 +50,7 @@
   --on-primary: #ffffff;
   --focus-ring: #788cec;
   --radius: 4px;
-  --sidebar-width: 228px;
+  --sidebar-width: 248px;
   --sidebar-collapsed-width: 58px;
   --topbar-height: 3.5rem;
   --control-height: 2.375rem;

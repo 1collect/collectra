@@ -1,10 +1,10 @@
 /* Entry point; the order is intentional. No framework or CDN is required. */
-@import url("variables.css");
-@import url("reset.css");
-@import url("layout.css");
-@import url("components.css");
-@import url("forms.css");
-@import url("tables.css");
-@import url("pages.css");
-@import url("utilities.css");
-@import url("responsive.css");
+@import url("variables.css?v=20261005-4");
+@import url("reset.css?v=20261005-2");
+@import url("layout.css?v=20261005-2");
+@import url("components.css?v=20261005-2");
+@import url("forms.css?v=20261005-2");
+@import url("tables.css?v=20261005-2");
+@import url("pages.css?v=20261005-2");
+@import url("utilities.css?v=20261005-2");
+@import url("responsive.css?v=20261005-2");
