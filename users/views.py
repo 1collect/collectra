@@ -22,7 +22,7 @@ User = get_user_model()
 def dashboard(request):
     """Send the user to the first section available through effective permissions."""
     destinations = (
-        ('imports.view_debt', 'imports:analytics'),
+        ('imports.view_debt', 'imports:debts'),
         ('auth.view_user', 'users:list'),
         ('users.view_role', 'users:roles'),
         ('users.view_permissiongroup', 'users:groups'),

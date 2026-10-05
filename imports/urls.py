@@ -2,21 +2,13 @@ from django.urls import path
 
 from . import views
 from . import project_views as project
-from . import reports
 
 app_name = 'imports'
 
 urlpatterns = [
     path('templates/', views.import_templates, name='templates'),
     path('templates/<str:code>/', project.import_template, name='import_template'),
-    path('reports/', reports.report, name='reports'),
-    path('analytics/', reports.analytics, name='analytics'),
-    path('journal/', project.action_log, name='action_log'),
     path('recalculate/', project.full_recalculation, name='recalculate'),
-    path('catalog/<str:kind>/', project.catalog, name='catalog'),
-    path('catalog/<str:kind>/new/', project.catalog_edit, name='catalog_new'),
-    path('catalog/<str:kind>/<int:pk>/edit/', project.catalog_edit, name='catalog_edit'),
-    path('catalog/<str:kind>/<int:pk>/delete/', project.catalog_delete, name='catalog_delete'),
     path('contracts/new/', project.debt_create, name='debt_new'),
     path('payments/<int:pk>/distribution/', project.payment_distribution, name='payment_distribution'),
     path('operations/<str:kind>/<int:pk>/edit/', project.operation_edit, name='operation_edit'),

@@ -9,15 +9,12 @@ class CollectionAgencyTests(TestCase):
     def setUp(self):
         self.admin = User.objects.create_superuser('agency-admin', password='test')
         self.client.force_login(self.admin)
-        self.data = {'name': 'Agency One', 'bin': '012345678901', 'phone': '+7 700 123 45 67',
-                     'email': 'office@example.com', 'address': 'Test address'}
+        self.data = {'name': 'Agency One'}
 
     def test_create_edit_and_delete(self):
         response = self.client.post(reverse('imports:collection_agency_new'), self.data)
         self.assertRedirects(response, reverse('imports:collection_agencies'))
         agency = CollectionAgency.objects.get()
-        self.assertEqual(agency.bin, '012345678901')
-        self.assertEqual(agency.email, self.data['email'])
         response = self.client.get(reverse('imports:collection_agencies'))
         self.assertContains(response, self.data['name'])
         self.assertContains(response, 'СПРАВОЧНИКИ')
@@ -32,31 +29,26 @@ class CollectionAgencyTests(TestCase):
         self.assertRedirects(self.client.post(delete_url), reverse('imports:collection_agencies'))
         self.assertFalse(CollectionAgency.objects.exists())
 
-    def test_validation_and_duplicate_bin(self):
-        for changes, field in [({'bin': '123'}, 'bin'), ({'bin': 'abcdefghijkl'}, 'bin'),
-                               ({'name': '  '}, 'name'), ({'email': 'invalid'}, 'email')]:
-            with self.subTest(changes=changes):
-                response = self.client.post(reverse('imports:collection_agency_new'), {**self.data, **changes})
-                self.assertEqual(response.status_code, 200)
-                self.assertIn(field, response.context['form'].errors)
-                self.assertFalse(CollectionAgency.objects.exists())
+    def test_name_is_required_and_unique(self):
+        response = self.client.post(reverse('imports:collection_agency_new'), {'name': '  '})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('name', response.context['form'].errors)
+        self.assertFalse(CollectionAgency.objects.exists())
         CollectionAgency.objects.create(**self.data)
-        response = self.client.post(reverse('imports:collection_agency_new'), {**self.data, 'name': 'Other'})
-        self.assertIn('bin', response.context['form'].errors)
+        response = self.client.post(reverse('imports:collection_agency_new'), self.data)
+        self.assertIn('name', response.context['form'].errors)
         self.assertEqual(CollectionAgency.objects.count(), 1)
 
-    def test_search_and_pagination_preserve_query(self):
+    def test_pagination(self):
         for number in range(26):
-            CollectionAgency.objects.create(name=f'Agency {number:02}', bin=f'{number:012}')
-        CollectionAgency.objects.create(name='Other', bin='999999999999')
+            CollectionAgency.objects.create(name=f'Agency {number:02}')
+        CollectionAgency.objects.create(name='Other')
         url = reverse('imports:collection_agencies')
-        response = self.client.get(url, {'q': 'Agency'})
-        self.assertEqual(response.context['page_obj'].paginator.count, 26)
-        self.assertContains(response, '?q=Agency&amp;page=2')
-        response = self.client.get(url, {'q': 'Agency', 'page': 2})
-        self.assertEqual(len(response.context['page_obj']), 1)
-        response = self.client.get(url, {'q': '999999999999'})
-        self.assertEqual(response.context['page_obj'].paginator.count, 1)
+        response = self.client.get(url)
+        self.assertEqual(response.context['page_obj'].paginator.count, 27)
+        self.assertContains(response, '?page=2')
+        response = self.client.get(url, {'page': 2})
+        self.assertEqual(len(response.context['page_obj']), 2)
 
     def test_view_permission_does_not_allow_changes(self):
         agency = CollectionAgency.objects.create(**self.data)

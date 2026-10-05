@@ -30,7 +30,7 @@ group.permissions.set(Permission.objects.filter(codename__startswith='view_'))
 for n in range(1, 29):
     user, _ = User.objects.get_or_create(username=f'operator-{n:02}', defaults={'first_name': 'Александр' if n % 2 else 'Мария', 'last_name': 'Константинопольский' if n % 3 else 'Иванова', 'is_active': bool(n % 4)})
     user.roles.add(role)
-    party, _ = Counterparty.objects.get_or_create(iin=f'{n:012}', defaults={'full_name': f'ТОО «Финансовая компания долгосрочного урегулирования {n}»'})
+    party, _ = Counterparty.objects.get_or_create(name=f'ТОО «Финансовая компания долгосрочного урегулирования {n}»')
     debtor, _ = Debtor.objects.get_or_create(iin=f'{n:012}', defaults={'full_name': f'Константинопольский Александр Владимирович {n}'})
     debt, _ = Debt.objects.get_or_create(contract_number=f'DBZ-2026-{n:04}', defaults={'counterparty': party, 'debtor': debtor, 'purchase_principal': '1234567.89', 'purchase_total_debt': '1456789.12', 'outstanding_amount': '456789.12'})
     payment, _ = Payment.objects.get_or_create(debt=debt, defaults={'amount': '125000.50', 'status': 'individual', 'payment_date': '2026-10-01'})

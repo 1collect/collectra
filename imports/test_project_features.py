@@ -168,7 +168,7 @@ class ProjectFeaturesTests(TestCase):
         self.assertEqual(self.client.post(reverse('imports:recalculate')).status_code, 403)
 
     def test_extended_import_creates_relations_borrower_and_own_expenses(self):
-        agency = CollectionAgency.objects.create(name='КА', bin='123456789012')
+        agency = CollectionAgency.objects.create(name='КА')
         creditor = Creditor.objects.create(name='Банк')
         cession = Cession.objects.create(number='Ц-1', date=date(2026, 9, 1), creditor=creditor)
         data = {'ДБЗ': 'PROJECT-2', 'ИИН': '900101300124', 'ФИО': 'Другой', 'Основной долг (выкуп)': 100, 'Дата рождения': '1990-01-01', 'Наименование КА': agency.name, 'Первичный кредитор': creditor.name, 'Номер договора цессии': cession.number, 'Дата договора цессии': '2026-09-01', 'Дата реестра': '2026-09-02', 'Гос. пошлина наша': 30}
@@ -195,26 +195,15 @@ class ProjectFeaturesTests(TestCase):
         self.assertEqual(rows[0]['paid'], 0)
         self.assertEqual(rows[0]['refunded'], 200)
         self.assertEqual(rows[0]['balance']['outstanding_amount'], 500)
-        for format in ('csv', 'xlsx', 'pdf'):
-            response = self.client.get(reverse('imports:reports'), {'period': 'as_of', 'day': '2026-10-02', 'format': format})
-            self.assertEqual(response.status_code, 200)
-            if format == 'pdf': self.assertTrue(response.content.startswith(b'%PDF'))
-            elif format == 'xlsx':
-                book = load_workbook(BytesIO(response.content))
-                headers = [cell.value for cell in book.active[1]]
-                self.assertEqual(book.active.cell(2, headers.index('Остаток на конец') + 1).value, 300)
-            else: self.assertIn(self.debt.contract_number, response.content.decode('utf-8-sig'))
-
     def test_period_boundaries(self):
         self.assertEqual(period_bounds({'period': 'week', 'day': date(2026, 10, 2)}), (date(2026, 9, 28), date(2026, 10, 4)))
         self.assertEqual(period_bounds({'period': 'quarter', 'day': date(2026, 10, 2)}), (date(2026, 10, 1), date(2026, 12, 31)))
 
-    def test_all_new_pages_render(self):
-        for name in ('reports', 'analytics', 'action_log', 'recalculate', 'debt_new'):
+    def test_remaining_pages_render_and_removed_pages_are_unroutable(self):
+        for name in ('recalculate', 'debt_new'):
             self.assertEqual(self.client.get(reverse('imports:' + name)).status_code, 200)
-        for kind in ('debtors', 'creditors', 'cessions', 'accounts', 'references'):
-            self.assertEqual(self.client.get(reverse('imports:catalog', args=[kind])).status_code, 200)
-            self.assertEqual(self.client.get(reverse('imports:catalog_new', args=[kind])).status_code, 200)
+        for path in ('/imports/reports/', '/imports/analytics/', '/imports/journal/', '/imports/catalog/debtors/', '/imports/catalog/creditors/', '/imports/catalog/cessions/', '/imports/catalog/accounts/', '/imports/catalog/references/'):
+            self.assertEqual(self.client.get(path).status_code, 404)
 
     def test_template_download_has_expanded_columns(self):
         response = self.client.get(reverse('imports:import_template', args=['contracts']))

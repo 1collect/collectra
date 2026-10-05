@@ -262,27 +262,18 @@ class ImportUploadForm(forms.Form):
 class CollectionAgencyForm(forms.ModelForm):
     class Meta:
         model = CollectionAgency
-        fields = ('name', 'bin', 'phone', 'email', 'address')
+        fields = ('name',)
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'bin': forms.TextInput(attrs={'class': 'form-control', 'inputmode': 'numeric', 'maxlength': '12'}),
-            'phone': forms.TextInput(attrs={'class': 'form-control', 'type': 'tel'}),
-            'email': forms.EmailInput(attrs={'class': 'form-control'}),
-            'address': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
 
 class CounterpartyForm(forms.ModelForm):
     class Meta:
         model = Counterparty
-        fields = ('full_name', 'iin')
+        fields = ('name',)
         widgets = {
-            'full_name': forms.TextInput(attrs={'class': 'form-control'}),
-            'iin': forms.TextInput(attrs={
-                'class': 'form-control',
-                'inputmode': 'numeric',
-                'maxlength': '12',
-            }),
+            'name': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
 

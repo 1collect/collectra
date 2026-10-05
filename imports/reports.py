@@ -4,43 +4,12 @@ from datetime import date, timedelta
 from decimal import Decimal
 from io import BytesIO
 from pathlib import Path
-from django import forms
-from django.core.paginator import Paginator
 from django.http import HttpResponse
-from django.shortcuts import render
 from django.utils import timezone
 from openpyxl import Workbook
-from users.views import permission_required
-from .audit import log_action
-from .balances import calculate_balance, CATEGORY_LABELS
-from .models import Debt, CollectionAgency, Creditor
+from .balances import CATEGORY_LABELS
+from .models import Debt
 from .operations import balance_on
-
-
-class ReportForm(forms.Form):
-    period = forms.ChoiceField(label='Период', required=False, choices=[('all', 'Весь период'), ('day', 'День'), ('week', 'Неделя'), ('month', 'Месяц'), ('quarter', 'Квартал'), ('year', 'Год'), ('custom', 'Произвольный период'), ('as_of', 'На дату')])
-    day = forms.DateField(label='Опорная дата', required=False, widget=forms.DateInput(attrs={'type': 'date'}))
-    start = forms.DateField(label='С', required=False, widget=forms.DateInput(attrs={'type': 'date'}))
-    end = forms.DateField(label='По', required=False, widget=forms.DateInput(attrs={'type': 'date'}))
-    agency = forms.ModelChoiceField(label='КА', queryset=CollectionAgency.objects.all(), required=False, empty_label='Все КА')
-    creditor = forms.ModelChoiceField(label='Кредитор', queryset=Creditor.objects.all(), required=False, empty_label='Все кредиторы')
-    status = forms.ChoiceField(label='Статус', required=False, choices=[('', 'Все'), *Debt.Status.choices])
-    dbz = forms.CharField(label='ДБЗ', required=False)
-    iin = forms.CharField(label='ИИН', required=False)
-    payments = forms.ChoiceField(label='Платежи за период', required=False, choices=[('', 'Все'), ('yes', 'Есть'), ('no', 'Нет')])
-    writeoffs = forms.ChoiceField(label='Списания за период', required=False, choices=[('', 'Все'), ('yes', 'Есть'), ('no', 'Нет')])
-    cession_number = forms.CharField(label='Номер цессии', required=False)
-    cession_date = forms.DateField(label='Дата цессии', required=False, widget=forms.DateInput(attrs={'type': 'date'}))
-    registry_date = forms.DateField(label='Дата реестра', required=False, widget=forms.DateInput(attrs={'type': 'date'}))
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        for field in self.fields.values(): field.widget.attrs['class'] = 'form-control'
-    def clean(self):
-        data = super().clean()
-        if data.get('period') == 'custom':
-            if not data.get('start') or not data.get('end'): raise forms.ValidationError('Укажите начало и конец периода.')
-            if data['start'] > data['end']: raise forms.ValidationError('Начало периода не может быть позже конца.')
-        return data
 
 
 def period_bounds(data):
@@ -138,37 +107,3 @@ def export_rows(rows, format, title, headers=HEADERS):
         response = HttpResponse(stream.getvalue(), content_type='application/pdf')
     response['Content-Disposition'] = f'attachment; filename="report.{format}"'
     return response
-
-
-@permission_required('imports.view_debt')
-def report(request):
-    form = ReportForm(request.GET or {'period': 'all'})
-    rows, start, end = ([], None, None)
-    if form.is_valid(): rows, start, end = report_rows(form.cleaned_data)
-    format = request.GET.get('format')
-    if format in ('csv', 'xlsx', 'pdf') and form.is_valid():
-        from .project_views import check
-        check(request, 'imports.export_debt')
-        log_action('report_exported', details={'format': format, 'filters': request.GET.dict(), 'count': len(rows)})
-        return export_rows([values(row) for row in rows], format, f'Отчёт по задолженности: {start or "начало"} — {end}')
-    totals = {key: sum((row[key] for row in rows), Decimal('0')) for key in ('paid', 'refunded', 'written')}
-    totals['outstanding'] = sum((r['balance']['outstanding_amount'] for r in rows), Decimal('0'))
-    query = request.GET.copy(); query.pop('format', None); query.pop('page', None)
-    return render(request, 'imports/report.html', {'form': form, 'page_obj': Paginator(rows, 50).get_page(request.GET.get('page')), 'totals': totals, 'start': start, 'end': end, 'query_string': query.urlencode()})
-
-
-@permission_required('imports.view_debt')
-def analytics(request):
-    rows, _, end = report_rows({'period': 'all'})
-    totals = {'count': len(rows), 'outstanding': Decimal('0'), 'overpayment': Decimal('0'), 'paid': Decimal('0'), 'written': Decimal('0'), 'review': 0}
-    categories = dict.fromkeys(CATEGORY_LABELS, Decimal('0'))
-    agencies = {}
-    for row in rows:
-        b = row['balance']
-        for key, field in [('outstanding', 'outstanding_amount'), ('overpayment', 'overpayment_amount'), ('paid', 'paid_amount'), ('written', 'written_off_amount')]: totals[key] += b[field]
-        totals['review'] += int(b.get('needs_manual_review', False))
-        agency = str(row['debt'].collection_agency or 'КА не указано')
-        agencies[agency] = agencies.get(agency, Decimal('0')) + b['outstanding_amount']
-        for key in categories: categories[key] += b['current'][key]
-    bars = [{'label': CATEGORY_LABELS[key], 'amount': value, 'percent': float(value / max(max(categories.values()), Decimal('1')) * 100)} for key, value in categories.items()]
-    return render(request, 'imports/analytics.html', {'totals': totals, 'bars': bars, 'agencies': agencies.items(), 'day': end})

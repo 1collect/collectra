@@ -48,21 +48,24 @@
 
     function render(html, url) {
       const page = new DOMParser().parseFromString(html, 'text/html');
-      const content = page.querySelector('#record-form-modal [data-form-body]');
+      const sourceDialog = page.querySelector('#record-form-modal');
+      const content = sourceDialog?.querySelector('[data-form-body]');
       if (!content || !content.querySelector('form[method="post"]')) {
         throw new Error('Не удалось загрузить форму. Обновите страницу и попробуйте снова.');
       }
+      dialog.classList.toggle('modal-form-compact', sourceDialog.classList.contains('modal-form-compact'));
       sourceURL = url;
       body.replaceChildren(...Array.from(content.childNodes, node => document.importNode(node, true)));
       prepare();
     }
 
-    async function openForm(url, label) {
+    async function openForm(url, label, compact = false) {
       if (dialog.dataset.busy === 'true') return;
       if (controller) controller.abort();
       controller = new AbortController();
       const version = ++generation;
       sourceURL = url;
+      dialog.classList.toggle('modal-form-compact', compact);
       title.textContent = label || 'Добавление и редактирование';
       const loading = document.createElement('p');
       loading.setAttribute('role', 'status');
@@ -87,7 +90,7 @@
       const link = event.target.closest('a[data-form-modal]');
       if (!link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
-      openForm(link.href, link.textContent.trim());
+      openForm(link.href, link.textContent.trim(), link.hasAttribute('data-form-modal-compact'));
     });
 
     dialog.addEventListener('submit', async event => {

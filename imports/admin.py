@@ -32,14 +32,14 @@ class ImportAdmin(admin.ModelAdmin):
 
 @admin.register(CollectionAgency)
 class CollectionAgencyAdmin(admin.ModelAdmin):
-    list_display = ('name', 'bin', 'phone', 'email')
-    search_fields = ('name', 'bin')
+    list_display = ('name',)
+    search_fields = ('name',)
 
 
 @admin.register(Counterparty)
 class CounterpartyAdmin(admin.ModelAdmin):
-    list_display = ('iin', 'full_name')
-    search_fields = ('iin', 'full_name')
+    list_display = ('name',)
+    search_fields = ('name',)
 
 
 @admin.register(Debtor)
@@ -61,8 +61,7 @@ class DebtAdmin(admin.ModelAdmin):
         'contract_number',
         'debtor__iin',
         'debtor__full_name',
-        'counterparty__iin',
-        'counterparty__full_name',
+        'counterparty__name',
     )
     list_select_related = ('debtor', 'counterparty')
 

@@ -140,6 +140,11 @@ dialog.modal::backdrop { background: var(--overlay); }
 dialog.modal-sm { width: min(350px, calc(var(--viewport-width) - 28px)); }
 dialog.modal-lg { width: min(750px, calc(var(--viewport-width) - 28px)); }
 dialog.modal-form { width: min(1000px, calc(var(--viewport-width) - 28px)); }
+dialog.modal-form.modal-form-compact { width: min(460px, calc(var(--viewport-width) - 28px)); }
+dialog.modal-form-compact .modal-body > form > .panel { border: 0; border-radius: 0; background: transparent; }
+dialog.modal-form-compact .modal-body > form > .panel > .panel-header { display: none; }
+dialog.modal-form-compact .modal-body > form > .panel > .panel-body { padding: 0; }
+dialog.modal-form-compact .modal-body > form > .panel > .panel-footer { margin: var(--space-5) calc(var(--space-5) * -1) calc(var(--space-5) * -1); }
 .modal-form > .modal-header { position: sticky; top: 0; z-index: 1; background: var(--bg-panel); }
 .modal-form .modal-body > .panel:last-child { margin-bottom: 0; }
 .modal-form .form-grid { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }

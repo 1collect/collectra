@@ -1,9 +1,7 @@
 from decimal import Decimal
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied, ValidationError
-from django.core.paginator import Paginator
 from django.db import transaction
-from django.db.models import Q
 from django.db.models.deletion import ProtectedError
 from django.http import Http404
 from django.shortcuts import get_object_or_404, redirect, render
@@ -18,62 +16,11 @@ from .balances import calculate_balance
 from .operations import cancel_record, delete_record
 from .services import recalculate_debt, recalculate_payment
 
-CATALOGS = {'debtors': (m.Debtor, f.DebtorForm, 'Заёмщики'), 'creditors': (m.Creditor, f.CreditorForm, 'Первичные кредиторы'), 'cessions': (m.Cession, f.CessionForm, 'Договоры цессии'), 'accounts': (m.CompanyAccount, f.CompanyAccountForm, 'Счета компаний'), 'references': (m.ReferenceValue, f.ReferenceForm, 'Справочники')}
 RECORDS = {'payment': m.Payment, 'expense': m.Expense, 'writeoff': m.WriteOff, 'refund': m.PaymentRefund}
 
 
 def check(request, permission):
     if not request.user.is_authenticated or not request.user.has_perm(permission): raise PermissionDenied
-
-
-def catalog(request, kind):
-    if kind not in CATALOGS: raise Http404
-    model, _, title = CATALOGS[kind]
-    check(request, 'imports.view_' + model._meta.model_name)
-    objects = model.objects.all()
-    if kind == 'debtors':
-        objects = objects.select_related('import_item__import_record')
-    query = request.GET.get('q', '').strip()
-    if query:
-        names = [field.name for field in model._meta.fields if field.get_internal_type() in ('CharField', 'TextField')]
-        conditions = Q()
-        for name in names: conditions |= Q(**{name + '__icontains': query})
-        objects = objects.filter(conditions)
-    fields = [field for field in model._meta.fields if field.name not in ('id', 'import_item')]
-    page = Paginator(objects, 25).get_page(request.GET.get('page'))
-    rows = [{'obj': obj, 'values': [getattr(obj, 'get_' + field.name + '_display')() if field.choices else getattr(obj, field.name) for field in fields]} for obj in page]
-    return render(request, 'imports/catalog.html', {'title': title, 'kind': kind, 'fields': fields, 'rows': rows, 'page_obj': page, 'query': query, 'can_add': request.user.has_perm('imports.add_' + model._meta.model_name), 'can_edit': request.user.has_perm('imports.change_' + model._meta.model_name), 'can_delete': request.user.has_perm('imports.delete_' + model._meta.model_name)})
-
-
-def catalog_edit(request, kind, pk=None):
-    if kind not in CATALOGS: raise Http404
-    model, form_class, title = CATALOGS[kind]
-    check(request, 'imports.' + ('change_' if pk else 'add_') + model._meta.model_name)
-    obj = get_object_or_404(model, pk=pk) if pk else model()
-    old = {field.name: str(getattr(obj, field.name)) for field in model._meta.fields} if pk else {}
-    form = form_class(request.POST if request.method == 'POST' else None, instance=obj)
-    if request.method == 'POST' and form.is_valid():
-        with transaction.atomic():
-            obj = form.save()
-            log_action('corrected' if pk else 'created', obj, actor=request.user, details={'old': old, 'new': {field.name: str(getattr(obj, field.name)) for field in model._meta.fields}})
-        return redirect('imports:catalog', kind=kind)
-    return render(request, 'imports/project_form.html', {'form': form, 'title': title})
-
-
-def catalog_delete(request, kind, pk):
-    if kind not in CATALOGS: raise Http404
-    model, _, title = CATALOGS[kind]
-    check(request, 'imports.delete_' + model._meta.model_name)
-    obj = get_object_or_404(model, pk=pk)
-    form = f.ReasonForm(request.POST if request.method == 'POST' else None)
-    if request.method == 'POST' and form.is_valid():
-        try:
-            with transaction.atomic():
-                log_action('deleted', obj, reason=form.cleaned_data['reason'])
-                obj.delete()
-        except ProtectedError: form.add_error(None, 'Запись используется в договорах или операциях.')
-        else: return redirect('imports:catalog', kind=kind)
-    return render(request, 'imports/project_form.html', {'form': form, 'title': 'Удалить: ' + str(obj)})
 
 
 def debt_create(request):
@@ -160,15 +107,8 @@ def full_recalculation(request):
         errors = 0
         for pk in ids: errors += int(recalculate_debt(pk, source='full_recalculation', actor=request.user).needs_manual_review)
         messages.success(request, f'Пересчитано ДБЗ: {len(ids)}. Требуют проверки: {errors}.')
-        return redirect('imports:action_log')
+        return redirect('imports:debts')
     return render(request, 'imports/recalculation.html')
-
-
-@permission_required('imports.view_actionlog')
-def action_log(request):
-    objects = m.ActionLog.objects.select_related('actor')
-    if request.GET.get('q'): objects = objects.filter(Q(action__icontains=request.GET['q']) | Q(reason__icontains=request.GET['q']) | Q(object_id=request.GET['q']) | Q(actor__username__icontains=request.GET['q']))
-    return render(request, 'imports/action_log.html', {'page_obj': Paginator(objects, 50).get_page(request.GET.get('page'))})
 
 
 @permission_required('imports.add_import')

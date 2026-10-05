@@ -591,24 +591,22 @@ class CounterpartyTests(TestCase):
 
     def test_create_and_edit_counterparty(self):
         response = self.client.post(reverse('imports:counterparty_new'), {
-            'full_name': 'ТОО Контрагент',
-            'iin': '920303300003',
+            'name': 'ТОО Контрагент',
         })
-        counterparty = Counterparty.objects.get(iin='920303300003')
+        counterparty = Counterparty.objects.get(name='ТОО Контрагент')
         self.assertRedirects(response, reverse('imports:counterparties'))
 
         response = self.client.post(
             reverse('imports:counterparty_edit', args=[counterparty.pk]),
-            {'full_name': 'ТОО Новый контрагент', 'iin': counterparty.iin},
+            {'name': 'ТОО Новый контрагент'},
         )
         self.assertRedirects(response, reverse('imports:counterparties'))
         counterparty.refresh_from_db()
-        self.assertEqual(counterparty.full_name, 'ТОО Новый контрагент')
+        self.assertEqual(counterparty.name, 'ТОО Новый контрагент')
 
     def test_counterparty_with_contract_cannot_be_deleted(self):
         counterparty = Counterparty.objects.create(
-            full_name='Иванов Иван',
-            iin='900101300001',
+            name='Иванов Иван',
         )
         money_fields = {
             field.name: 0
@@ -637,8 +635,7 @@ class CounterpartyTests(TestCase):
 
     def test_counterparty_without_contract_can_be_deleted(self):
         counterparty = Counterparty.objects.create(
-            full_name='Петров Пётр',
-            iin='910202300002',
+            name='Петров Пётр',
         )
 
         response = self.client.post(

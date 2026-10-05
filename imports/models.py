@@ -146,33 +146,20 @@ class ImportItem(models.Model):
 
 
 class Counterparty(models.Model):
-    full_name = models.CharField('Наименование / ФИО', max_length=255)
-    iin = models.CharField(
-        'ИИН',
-        max_length=12,
-        unique=True,
-        validators=[RegexValidator(r'^\d{12}$', 'ИИН должен содержать 12 цифр.')],
-    )
+    name = models.CharField('Название', max_length=255, unique=True)
 
     class Meta:
         db_table = 'counterparties'
-        ordering = ['full_name']
+        ordering = ['name']
         verbose_name = 'контрагент'
         verbose_name_plural = 'контрагенты'
 
     def __str__(self):
-        return f'{self.full_name} ({self.iin})'
+        return self.name
 
 
 class CollectionAgency(models.Model):
-    name = models.CharField('Наименование', max_length=255)
-    bin = models.CharField(
-        'БИН', max_length=12, unique=True,
-        validators=[RegexValidator(r'^[0-9]{12}$', 'БИН должен содержать 12 цифр.')],
-    )
-    phone = models.CharField('Телефон', max_length=50, blank=True)
-    email = models.EmailField('Электронная почта', blank=True)
-    address = models.CharField('Адрес', max_length=500, blank=True)
+    name = models.CharField('Название', max_length=255, unique=True)
 
     class Meta:
         db_table = 'collection_agencies'
@@ -181,7 +168,7 @@ class CollectionAgency(models.Model):
         verbose_name_plural = 'коллекторские агентства'
 
     def __str__(self):
-        return f'{self.name} ({self.bin})'
+        return self.name
 
 
 class Debtor(ImportSourceModel):

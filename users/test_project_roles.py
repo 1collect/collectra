@@ -28,9 +28,8 @@ class ProjectRoleTests(TestCase):
 
     def test_analyst_can_view_and_export_but_cannot_change_data(self):
         self.select_role('Аналитик')
-        for route in ('debts', 'payments', 'expenses', 'writeoffs', 'refunds', 'reports', 'analytics'):
+        for route in ('debts', 'payments', 'expenses', 'writeoffs', 'refunds'):
             self.assertEqual(self.client.get(reverse('imports:' + route)).status_code, 200)
-        self.assertEqual(self.client.get(reverse('imports:reports'), {'format': 'csv'}).status_code, 200)
         for route in ('payment_new', 'expense_new', 'writeoff_new', 'refund_new', 'new', 'debt_new'):
             self.assertEqual(self.client.post(reverse('imports:' + route), {}).status_code, 403)
         self.assertFalse(self.user.has_perm('imports.change_payment'))
@@ -55,7 +54,6 @@ class ProjectRoleTests(TestCase):
         self.select_role('Координатор')
         payment = Payment.objects.create(debt=self.debt, amount=20, status='individual', payment_date=date(2026, 10, 2))
         urls = [reverse('users:list'), reverse('users:roles'), reverse('imports:recalculate'),
-                reverse('imports:catalog_new', args=['creditors']), reverse('imports:action_log'),
                 reverse('imports:operation_action', args=['payment', payment.pk, 'delete'])]
         for url in urls:
             self.assertEqual(self.client.post(url, {'reason': 'Test'}).status_code, 403, url)
@@ -67,12 +65,13 @@ class ProjectRoleTests(TestCase):
         self.assertFalse(self.user.is_superuser)
         self.assertTrue(is_system_administrator(self.user))
         self.assertEqual(self.client.get(reverse('users:list')).status_code, 200)
-        self.assertEqual(self.client.post(reverse('imports:recalculate')).status_code, 302)
+        response = self.client.post(reverse('imports:recalculate'))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('imports:debts'))
         payment = Payment.objects.create(debt=self.debt, amount=20, status='individual', payment_date=date(2026, 10, 2))
         response = self.client.post(reverse('imports:operation_action', args=['payment', payment.pk, 'delete']), {'reason': 'Ошибка'})
         self.assertEqual(response.status_code, 302)
         self.assertFalse(Payment.objects.filter(pk=payment.pk).exists())
-        self.assertContains(self.client.get(reverse('imports:action_log')), 'Полный перерасчёт')
 
     def test_administrative_permission_alone_does_not_bypass_operation_permissions(self):
         self.user.user_permissions.add(Permission.objects.get(codename='administer_system'))

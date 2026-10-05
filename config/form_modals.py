@@ -19,12 +19,17 @@ FORM_ROUTES = {
     'imports:refund_new': 'imports:refunds',
     'imports:operation_edit': 'imports:debts',
     'imports:payment_distribution': 'imports:payments',
-    'imports:catalog_new': 'imports:catalog',
-    'imports:catalog_edit': 'imports:catalog',
     'imports:collection_agency_new': 'imports:collection_agencies',
     'imports:collection_agency_edit': 'imports:collection_agencies',
     'imports:counterparty_new': 'imports:counterparties',
     'imports:counterparty_edit': 'imports:counterparties',
+}
+
+COMPACT_FORM_ROUTES = {
+    'imports:collection_agency_new',
+    'imports:collection_agency_edit',
+    'imports:counterparty_new',
+    'imports:counterparty_edit',
 }
 
 
@@ -37,11 +42,13 @@ def form_modal_context(request):
         return {'form_modal_page': False}
     route = FORM_ROUTES[match.view_name]
     kwargs = {}
-    if route == 'imports:catalog':
-        kwargs['kind'] = match.kwargs['kind']
-    elif match.view_name == 'imports:operation_edit':
+    if match.view_name == 'imports:operation_edit':
         route = 'imports:writeoffs' if match.kwargs['kind'] == 'writeoff' else 'imports:refunds'
-    return {'form_modal_page': True, 'form_modal_return_url': reverse(route, kwargs=kwargs)}
+    return {
+        'form_modal_page': True,
+        'form_modal_return_url': reverse(route, kwargs=kwargs),
+        'form_modal_compact': match.view_name in COMPACT_FORM_ROUTES,
+    }
 
 
 class FormModalMiddleware:

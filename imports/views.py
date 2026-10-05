@@ -621,12 +621,8 @@ def refund_create(request):
 @permission_required('imports.view_collectionagency')
 def collection_agency_list(request):
     agencies = CollectionAgency.objects.all()
-    query = request.GET.get('q', '').strip()
-    if query:
-        agencies = agencies.filter(Q(name__icontains=query) | Q(bin__icontains=query))
     return render(request, 'imports/collection_agency_list.html', {
         'page_obj': Paginator(agencies, 25).get_page(request.GET.get('page')),
-        'query': query, 'query_string': list_query_string(request),
     })
 
 
@@ -662,10 +658,8 @@ def counterparty_list(request):
     )
     query = request.GET.get('q', '').strip()
     if query:
-        counterparties = counterparties.filter(
-            Q(full_name__icontains=query) | Q(iin__icontains=query)
-        )
-    page_obj = Paginator(counterparties.order_by('full_name'), 25).get_page(
+        counterparties = counterparties.filter(name__icontains=query)
+    page_obj = Paginator(counterparties.order_by('name'), 25).get_page(
         request.GET.get('page')
     )
     return render(request, 'imports/counterparty_list.html', {
