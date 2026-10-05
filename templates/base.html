@@ -7,7 +7,7 @@
     <meta name="description" content="Панель управления платежами">
     <title>{% block title %}Панель управления{% endblock %} — Collectra</title>
     <link href="{% static 'assets/icons/favicon.svg' %}" rel="icon" type="image/svg+xml">
-    <link href="{% static 'css/main.css' %}?v=20261005-13" rel="stylesheet">
+    <link href="{% static 'css/main.css' %}?v=20261005-29" rel="stylesheet">
 </head>
 <body data-page="{% block page_name %}dashboard{% endblock %}">
     <a class="skip-link" href="#main-content">Перейти к содержимому</a>
@@ -63,7 +63,7 @@
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M9 7H4v-5M4 7a9 9 0 1 1-1 7m6-3h7m-7 4h5"></path></svg>
                 <span>Возвраты</span>
             </a>{% endif %}
-            {% if perms.imports.view_import %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:list' or request.resolver_match.view_name == 'imports:items' or request.resolver_match.view_name == 'imports:new' %}active{% endif %}" href="{% url 'imports:list' %}" title="Импорты">
+            {% if perms.imports.view_import %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:list' or request.resolver_match.view_name == 'imports:preview' or request.resolver_match.view_name == 'imports:new' %}active{% endif %}" href="{% url 'imports:list' %}" title="Импорты">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M14 3H5v18h14V8ZM14 3v6h5M8 13h8m-8 4h6"></path></svg>
                 <span>Импорты</span>
             </a>{% endif %}
@@ -137,10 +137,10 @@
     <script defer src="{% static 'js/toast.js' %}?v=20261005-4"></script>
     <script defer src="{% static 'js/sidebar.js' %}?v=20261005-7"></script>
     <script defer src="{% static 'js/dropdown.js' %}?v=20261005-2"></script>
-    <script defer src="{% static 'js/modal.js' %}?v=20261005-1"></script>
-    <script defer src="{% static 'js/distribution.js' %}"></script>
-    <script defer src="{% static 'js/writeoffs.js' %}"></script>
-    <script defer src="{% static 'js/form-modals.js' %}"></script>
+    <script defer src="{% static 'js/modal.js' %}?v=20261005-2"></script>
+    <script defer src="{% static 'js/distribution.js' %}?v=20261005-1"></script>
+    <script defer src="{% static 'js/writeoffs.js' %}?v=20261005-1"></script>
+    <script defer src="{% static 'js/form-modals.js' %}?v=20261005-1"></script>
     <script defer src="{% static 'js/integration.js' %}"></script>
     {% block scripts %}{% endblock %}
 </body>

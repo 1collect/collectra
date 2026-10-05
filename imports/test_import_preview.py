@@ -134,6 +134,30 @@ class ImportPreviewTests(TestCase):
         self.assertNotContains(response, 'class="stat-meta"')
         self.assertFalse(Debtor.objects.filter(iin='000000000001').exists())
 
+    def test_contract_total_includes_every_duplicate_and_failed_row(self):
+        record = self.upload('contracts', [
+            ['PREVIEW-1', '900101300001', 'Повторный договор',
+             '100.25', 0, 0, 0, 0, 0, 0, 0, '100.25']
+        ] * 275)
+        self.assertEqual(record.failed_items, 275)
+        self.assertEqual(record.successful_items, 0)
+        summary = self.client.get(self.url).context['summary']
+        self.assertEqual(summary['total'], Decimal('27568.75'))
+        self.assertEqual(Debt.objects.count(), 1)
+        self.debt.refresh_from_db()
+        self.assertEqual(self.debt.purchase_total_debt, 1000)
+
+    def test_contract_total_skips_unreadable_and_nonfinite_amounts_without_hiding_other_rows(self):
+        self.upload('contracts', [
+            ['NEW-1', '000000000001', 'Заёмщик', '100.10', 0, 0, 0, 0, 0, 0, 0, '100.10'],
+            ['PREVIEW-1', '900101300001', 'Повторный договор', 200, 0, 0, 0, 0, 0, 0, 0, '200.20'],
+            ['NEW-2', 'bad-iin', 'Заёмщик', 300, 0, 0, 0, 0, 0, 0, 0, '300.30'],
+            ['NEW-3', '000000000003', 'Заёмщик', 100, 0, 0, 0, 0, 0, 0, 0, 'not-a-number'],
+            ['NEW-4', '000000000004', 'Заёмщик', 100, 0, 0, 0, 0, 0, 0, 0, 'NaN'],
+            ['NEW-5', '000000000005', 'Заёмщик', 100, 0, 0, 0, 0, 0, 0, 0, 'Infinity'],
+        ])
+        self.assertEqual(self.client.get(self.url).context['summary']['total'], Decimal('600.60'))
+
     def test_financial_summary_counts_borrowers_across_contracts_and_repeated_rows(self):
         Debt.objects.create(contract_number='PREVIEW-2', debtor=self.debt.debtor)
         second_debtor = Debtor.objects.create(iin='000000000002', full_name='Другой заёмщик')
@@ -183,7 +207,8 @@ class ImportPreviewTests(TestCase):
                           ['MISSING', '900', 'ЧСИ', '02.10.2026']])
         response = self.client.get(self.url)
         self.assertContains(response, 'id="import-preview-modal"')
-        self.assertContains(response, 'open data-auto-open')
+        self.assertContains(response, 'aria-labelledby="import-preview-title" data-auto-open>')
+        self.assertNotContains(response, 'open data-auto-open')
         self.assertContains(response, 'Подтверждение импорта')
         self.assertContains(response, 'Строк с ошибками')
         self.assertEqual(response.context['summary']['errors'][0]['row_number'], 3)
@@ -197,6 +222,22 @@ class ImportPreviewTests(TestCase):
         self.assertNotContains(response, '<html')
         self.assertNotContains(response, 'import-preview__rows')
         self.assertEqual(response.headers['Cache-Control'], 'no-store')
+
+    def test_summary_groups_all_errors_and_keeps_rare_errors_after_first_ten_rows(self):
+        record = self.upload()
+        ImportItem.objects.bulk_create([
+            ImportItem(import_record=record, row_number=index + 3, status=ImportItem.Status.FAILED,
+                       data={}, error_message='Повторяющаяся ошибка' if index < 270 else 'Редкая ошибка')
+            for index in range(271)
+        ])
+        Import.objects.filter(pk=record.pk).update(total_items=272, failed_items=271)
+        response = self.client.get(self.url, headers={'X-Import-Modal': '1'})
+        self.assertEqual(len(response.context['summary']['errors']), 2)
+        self.assertEqual([error['count'] for error in response.context['summary']['errors']], [270, 1])
+        self.assertContains(response, 'Повторяющаяся ошибка', count=1)
+        self.assertContains(response, 'Редкая ошибка', count=1)
+        self.assertContains(response, 'Строк: 270')
+        self.assertNotContains(response, 'Показаны первые 10 ошибок')
 
     def test_modal_validation_errors_keep_confirmation_content(self):
         self.upload()
@@ -223,6 +264,31 @@ class ImportPreviewTests(TestCase):
         record.refresh_from_db()
         self.assertEqual(record.status, Import.Status.CANCELLED)
 
+    def test_completed_import_opens_same_summary_modal_without_extra_actions(self):
+        record = self.upload()
+        self.confirm()
+        response = self.client.get(reverse('imports:list'))
+        self.assertContains(response, f'href="{self.url}"')
+        self.assertContains(response, 'data-import-preview', count=1)
+        response = self.client.get(self.url, headers={'X-Import-Modal': '1'})
+        self.assertContains(response, 'import-preview__summary')
+        self.assertNotContains(response, 'data-import-confirm')
+        self.assertNotContains(response, 'Новый импорт')
+        self.assertNotContains(response, 'Повторное сохранение недоступно')
+        self.assertNotContains(response, 'import-preview__rows')
+
+    def test_viewer_can_open_another_users_summary_but_cannot_submit_it(self):
+        record = self.upload()
+        self.confirm()
+        viewer = User.objects.create_user('import-viewer')
+        viewer.user_permissions.add(Permission.objects.get(codename='view_import'))
+        self.client.force_login(viewer)
+        response = self.client.get(self.url, headers={'X-Import-Modal': '1'})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, record.file_name)
+        self.assertNotContains(response, 'data-import-confirm')
+        self.assertEqual(self.client.post(self.url, {'action': 'cancel'}).status_code, 403)
+
     def test_one_error_blocks_confirmation_even_when_count_is_stale(self):
         record = self.upload(rows=[['PREVIEW-1', 10, 'ЧСИ', '02.10.2026'],
                                   ['MISSING', 10, 'ЧСИ', '02.10.2026']])
@@ -244,7 +310,7 @@ class ImportPreviewTests(TestCase):
         self.assertFalse(Payment.objects.exists())
         response = self.client.get(reverse('imports:list'))
         self.assertContains(response, 'badge badge-danger')
-        response = self.client.get(reverse('imports:items', args=[record.pk]))
+        response = self.client.get(reverse('imports:list'))
         self.assertContains(response, 'badge badge-danger')
 
     def test_all_error_file_cannot_be_confirmed(self):

@@ -2,6 +2,29 @@
 (function (A) {
   'use strict';
   let pendingConfirmation = null;
+  let lockedScroll;
+  function syncScrollLock() {
+    if (!document.querySelector('dialog[open]')) { lockedScroll = null; return; }
+    if (!lockedScroll) lockedScroll = { x: window.scrollX, y: window.scrollY };
+    if (window.scrollX !== lockedScroll.x || window.scrollY !== lockedScroll.y) {
+      window.scrollTo({ left: lockedScroll.x, top: lockedScroll.y, behavior: 'instant' });
+    }
+  }
+  function blockBackgroundScroll(event) {
+    if (!document.querySelector('dialog[open]')) return;
+    const dialog = event.target instanceof Element ? event.target.closest('dialog[open]') : null;
+    const point = event.touches?.[0] || event;
+    const rect = dialog?.getBoundingClientRect();
+    if (!rect || point.clientX < rect.left || point.clientX > rect.right || point.clientY < rect.top || point.clientY > rect.bottom) {
+      event.preventDefault();
+    }
+  }
+  document.addEventListener('wheel', blockBackgroundScroll, { passive: false });
+  document.addEventListener('touchmove', blockBackgroundScroll, { passive: false });
+  window.addEventListener('scroll', syncScrollLock);
+  document.addEventListener('close', event => {
+    if (event.target instanceof HTMLDialogElement) syncScrollLock();
+  }, true);
   function settleConfirmation(dialog, value) {
     if (dialog.id !== 'confirm-dialog' || !pendingConfirmation) return;
     const resolve = pendingConfirmation;
@@ -13,13 +36,16 @@
     if (!dialog || dialog.open) return;
     A.dropdown.close();
     dialog.returnValue = 'cancel';
+    if (!lockedScroll) lockedScroll = { x: window.scrollX, y: window.scrollY };
     dialog.showModal();
+    syncScrollLock();
     A.emit('modal:shown', { dialog });
   }
   function close(dialog, value = 'cancel') {
     if (dialog && dialog.dataset.busy === 'true') return;
     if (dialog && dialog.open) {
       dialog.close(value);
+      syncScrollLock();
       // Settle before the queued native close event. Reopening immediately is safe.
       settleConfirmation(dialog, value);
     }

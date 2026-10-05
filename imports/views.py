@@ -2,11 +2,12 @@ from datetime import date
 
 from django.core.paginator import Paginator
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
 from django.db import transaction
-from django.http import FileResponse, JsonResponse
+from django.http import FileResponse, JsonResponse, QueryDict
 from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -14,6 +15,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET
 
 from .forms import (
+    ImportFilterForm,
     CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
     ImportUploadForm, PaymentChangeForm, PaymentRefundForm, WriteOffForm,
     PaymentCreateForm, ExpenseCreateForm,
@@ -48,54 +50,46 @@ def list_query_string(request):
     return query.urlencode()
 
 
-def import_workspace_context(request, selected_import_id=None):
-    import_records = list(
-        Import.objects.select_related('import_type', 'created_by')
-    )
-    for import_record in import_records:
+def import_page_context(request):
+    page_sizes = (10, 20, 50, 100)
+    try:
+        page_size = int(request.GET.get('per_page', 10))
+    except (ValueError, TypeError):
+        page_size = 10
+    if page_size not in page_sizes:
+        page_size = 10
+    records = Import.objects.select_related('import_type', 'created_by').order_by('-created_at', '-pk')
+    filters = ImportFilterForm(request.GET)
+    filters.is_valid()
+    for name, lookup in [('import_type', 'import_type'), ('status', 'status'),
+                         ('date_from', 'created_at__date__gte'), ('date_to', 'created_at__date__lte'),
+                         ('author', 'created_by')]:
+        value = filters.cleaned_data.get(name)
+        if value:
+            records = records.filter(**{lookup: value})
+    query = QueryDict(mutable=True)
+    query['per_page'] = page_size
+    for name in filters.fields:
+        if request.GET.get(name):
+            query[name] = request.GET[name]
+    page = Paginator(records, page_size).get_page(request.GET.get('page'))
+    for import_record in page:
         add_progress(import_record)
-
-    if selected_import_id is None:
-        selected_import = None
-    else:
-        selected_import = get_object_or_404(
-            Import.objects.select_related('import_type', 'created_by'),
-            pk=selected_import_id,
-        )
-        add_progress(selected_import)
-
-    page_obj = None
-    rows = []
-    if selected_import is not None:
-        columns = selected_import.metadata.get('columns')
-        if not isinstance(columns, list):
-            columns = selected_import.import_type.expected_columns
-
-        page_obj = Paginator(
-            selected_import.items.order_by('row_number').prefetch_related(
-                'debt_records', 'debtor_records', 'payment_records', 'expense_records',
-                'writeoff_records', 'paymentrefund_records__payment__debt',
-            ),
-            50,
-        ).get_page(request.GET.get('page'))
-        from .provenance import source_records
-        rows = [
-            {
-                'item': item,
-                'source_records': source_records(item, request.user),
-                'payload': [
-                    {'name': column, 'value': item.data.get(column, '—')}
-                    for column in columns
-                ],
-            }
-            for item in page_obj
-        ]
-
     return {
-        'imports': import_records,
-        'selected_import': selected_import,
-        'page_obj': page_obj,
-        'rows': rows,
+        'imports': page.object_list,
+        'page_obj': page,
+        'page_size': page_size,
+        'page_sizes': page_sizes,
+        'import_filters': filters,
+        'filters_active': any(request.GET.get(name) for name in filters.fields),
+        'import_query_string': query.urlencode(),
+        'page_numbers': list(page.paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+        'import_row_offset': page.start_index() - 1 if page.paginator.count else 0,
+    }
+
+
+def import_workspace_context(request):
+    return import_page_context(request) | {
         'upload_form': ImportUploadForm(user=request.user),
         'open_upload_modal': False,
     }
@@ -108,24 +102,6 @@ def import_list(request):
         'imports/import_list.html',
         import_workspace_context(request),
     )
-
-
-@permission_required('imports.view_import')
-def import_items(request, import_id):
-    return render(
-        request,
-        'imports/import_items.html',
-        import_workspace_context(request, import_id),
-    )
-
-
-@permission_required('imports.view_import')
-@require_GET
-def import_item(request, item_id):
-    item = get_object_or_404(ImportItem, pk=item_id)
-    position = item.import_record.items.filter(row_number__lt=item.row_number).count()
-    target = reverse('imports:items', args=[item.import_record_id])
-    return redirect(f'{target}?page={position // 50 + 1}#import-item-{item.pk}')
 
 
 @permission_required('imports.view_import')
@@ -189,23 +165,32 @@ def start_import_check(request, import_record, uploaded_file):
 @permission_required('imports.view_import')
 @require_GET
 def import_status(request):
-    records = list(Import.objects.select_related('import_type', 'created_by'))
-    for record in records:
-        add_progress(record)
+    context = import_page_context(request)
     response = JsonResponse({
-        'html': render_to_string('imports/partials/import_rows.html', {'imports': records}, request=request),
-        'pending': any(record.status in (Import.Status.NEW, Import.Status.PROCESSING) for record in records),
-        'count': len(records),
+        'html': render_to_string('imports/partials/import_rows.html', context, request=request),
+        'pagination_html': render_to_string('imports/partials/import_pagination.html', context, request=request),
+        'pending': Import.objects.filter(status__in=(Import.Status.NEW, Import.Status.PROCESSING)).exists(),
+        'count': context['page_obj'].paginator.count,
     })
     response['Cache-Control'] = 'no-store'
     return response
 
 
-@permission_required('imports.add_import')
+@login_required
 def import_preview(request, import_id):
-    import_record = get_object_or_404(
-        Import.objects.select_related('import_type'), pk=import_id, created_by=request.user,
-    )
+    if request.method == 'POST':
+        if not request.user.has_perm('imports.add_import'):
+            raise PermissionDenied
+        import_record = get_object_or_404(
+            Import.objects.select_related('import_type'), pk=import_id, created_by=request.user,
+        )
+    else:
+        if not (request.user.has_perm('imports.view_import') or request.user.has_perm('imports.add_import')):
+            raise PermissionDenied
+        records = Import.objects.select_related('import_type')
+        if not request.user.has_perm('imports.view_import'):
+            records = records.filter(created_by=request.user)
+        import_record = get_object_or_404(records, pk=import_id)
     preview_error = ''
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -235,7 +220,11 @@ def import_preview(request, import_id):
     context = {
         'import_record': import_record,
         'summary': import_preview_summary(import_record),
-        'can_confirm': import_record.status == Import.Status.REVIEW,
+        'can_confirm': (
+            import_record.status == Import.Status.REVIEW
+            and import_record.created_by_id == request.user.pk
+            and request.user.has_perm('imports.add_import')
+        ),
         'has_errors': bool(import_record.failed_items) or import_record.items.filter(status=ImportItem.Status.FAILED).exists(),
         'preview_error': preview_error,
     }

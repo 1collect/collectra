@@ -111,7 +111,7 @@ class DebtListTests(TestCase):
         self.assertEqual(response.status_code, 403)
 
 
-class ImportItemsViewTests(TestCase):
+class ImportWorkspaceViewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user(
             'import-reader',
@@ -146,29 +146,30 @@ class ImportItemsViewTests(TestCase):
         )
         self.client.force_login(self.user)
 
-    def test_user_can_view_items_of_import(self):
-        response = self.client.get(
-            reverse('imports:items', args=[self.import_record.pk]),
-        )
+    def test_import_row_view_routes_are_removed(self):
+        item = self.import_record.items.first()
+        for path in (f'/imports/{self.import_record.pk}/items/', f'/imports/items/{item.pk}/'):
+            for method in (self.client.get, self.client.post):
+                with self.subTest(path=path, method=method.__name__):
+                    self.assertEqual(method(path).status_code, 404)
+        self.assertEqual(self.import_record.items.count(), 2)
+        administrator = User.objects.create_superuser('row-admin', password='test-password')
+        self.client.force_login(administrator)
+        self.assertEqual(self.client.get('/admin/imports/importitem/').status_code, 404)
 
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'DBZ-001')
-        self.assertContains(response, 'DBZ-002')
-        self.assertContains(response, 'Данные строки')
-        self.assertContains(response, 'ИИН должен содержать 12 цифр.')
-        self.assertContains(response, 'table-bordered')
-
-    def test_import_list_shows_table_linking_to_import_items(self):
+    def test_import_list_opens_import_summary_in_modal(self):
         response = self.client.get(reverse('imports:list'))
 
-        self.assertContains(response, 'История импорта')
+        self.assertContains(response, 'Список импортов')
         self.assertContains(response, 'table-bordered')
         self.assertContains(response, 'Автор')
         self.assertContains(response, 'import-reader')
         self.assertContains(
             response,
-            reverse('imports:items', args=[self.import_record.pk]),
+            reverse('imports:preview', args=[self.import_record.pk]),
         )
+        self.assertContains(response, 'data-import-preview')
+        self.assertNotContains(response, f'/imports/{self.import_record.pk}/items/')
         self.assertNotContains(response, 'Результат обработки')
         self.assertContains(response, 'imports.js')
 
@@ -195,7 +196,7 @@ class ImportItemsViewTests(TestCase):
         )
 
         response = self.client.get(
-            reverse('imports:items', args=[self.import_record.pk]),
+            reverse('imports:preview', args=[self.import_record.pk]),
         )
 
         self.assertEqual(response.status_code, 403)

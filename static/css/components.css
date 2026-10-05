@@ -101,8 +101,6 @@
 .master-detail__table td:nth-child(2) { min-width: 20rem; }
 .master-detail__table td:last-child { white-space: normal; overflow-wrap: anywhere; }
 .master-detail__scroll { max-height: calc(var(--viewport-dynamic-height) * .65); }
-.key-value-line { display: grid; grid-template-columns: minmax(12rem, 20rem) minmax(10rem, 1fr); min-width: calc(22rem + 12px); gap: 12px; line-height: 1.6; white-space: normal; overflow-wrap: anywhere; }
-.key-value-line + .key-value-line { margin-top: 2px; }
 .master-detail__empty { margin: auto; }
 @keyframes master-detail-enter { from { opacity: .35; transform: translateX(8px); } to { opacity: 1; transform: translateX(0); } }
 .stat-card { padding: 12px 14px; display: flex; flex-direction: column; gap: 7px; }
@@ -152,7 +150,7 @@ dialog.modal-form { width: min(1000px, calc(var(--viewport-width) - 28px)); }
 .modal-footer { display: flex; justify-content: flex-end; gap: var(--space-2); padding: var(--space-3) var(--space-4); border-top: 1px solid var(--border-color); background: var(--bg-subtle); }
 dialog.drawer { height: var(--viewport-dynamic-height); max-height: var(--viewport-dynamic-height); margin: 0 0 0 auto; border-radius: 0; border-top: 0; border-right: 0; border-bottom: 0; width: min(390px, var(--viewport-width)); }
 dialog.drawer .modal-body { padding: 16px; }
-body:has(dialog[open]) { overflow: hidden; }
+dialog.modal { overscroll-behavior: contain; }
 .detail-list { display: grid; grid-template-columns: 115px 1fr; gap: 9px 8px; font-size: var(--text-small); margin: 0; }
 .detail-list dt { color: var(--text-secondary); }
 .detail-list dd { margin: 0; overflow-wrap: anywhere; }

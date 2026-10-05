@@ -1,3 +1,3 @@
 {% if perms.imports.view_import and record.import_item_id %}
-<div class="text-xs mt-1"><a href="{% url 'imports:item' record.import_item_id %}" title="{{ record.import_item.import_record.file_name }}">Импорт #{{ record.import_item.import_record_id }} · строка {{ record.import_item.row_number }}</a></div>
+<div class="text-xs mt-1"><a href="{% url 'imports:preview' record.import_item.import_record_id %}" title="{{ record.import_item.import_record.file_name }}">Импорт #{{ record.import_item.import_record_id }} · строка {{ record.import_item.row_number }}</a></div>
 {% endif %}

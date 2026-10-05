@@ -2,9 +2,43 @@ document.addEventListener('DOMContentLoaded', () => {
   const A = window.Admin;
   const preview = document.getElementById('import-preview-modal');
   const upload = document.getElementById('import-upload-modal');
+  const isReload = performance.getEntriesByType('navigation')[0]?.type === 'reload';
+  if (isReload) {
+    [preview, upload].forEach(dialog => {
+      if (dialog?.open) dialog.close();
+    });
+  }
   let controller;
   let generation = 0;
   const tableContainer = document.querySelector('[data-import-status-url]');
+  const filterToggle = document.querySelector('[data-import-filter-toggle]');
+  const filterPanel = filterToggle && document.getElementById(filterToggle.getAttribute('aria-controls'));
+  if (filterPanel) {
+    const storageKey = 'imports.filtersExpanded';
+    const setExpanded = expanded => {
+      filterPanel.classList.toggle('is-open', expanded);
+      filterPanel.inert = !expanded;
+      filterToggle.setAttribute('aria-expanded', String(expanded));
+    };
+    const savedExpanded = A.storage.get(storageKey, null);
+    if (typeof savedExpanded === 'boolean') {
+      filterPanel.style.transition = 'none';
+      setExpanded(savedExpanded);
+      filterPanel.getBoundingClientRect();
+      filterPanel.style.removeProperty('transition');
+    }
+    filterToggle.addEventListener('click', () => {
+      const expanded = filterToggle.getAttribute('aria-expanded') !== 'true';
+      setExpanded(expanded);
+      A.storage.set(storageKey, expanded);
+    });
+  }
+  document.getElementById('import-filters')?.addEventListener('change', event => {
+    if (event.currentTarget.checkValidity()) event.currentTarget.requestSubmit();
+  });
+  document.querySelector('[data-import-page-size]')?.addEventListener('change', event => {
+    event.target.form.requestSubmit();
+  });
   let statusTimer;
   let statusRequest = false;
   let refreshQueued = false;
@@ -22,7 +56,9 @@ document.addEventListener('DOMContentLoaded', () => {
     statusRequest = true;
     let pending = true;
     try {
-      const response = await fetch(tableContainer.dataset.importStatusUrl, { credentials: 'same-origin', cache: 'no-store' });
+      const statusURL = new URL(tableContainer.dataset.importStatusUrl, location.href);
+      statusURL.search = location.search;
+      const response = await fetch(statusURL, { credentials: 'same-origin', cache: 'no-store' });
       if (!response.ok) throw new Error('Не удалось обновить статус');
       const result = await response.json();
       const tbody = tableContainer.querySelector('tbody');
@@ -32,12 +68,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const status = row.dataset.importStatus;
         knownStatuses.set(row.dataset.importId, status);
         if (!row.hasAttribute('data-import-owned') || !['new', 'processing'].includes(previous)) return;
-        if (status === 'review') A.toast('success', 'Проверка завершена', 'Можно подтвердить импорт.');
-        if (status === 'failed') A.toast('error', 'Ошибка проверки', 'Подробности — в импорте.');
+        if (status === 'failed') A.toast('error', 'Ошибка проверки', 'Откройте импорт для подробностей.');
       });
       statusUnavailable = false;
-      const count = document.querySelector('[title="Количество импортов"]');
-      if (count) count.textContent = result.count;
+      const pagination = document.querySelector('[data-import-pagination]');
+      if (pagination && pagination.innerHTML !== result.pagination_html) pagination.innerHTML = result.pagination_html;
       pending = result.pending;
     } catch (_) {
       if (!statusUnavailable) A.toast('warning', 'Нет связи', 'Повторяем запрос…');
@@ -51,8 +86,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (tableContainer?.querySelector('[data-import-status="new"], [data-import-status="processing"]')) refreshStatus();
   const autoOpen = document.querySelector('[data-auto-open]');
-  if (autoOpen) {
-    if (autoOpen.open) autoOpen.close();
+  if (autoOpen && !isReload) {
     A.modal.show(autoOpen);
   }
   if (!preview) return;
@@ -150,7 +184,10 @@ document.addEventListener('DOMContentLoaded', () => {
           dialog.dataset.busy = 'false';
           A.modal.close(upload);
           form.reset();
-          A.toast('info', 'Проверка началась', 'Прогресс — в списке импортов.');
+          A.toast('info', 'Проверка началась', 'Прогресс отображается в списке импортов.');
+          const listingURL = new URL(location.href);
+          listingURL.searchParams.delete('page');
+          history.replaceState(null, '', listingURL);
           await refreshStatus();
           return;
         }

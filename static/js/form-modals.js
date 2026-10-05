@@ -39,8 +39,8 @@
           link.dataset.formCancel = '';
         }
       });
-      A.initDistribution(body);
-      A.initWriteoffs(body);
+      if (body.querySelector('[name="mode"]')) A.initDistribution(body);
+      if (body.querySelector('#writeoff-form')) A.initWriteoffs(body);
       const field = body.querySelector('[aria-invalid="true"]:not([disabled])')
         || body.querySelector('[autofocus], input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])');
       if (field) field.focus();

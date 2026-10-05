@@ -4,7 +4,7 @@ from decimal import Decimal, InvalidOperation
 from zipfile import BadZipFile
 
 from django.db import transaction
-from django.db.models import Sum
+from django.db.models import Count, Min, Sum
 from django.utils import timezone
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
@@ -810,15 +810,25 @@ IMPORT_HANDLERS.update({
 
 
 def import_preview_summary(import_record):
-    """Totals cover every valid row, including rows outside the current page."""
+    """Contract totals cover the full file; financial totals cover valid rows."""
     code = import_record.import_type.code
     total = Decimal('0')
     by_date = {}
     by_status = {}
     contracts = set()
     iins = set()
-    for item in import_record.items.exclude(status=ImportItem.Status.FAILED):
+    for item in import_record.items.all():
         data = item.data
+        if code == 'contracts':
+            try:
+                file_amount = Decimal(data.get('Общая сумма задолженности (выкуп)') or '0')
+            except (InvalidOperation, ValueError, TypeError):
+                pass
+            else:
+                if file_amount.is_finite():
+                    total += file_amount
+        if item.status == ImportItem.Status.FAILED:
+            continue
         contracts.add(data['ДБЗ'])
         if code == 'contracts':
             iin = str(data.get('ИИН', '')).strip()
@@ -841,7 +851,8 @@ def import_preview_summary(import_record):
         else:
             amount = Decimal(data['Общая сумма задолженности (выкуп)'] or '0')
             event_date = None
-        total += amount
+        if code != 'contracts':
+            total += amount
         if event_date is not None:
             group = by_date.setdefault(event_date, {'date': event_date, 'count': 0, 'amount': Decimal('0')})
             group['count'] += 1
@@ -856,7 +867,9 @@ def import_preview_summary(import_record):
         'unique_iin_count': len(iins),
         'dates': [by_date[key] for key in sorted(by_date)],
         'categories': [{'label': label, 'amount': amount} for label, amount in by_status.items()],
-        'errors': list(import_record.items.filter(status=ImportItem.Status.FAILED).order_by('row_number').values('row_number', 'error_message')[:10]),
+        'errors': list(import_record.items.filter(status=ImportItem.Status.FAILED).values(
+            'error_message',
+        ).annotate(count=Count('pk'), row_number=Min('row_number')).order_by('row_number')),
         'total_label': {'payments': 'Сумма платежей к добавлению', 'expenses': 'Сумма расходов к добавлению',
                         'writeoffs': 'Общая сумма списаний',
                         'contracts': 'Сумма задолженности в строках файла'}.get(code, 'Общая сумма'),

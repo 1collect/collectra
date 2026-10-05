@@ -5,20 +5,33 @@
 {% block heading %}Импорты{% endblock %}
 {% block notifications %}{% if messages %}<div hidden data-import-notifications>{% for message in messages %}<span data-toast-type="{{ message.tags|default:'info' }}">{{ message }}</span>{% endfor %}</div>{% endif %}{% endblock %}
 {% block content %}
-<div class="page-header">
-    <div><div class="page-eyebrow">Данные</div><h1>Импорты</h1></div>
+<div class="page-header import-page-header">
+    <div><h1>Импорты</h1></div>
     <div class="page-actions">
         {% if perms.imports.add_import %}<button class="btn btn-primary" data-modal-open="import-upload-modal" type="button"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Новый импорт</button>{% endif %}
     </div>
 </div>
-<section class="panel" aria-label="Список импортов">
-    <div class="panel-header"><h2>История импорта</h2><span class="badge" title="Количество импортов">{{ imports|length }}</span></div>
-    <div class="p-0 table-container import-table-container" data-import-status-url="{% url 'imports:status' %}" tabindex="0" role="region" aria-label="История импорта">
+<section class="panel import-history" aria-label="Список импортов">
+    <div class="panel-header">
+        <h2 class="flex-1">Список импортов</h2>
+        <button class="btn btn-icon{% if filters_active %} btn-outline-primary{% endif %}" type="button" data-import-filter-toggle aria-label="Фильтры" title="Фильтры" aria-controls="import-filter-panel" aria-expanded="{% if filters_active %}true{% else %}false{% endif %}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"></path><circle cx="9" cy="7" r="3"></circle><circle cx="15" cy="17" r="3"></circle></svg></button>
+        {% if page_sizes %}<div class="rows-control"><select class="form-control" id="import-page-size" name="per_page" form="import-filters" aria-label="Количество импортов на странице" data-import-page-size>{% for size in page_sizes %}<option value="{{ size }}"{% if size == page_size %} selected{% endif %}>{{ size }}</option>{% endfor %}</select></div>{% endif %}
+    </div>
+    <div id="import-filter-panel" class="import-filter-panel{% if filters_active %} is-open{% endif %}"{% if not filters_active %} inert{% endif %}>
+    <div class="import-filter-clip">
+    <form id="import-filters" class="table-advanced import-filter-grid" method="get">
+        {% for field in import_filters %}<div class="form-field"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+        <div class="import-filter-actions"><a class="btn" href="{% url 'imports:list' %}?per_page={{ page_size }}">Сбросить</a></div>
+    </form>
+    </div>
+    </div>
+    <div class="p-0 table-container import-table-container" data-import-status-url="{% url 'imports:status' %}" tabindex="0" role="region" aria-label="Список импортов">
         <table class="table table-bordered table-compact import-table">
             <thead><tr><th scope="col" class="import-id-column">№</th><th scope="col" class="import-file-column">Файл</th><th scope="col" class="import-type-column">Тип</th><th scope="col" class="import-status-column">Статус</th><th scope="col" class="import-author-column">Автор</th><th scope="col" class="import-date-column">Дата</th><th scope="col" class="import-action-column">Действие</th></tr></thead>
             <tbody>{% include 'imports/partials/import_rows.html' %}</tbody>
         </table>
     </div>
+    {% if page_sizes %}<div class="table-footer" data-import-pagination>{% include 'imports/partials/import_pagination.html' %}</div>{% endif %}
 </section>
 {% if perms.imports.add_import %}
 <dialog class="modal" id="import-upload-modal"{% if open_upload_modal %} data-auto-open{% endif %}>
@@ -33,11 +46,11 @@
     </form>
 </dialog>
 {% endif %}
-<dialog class="modal import-preview-modal" id="import-preview-modal" aria-labelledby="import-preview-title"{% if import_record %} open data-auto-open{% endif %}>
+<dialog class="modal import-preview-modal" id="import-preview-modal" aria-labelledby="import-preview-title"{% if import_record %} data-auto-open{% endif %}>
     {% if import_record %}{% include 'imports/partials/import_preview.html' %}{% else %}
     <div class="modal-header"><h2 id="import-preview-title">Подтверждение импорта</h2>{% include 'partials/modal_close.html' %}</div>
     <div class="modal-body" data-preview-loading role="status">Загрузка проверки…</div>
     {% endif %}
 </dialog>
 {% endblock %}
-{% block scripts %}<script defer src="{% static 'js/imports.js' %}?v=20261005-12"></script>{% endblock %}
+{% block scripts %}<script defer src="{% static 'js/imports.js' %}?v=20261005-19"></script>{% endblock %}

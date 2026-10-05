@@ -10,7 +10,6 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .models import Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment, WriteOff
-from .provenance import source_records
 from .services import IMPORT_HANDLERS, ImportValidationError, confirm_import, process_xlsx_import, save_contract
 from .tests import xlsx_file
 
@@ -125,29 +124,13 @@ class ImportSourceTests(TestCase):
         payment.refresh_from_db()
         self.assertEqual(payment.import_item, record.items.get())
 
-    def test_source_redirect_uses_pagination_position_not_excel_row_number(self):
-        record = Import.objects.create(import_type=ImportType.objects.get(code='payments'))
-        ImportItem.objects.bulk_create([ImportItem(import_record=record, row_number=n * 3)
-                                        for n in range(1, 52)])
-        item = record.items.get(row_number=153)
-        url = reverse('imports:item', args=[item.pk])
-        response = self.client.get(url)
-        self.assertEqual(response.url, reverse('imports:items', args=[record.pk]) +
-                         f'?page=2#import-item-{item.pk}')
-        target = self.client.get(response.url)
-        self.assertContains(target, f'id="import-item-{item.pk}"')
-        user = User.objects.create_user('no-import-access')
-        self.client.force_login(user)
-        self.assertEqual(self.client.get(url).status_code, 403)
-
-    def test_reverse_links_respect_business_permissions(self):
+    def test_business_record_source_link_opens_import_summary(self):
         record = self.upload('payments', [['SOURCE-1', 20, 'ЧСИ', '02.10.2026']])
-        item = record.items.get()
-        links = source_records(item, self.user)
-        self.assertEqual(links[0]['url'], reverse('imports:payment_history', args=[Payment.objects.get().pk]))
-        user = User.objects.create_user('import-only')
-        user.user_permissions.add(Permission.objects.get(codename='view_import'))
-        self.assertEqual(source_records(item, user), [])
+        payment = Payment.objects.get()
+        response = self.client.get(reverse('imports:payment_history', args=[payment.pk]))
+        self.assertContains(response, reverse('imports:preview', args=[record.pk]))
+        self.assertNotContains(response, '/items/')
+        self.assertEqual(payment.import_item, record.items.get())
 
     def restore(self):
         return import_module('imports.migrations.0032_restore_import_sources').restore_sources(

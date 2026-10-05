@@ -2,7 +2,7 @@ from django.contrib import admin
 
 from .models import (
     CollectionAgency, Counterparty, Debt, Debtor, Expense, FinancialChangeRequest, Import,
-    ImportItem, ImportType, Payment, PaymentRefund, WriteOff, FinancialRecordHistory,
+    ImportType, Payment, PaymentRefund, WriteOff, FinancialRecordHistory,
 )
 from .models import Creditor, Cession, CompanyAccount, ReferenceValue, ActionLog, BalanceSnapshot, PaymentDistribution
 admin.site.register([Creditor, Cession, CompanyAccount, ReferenceValue])
@@ -28,14 +28,6 @@ class ImportAdmin(admin.ModelAdmin):
     list_filter = ('status', 'import_type')
     search_fields = ('file_name', 'error_message')
     readonly_fields = ('created_at', 'completed_at')
-
-
-@admin.register(ImportItem)
-class ImportItemAdmin(admin.ModelAdmin):
-    list_display = ('id', 'import_record', 'row_number', 'status', 'created_at')
-    list_filter = ('import_record__import_type', 'status')
-    search_fields = ('error_message',)
-    readonly_fields = ('created_at',)
 
 
 @admin.register(CollectionAgency)
