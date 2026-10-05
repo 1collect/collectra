@@ -44,7 +44,7 @@ class ImportDownloadTests(TestCase):
         sheet = book.active
         self.assertEqual([cell.value for cell in sheet[1]], [*self.columns, 'Ошибка'])
         self.assertEqual(sheet.max_column, len(self.columns) + 1)
-        self.assertIsNone(sheet['E2'].value)
+        self.assertEqual(sheet['E2'].value, 'Нет')
         self.assertEqual(sheet['E4'].value, 'Неверный ИИН')
         self.assertEqual(sheet['A2'].value, '001')
         self.assertEqual(sheet['C2'].value, '=1+1')
@@ -100,7 +100,7 @@ class ImportDownloadTests(TestCase):
         self.assertEqual(book.active['A2'].data_type, 's')
         self.assertEqual(book.active['B2'].value, '000000000001')
         self.assertEqual(book.active['D2'].value, 123.45)
-        self.assertIsNone(book.active['E2'].value)
+        self.assertEqual(book.active['E2'].value, 'Нет')
         book.close()
 
     def test_legacy_import_without_metadata_uses_saved_headers(self):

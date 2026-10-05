@@ -50,7 +50,7 @@ def build_import_workbook(record, *, include_status=False):
     widths = [text_width(column) for column in export_columns]
 
     def row_status(status, error):
-        return (error or 'Ошибка') if status == ImportItem.Status.FAILED else None
+        return (error or 'Ошибка') if status == ImportItem.Status.FAILED else 'Нет'
 
     for data, status, error in rows.values_list('data', 'status', 'error_message').iterator(chunk_size=500):
         for index, column in enumerate(columns):

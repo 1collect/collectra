@@ -58,7 +58,6 @@ document.addEventListener('DOMContentLoaded', () => {
     link.setAttribute('aria-busy', 'true');
     link.setAttribute('aria-disabled', 'true');
     link.textContent = 'Подготовка файла…';
-    A.toast('info', 'Подготовка отчёта', 'Большой файл может готовиться около минуты. Дождитесь начала скачивания.');
     try {
       const response = await fetch(link.href, { credentials: 'same-origin' });
       if (!response.ok || response.redirected || !(response.headers.get('Content-Type') || '').includes('spreadsheetml')) {
@@ -229,7 +228,6 @@ document.addEventListener('DOMContentLoaded', () => {
           dialog.dataset.busy = 'false';
           A.modal.close(upload);
           form.reset();
-          A.toast('info', 'Проверка началась', 'Прогресс отображается в списке импортов.');
           const listingURL = new URL(location.href);
           listingURL.searchParams.delete('page');
           history.replaceState(null, '', listingURL);
