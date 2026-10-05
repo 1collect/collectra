@@ -1,17 +1,19 @@
-<div class="modal-header"><h2 id="import-preview-title">Подтверждение импорта</h2><button type="button" class="btn btn-icon btn-ghost" data-modal-close aria-label="Закрыть">×</button></div>
+<div class="modal-header"><h2 id="import-preview-title">Подтверждение импорта</h2>{% include 'partials/modal_close.html' %}</div>
 <div class="stack import-preview modal-body">
     {% if preview_error %}<div class="alert alert-danger" role="alert">{{ preview_error }}</div>{% endif %}
     <section class="panel">
         <div class="panel-header"><h2>{{ import_record.file_name }}</h2><span class="badge">{{ import_record.import_type.name }}</span></div>
-        <div class="panel-body">
-            {% if can_confirm %}<p>Проверьте суммы и ошибки. Импорт возможен только при отсутствии ошибок во всём файле.</p>{% else %}<p>Этот импорт уже завершён или отменён. Повторное сохранение недоступно.</p>{% endif %}
-            {% if import_record.import_type.code == 'writeoffs' %}<p class="text-muted">Сумма полного списания рассчитана по остатку договора. Несколько списаний одного договора учтены последовательно, в порядке строк файла.</p>{% endif %}
-            {% if import_record.import_type.code == 'contracts' %}<p class="text-muted">Будут добавлены новые договоры. Существующие или повторяющиеся ДБЗ считаются ошибками и блокируют импорт всего файла.</p>{% endif %}
-        </div>
-        <div class="import-preview__stats">
-            <div class="card stat-card"><span class="stat-label">{{ summary.total_label }}</span><strong class="stat-value">{{ summary.total|floatformat:'2g' }}</strong><span class="stat-meta">Только строки без ошибок</span></div>
-            <div class="card stat-card"><span class="stat-label">Строк без ошибок</span><strong class="stat-value text-success">{{ import_record.successful_items }}</strong><span class="stat-meta">Из {{ import_record.total_items }} строк · договоров: {{ summary.contract_count }}</span></div>
-            <div class="card stat-card"><span class="stat-label">Строк с ошибками</span><strong class="stat-value{% if import_record.failed_items %} text-danger{% endif %}">{{ import_record.failed_items }}</strong><span class="stat-meta">{% if has_errors %}Импорт файла заблокирован{% else %}Ошибок нет{% endif %}</span></div>
+        {% if not can_confirm %}<div class="panel-body"><p>Этот импорт уже завершён или отменён. Повторное сохранение недоступно.</p></div>{% endif %}
+        <div class="table-container">
+            <table class="table table-bordered table-compact import-preview__summary">
+                <tbody>
+                    <tr><th scope="row">{{ summary.total_label }}</th><td><strong>{{ summary.total|floatformat:'2g' }}</strong></td></tr>
+                    <tr><th scope="row">Строк без ошибок</th><td class="text-success"><strong>{{ import_record.successful_items }}</strong></td></tr>
+                    <tr><th scope="row">Строк с ошибками</th><td{% if has_errors %} class="text-danger"{% endif %}><strong>{{ import_record.failed_items }}</strong></td></tr>
+                    <tr><th scope="row">Количество ДБЗ</th><td><strong>{{ summary.contract_count }}</strong></td></tr>
+                    <tr><th scope="row">Количество уникальных ИИН</th><td><strong>{{ summary.unique_iin_count }}</strong></td></tr>
+                </tbody>
+            </table>
         </div>
         {% if has_errors %}<div class="panel-body"><div class="alert alert-danger">В файле есть ошибки. Ни одна строка не будет импортирована. Исправьте файл и загрузите его заново.</div></div>{% endif %}
         {% if not import_record.successful_items %}<div class="panel-body"><div class="alert alert-danger">Нет строк, готовых к импорту. Исправьте файл и загрузите его заново.</div></div>{% endif %}
@@ -38,7 +40,7 @@
     <form action="{% url 'imports:preview' import_record.pk %}" method="post" class="panel import-preview__actions" data-import-confirm>
         {% csrf_token %}
         <input type="hidden" name="reviewed" value="yes">
-        <div class="panel-footer"><span class="{% if has_errors %}text-danger{% else %}text-muted{% endif %}">{% if has_errors %}Импорт заблокирован до исправления ошибок{% else %}К импорту: {{ import_record.successful_items }} записей{% endif %}</span><button type="submit" class="btn" name="action" value="cancel" formnovalidate>Отменить импорт</button><button type="submit" class="btn btn-primary" name="action" value="confirm"{% if has_errors or not import_record.successful_items %} disabled{% endif %}>Подтвердить импорт</button></div>
+        <div class="panel-footer"><span class="{% if has_errors %}text-danger{% else %}text-muted{% endif %}">{% if has_errors %}Импорт заблокирован до исправления ошибок{% else %}К импорту: {{ import_record.successful_items }} записей{% endif %}</span><button type="button" class="btn" data-modal-close>Закрыть</button><button type="submit" class="btn btn-danger" name="action" value="cancel" formnovalidate>Отменить импорт</button><button type="submit" class="btn btn-primary" name="action" value="confirm" disabled{% if not has_errors and import_record.successful_items %} data-confirm-delay="5"{% endif %}>Подтвердить импорт{% if not has_errors and import_record.successful_items %} (5 с){% endif %}</button></div>
     </form>
     {% else %}<a class="btn" href="{% url 'imports:new' %}">Новый импорт</a>{% endif %}
 </div>

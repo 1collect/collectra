@@ -219,6 +219,12 @@ def import_preview(request, import_id):
             except ImportValidationError as error:
                 preview_error = str(error)
             else:
+                if request.headers.get('X-Import-Modal') == '1':
+                    return JsonResponse({
+                        'status': result.status,
+                        'message': 'Данные не сохранены.' if action == 'cancel' else
+                                   f'Добавлено строк: {result.successful_items}.',
+                    })
                 if action == 'cancel':
                     messages.success(request, 'Импорт отменён. Данные не были сохранены.')
                 else:

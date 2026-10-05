@@ -1,6 +1,6 @@
 
                 {% for item in imports %}
-                <tr data-import-id="{{ item.pk }}" data-import-status="{{ item.status }}">
+                <tr data-import-id="{{ item.pk }}" data-import-status="{{ item.status }}"{% if item.created_by_id == request.user.pk %} data-import-owned{% endif %}>
                     <td class="font-mono import-id-column">{{ forloop.counter }}</td>
                     <td><a class="font-semibold" href="{% url 'imports:download' item.pk %}" title="Скачать XLSX из данных импорта">{{ item.file_name|default:'Файл не указан' }}</a></td>
                     <td>{{ item.import_type.name }}</td>

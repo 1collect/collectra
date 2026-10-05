@@ -32,11 +32,8 @@
 @media (max-width: 600px) {
   .topbar { padding: 0 10px; gap: 5px; }
   .topbar-right, .topbar-left { gap: 3px; }
-  .topbar-separator { margin: 0 2px; }
   .global-search { min-width: 28px; width: 28px; padding: 0; justify-content: center; border-color: transparent; background: transparent; }
   .global-search > span, .global-search kbd { display: none; }
-  .breadcrumbs { font-size: var(--text-caption); gap: 4px; }
-  .breadcrumbs .root-crumb, .breadcrumbs .root-separator { display: none; }
   :root { --page-padding: var(--space-3); }
   .page-header { gap: 9px; flex-wrap: wrap; }
   .page-actions { justify-content: flex-start; padding: 0; }

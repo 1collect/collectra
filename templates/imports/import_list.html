@@ -3,6 +3,7 @@
 {% block title %}Импорты{% endblock %}
 {% block page_name %}imports{% endblock %}
 {% block heading %}Импорты{% endblock %}
+{% block notifications %}{% if messages %}<div hidden data-import-notifications>{% for message in messages %}<span data-toast-type="{{ message.tags|default:'info' }}">{{ message }}</span>{% endfor %}</div>{% endif %}{% endblock %}
 {% block content %}
 <div class="page-header">
     <div><div class="page-eyebrow">Данные</div><h1>Импорты</h1></div>
@@ -23,8 +24,8 @@
 <dialog class="modal" id="import-upload-modal"{% if open_upload_modal %} data-auto-open{% endif %}>
     <form action="{% url 'imports:new' %}" enctype="multipart/form-data" method="post">
         {% csrf_token %}
-        <div class="modal-header"><h2>Новый импорт</h2><button aria-label="Закрыть" class="btn btn-icon btn-ghost" data-modal-close type="button"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"></path></svg></button></div>
-        <div class="modal-body">{{ upload_form.non_field_errors }}<p class="panel-note">Выберите тип импорта и файл XLSX размером до 20 МБ.</p><div class="stack">
+        <div class="modal-header"><h2>Новый импорт</h2>{% include 'partials/modal_close.html' %}</div>
+        <div class="modal-body">{{ upload_form.non_field_errors }}<div class="stack">
             <div class="form-field"><label class="form-label" for="{{ upload_form.import_type.id_for_label }}">{{ upload_form.import_type.label }}</label>{{ upload_form.import_type }}{% for error in upload_form.import_type.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
             <div class="form-field"><label class="form-label" for="{{ upload_form.file.id_for_label }}">{{ upload_form.file.label }}</label>{{ upload_form.file }}{% for error in upload_form.file.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
         </div></div>
@@ -34,9 +35,9 @@
 {% endif %}
 <dialog class="modal import-preview-modal" id="import-preview-modal" aria-labelledby="import-preview-title"{% if import_record %} open data-auto-open{% endif %}>
     {% if import_record %}{% include 'imports/partials/import_preview.html' %}{% else %}
-    <div class="modal-header"><h2 id="import-preview-title">Подтверждение импорта</h2><button type="button" class="btn btn-icon btn-ghost" data-modal-close aria-label="Закрыть">×</button></div>
+    <div class="modal-header"><h2 id="import-preview-title">Подтверждение импорта</h2>{% include 'partials/modal_close.html' %}</div>
     <div class="modal-body" data-preview-loading role="status">Загрузка проверки…</div>
     {% endif %}
 </dialog>
 {% endblock %}
-{% block scripts %}<script defer src="{% static 'js/imports.js' %}?v=20261005-8"></script>{% endblock %}
+{% block scripts %}<script defer src="{% static 'js/imports.js' %}?v=20261005-12"></script>{% endblock %}

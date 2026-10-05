@@ -7,7 +7,7 @@
     <meta name="description" content="Панель управления платежами">
     <title>{% block title %}Панель управления{% endblock %} — Collectra</title>
     <link href="{% static 'assets/icons/favicon.svg' %}" rel="icon" type="image/svg+xml">
-    <link href="{% static 'css/main.css' %}?v=20261005-7" rel="stylesheet">
+    <link href="{% static 'css/main.css' %}?v=20261005-13" rel="stylesheet">
 </head>
 <body data-page="{% block page_name %}dashboard{% endblock %}">
     <a class="skip-link" href="#main-content">Перейти к содержимому</a>
@@ -91,12 +91,6 @@
                 <button aria-controls="sidebar" aria-expanded="true" aria-label="Переключить навигацию" class="btn btn-icon btn-ghost" data-sidebar-toggle>
                     <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><rect height="18" rx="2" width="18" x="3" y="3"></rect><path d="M9 3v18"></path></svg>
                 </button>
-                <span class="topbar-separator"></span>
-                <nav aria-label="Хлебные крошки" class="breadcrumbs">
-                    <a class="root-crumb" href="{% url 'dashboard' %}">Панель управления</a>
-                    <svg aria-hidden="true" class="icon root-separator" focusable="false" viewBox="0 0 24 24"><path d="m9 5 7 7-7 7"></path></svg>
-                    <span aria-current="page">{% block breadcrumb %}{% block heading %}Главная{% endblock %}{% endblock %}</span>
-                </nav>
             </div>
             <div class="topbar-right">
                 <div class="dropdown">
@@ -123,10 +117,10 @@
             </div>
         </header>
         <main class="content" id="main-content" tabindex="-1">
-            {% if messages %}{% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} mb-3">{{ message }}</div>{% endfor %}{% endif %}
+            {% block notifications %}{% if messages %}{% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} mb-3">{{ message }}</div>{% endfor %}{% endif %}{% endblock %}
             {% if form_modal_page %}
             <dialog class="modal modal-form" id="record-form-modal" data-form-auto-open data-return-url="{{ form_modal_return_url }}" aria-labelledby="record-form-title">
-                <div class="modal-header"><h2 id="record-form-title" data-form-title>Добавление и редактирование</h2><button class="btn btn-icon btn-ghost" type="button" data-modal-close aria-label="Закрыть">✕</button></div>
+                <div class="modal-header"><h2 id="record-form-title" data-form-title>Добавление и редактирование</h2>{% include 'partials/modal_close.html' %}</div>
                 <div class="modal-body" data-form-body>
             {% endif %}
             {% block content %}{% endblock %}
@@ -135,14 +129,15 @@
     </div>
     {% if not form_modal_page %}
     <dialog class="modal modal-form" id="record-form-modal" aria-labelledby="record-form-title">
-        <div class="modal-header"><h2 id="record-form-title" data-form-title>Добавление и редактирование</h2><button class="btn btn-icon btn-ghost" type="button" data-modal-close aria-label="Закрыть">✕</button></div>
+        <div class="modal-header"><h2 id="record-form-title" data-form-title>Добавление и редактирование</h2>{% include 'partials/modal_close.html' %}</div>
         <div class="modal-body" data-form-body></div>
     </dialog>
     {% endif %}
     <script defer src="{% static 'js/core.js' %}"></script>
+    <script defer src="{% static 'js/toast.js' %}?v=20261005-4"></script>
     <script defer src="{% static 'js/sidebar.js' %}?v=20261005-7"></script>
     <script defer src="{% static 'js/dropdown.js' %}?v=20261005-2"></script>
-    <script defer src="{% static 'js/modal.js' %}"></script>
+    <script defer src="{% static 'js/modal.js' %}?v=20261005-1"></script>
     <script defer src="{% static 'js/distribution.js' %}"></script>
     <script defer src="{% static 'js/writeoffs.js' %}"></script>
     <script defer src="{% static 'js/form-modals.js' %}"></script>

@@ -8,6 +8,12 @@ document.addEventListener('DOMContentLoaded', () => {
   let statusTimer;
   let statusRequest = false;
   let refreshQueued = false;
+  let statusUnavailable = false;
+  const knownStatuses = new Map(Array.from(tableContainer?.querySelectorAll('[data-import-id]') || [], row => [row.dataset.importId, row.dataset.importStatus]));
+  document.querySelectorAll('[data-import-notifications] [data-toast-type]').forEach(item => {
+    A.toast(item.dataset.toastType, 'Импорт', item.textContent.trim());
+  });
+  document.querySelector('[data-import-notifications]')?.remove();
 
   async function refreshStatus() {
     if (!tableContainer) return;
@@ -21,10 +27,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const result = await response.json();
       const tbody = tableContainer.querySelector('tbody');
       if (tbody.innerHTML !== result.html) tbody.innerHTML = result.html;
+      tbody.querySelectorAll('[data-import-id]').forEach(row => {
+        const previous = knownStatuses.get(row.dataset.importId);
+        const status = row.dataset.importStatus;
+        knownStatuses.set(row.dataset.importId, status);
+        if (!row.hasAttribute('data-import-owned') || !['new', 'processing'].includes(previous)) return;
+        if (status === 'review') A.toast('success', 'Проверка завершена', 'Можно подтвердить импорт.');
+        if (status === 'failed') A.toast('error', 'Ошибка проверки', 'Подробности — в импорте.');
+      });
+      statusUnavailable = false;
       const count = document.querySelector('[title="Количество импортов"]');
       if (count) count.textContent = result.count;
       pending = result.pending;
     } catch (_) {
+      if (!statusUnavailable) A.toast('warning', 'Нет связи', 'Повторяем запрос…');
+      statusUnavailable = true;
       // Retry temporary connection failures without interrupting the import.
     } finally {
       statusRequest = false;
@@ -40,16 +57,30 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   if (!preview) return;
 
-  function message(dialog, text) {
-    let alert = dialog.querySelector('[data-import-message]');
-    if (!alert) {
-      alert = document.createElement('div');
-      alert.className = 'alert alert-danger';
-      alert.dataset.importMessage = '';
-      alert.setAttribute('role', 'alert');
-      (dialog.querySelector('.modal-body') || dialog).prepend(alert);
+  let confirmTimer;
+  function startConfirmTimer() {
+    clearInterval(confirmTimer);
+    const button = preview.querySelector('[data-confirm-delay]');
+    if (!button) return;
+    const deadline = performance.now() + Number(button.dataset.confirmDelay) * 1000;
+    button.dataset.confirmReady = 'false';
+    button.disabled = true;
+    function update() {
+      const remaining = Math.max(0, Math.ceil((deadline - performance.now()) / 1000));
+      button.textContent = remaining ? `Подтвердить импорт (${remaining} с)` : 'Подтвердить импорт';
+      if (!remaining) {
+        clearInterval(confirmTimer);
+        button.dataset.confirmReady = 'true';
+        button.disabled = preview.dataset.busy === 'true';
+      }
     }
-    alert.textContent = text;
+    update();
+    confirmTimer = setInterval(update, 100);
+  }
+  startConfirmTimer();
+
+  function message(dialog, text) {
+    A.toast('error', 'Ошибка импорта', text);
   }
 
   function render(html, wholePage = false) {
@@ -57,6 +88,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const content = wholePage ? page.querySelector('#import-preview-modal') : page.body;
     if (!content || !content.querySelector('#import-preview-title')) throw new Error('Не удалось загрузить проверку импорта.');
     preview.replaceChildren(...Array.from(content.childNodes, node => document.importNode(node, true)));
+    A.toast.syncHost();
+    startConfirmTimer();
   }
 
   document.addEventListener('click', async event => {
@@ -77,7 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const response = await fetch(link.href, {
         credentials: 'same-origin', headers: { 'X-Import-Modal': '1' }, signal: controller.signal,
       });
-      if (!response.ok || response.redirected) throw new Error('Не удалось открыть проверку. Обновите страницу и проверьте доступ.');
+      if (!response.ok || response.redirected) throw new Error('Не удалось открыть проверку.');
       const html = await response.text();
       if (version === generation && preview.open) render(html);
     } catch (error) {
@@ -93,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const isUpload = upload?.contains(form);
     if (!isUpload && !form.matches('[data-import-confirm]')) return;
     event.preventDefault();
+    if (!isUpload && event.submitter?.value !== 'cancel' && form.querySelector('[value="confirm"]')?.disabled) return;
     const dialog = isUpload ? upload : preview;
     if (dialog.dataset.busy === 'true') return;
     const data = new FormData(form);
@@ -108,13 +142,15 @@ document.addEventListener('DOMContentLoaded', () => {
         method: 'POST', body: data, credentials: 'same-origin',
         headers: isUpload ? { 'X-Import-Async': '1' } : { 'X-Import-Modal': '1' },
       });
-      if (!response.ok) throw new Error('Не удалось обработать импорт. Проверьте доступ и соединение.');
+      if (!response.ok) throw new Error('Не удалось выполнить запрос.');
       if (isUpload) {
         if ((response.headers.get('Content-Type') || '').includes('application/json')) {
-          await response.json();
+          const result = await response.json();
+          knownStatuses.set(String(result.import_id), 'new');
           dialog.dataset.busy = 'false';
           A.modal.close(upload);
           form.reset();
+          A.toast('info', 'Проверка началась', 'Прогресс — в списке импортов.');
           await refreshStatus();
           return;
         }
@@ -134,23 +170,36 @@ document.addEventListener('DOMContentLoaded', () => {
           const fields = page.querySelector('#import-upload-modal .modal-body');
           if (!fields) throw new Error('Не удалось загрузить сообщения проверки файла.');
           upload.querySelector('.modal-body').replaceChildren(...Array.from(fields.childNodes, node => document.importNode(node, true)));
+          const error = fields.querySelector('.field-error, .errorlist');
+          if (error) A.toast('error', 'Импорт не запущен', error.textContent.includes('уже запущен') ? 'Этот тип импорта уже занят.' : 'Проверьте поля формы.');
         }
+      } else if ((response.headers.get('Content-Type') || '').includes('application/json')) {
+        const result = await response.json();
+        dialog.dataset.busy = 'false';
+        A.modal.close(preview);
+        A.toast(result.status === 'cancelled' ? 'info' : 'success', result.status === 'cancelled' ? 'Импорт отменён' : 'Импорт завершён', result.message);
+        await refreshStatus();
       } else if (response.redirected) {
         location.assign(response.url);
       } else {
         render(await response.text());
+        const error = preview.querySelector('.modal-body [role="alert"]');
+        if (error) A.toast('error', 'Подтверждение недоступно', 'Проверьте ошибки в импорте.');
       }
     } catch (error) {
       message(dialog, error.message);
     } finally {
       dialog.dataset.busy = 'false';
       dialog.removeAttribute('aria-busy');
-      buttons.forEach((button, index) => { button.disabled = disabled[index]; });
+      buttons.forEach((button, index) => {
+        button.disabled = button.hasAttribute('data-confirm-delay') ? button.dataset.confirmReady !== 'true' : disabled[index];
+      });
     }
   });
 
   preview.addEventListener('close', () => {
     if (preview.open) return;
+    clearInterval(confirmTimer);
     ++generation;
     controller?.abort();
     preview.removeAttribute('aria-busy');

@@ -816,9 +816,14 @@ def import_preview_summary(import_record):
     by_date = {}
     by_status = {}
     contracts = set()
+    iins = set()
     for item in import_record.items.exclude(status=ImportItem.Status.FAILED):
         data = item.data
         contracts.add(data['ДБЗ'])
+        if code == 'contracts':
+            iin = str(data.get('ИИН', '')).strip()
+            if iin:
+                iins.add(iin)
         if code == 'payments':
             amount = Decimal(data['Платеж'])
             event_date = parse_date(data['Дата платежа'], 'Дата платежа')
@@ -841,9 +846,14 @@ def import_preview_summary(import_record):
             group = by_date.setdefault(event_date, {'date': event_date, 'count': 0, 'amount': Decimal('0')})
             group['count'] += 1
             group['amount'] += amount
+    if code != 'contracts':
+        iins.update(Debt.objects.filter(contract_number__in=contracts).exclude(
+            debtor__iin='',
+        ).values_list('debtor__iin', flat=True).distinct())
     return {
         'total': total,
         'contract_count': len(contracts),
+        'unique_iin_count': len(iins),
         'dates': [by_date[key] for key in sorted(by_date)],
         'categories': [{'label': label, 'amount': amount} for label, amount in by_status.items()],
         'errors': list(import_record.items.filter(status=ImportItem.Status.FAILED).order_by('row_number').values('row_number', 'error_message')[:10]),

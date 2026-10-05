@@ -121,6 +121,33 @@ class ImportPreviewTests(TestCase):
         self.confirm()
         self.assertEqual(Expense.objects.count(), 1)
 
+    def test_contract_summary_counts_distinct_iins_before_saving_borrowers(self):
+        self.upload('contracts', [
+            ['NEW-1', '000000000001', 'Первый заёмщик', 100, 0, 0, 0, 0, 0, 0, 0, 100],
+            ['NEW-2', '000000000001', 'Первый заёмщик', 100, 0, 0, 0, 0, 0, 0, 0, 100],
+            ['NEW-3', '000000000002', 'Второй заёмщик', 100, 0, 0, 0, 0, 0, 0, 0, 100],
+            ['INVALID', 'bad-iin', 'Ошибка', 100, 0, 0, 0, 0, 0, 0, 0, 100],
+        ])
+        response = self.client.get(self.url)
+        self.assertEqual(response.context['summary']['contract_count'], 3)
+        self.assertEqual(response.context['summary']['unique_iin_count'], 2)
+        self.assertNotContains(response, 'class="stat-meta"')
+        self.assertFalse(Debtor.objects.filter(iin='000000000001').exists())
+
+    def test_financial_summary_counts_borrowers_across_contracts_and_repeated_rows(self):
+        Debt.objects.create(contract_number='PREVIEW-2', debtor=self.debt.debtor)
+        second_debtor = Debtor.objects.create(iin='000000000002', full_name='Другой заёмщик')
+        Debt.objects.create(contract_number='PREVIEW-3', debtor=second_debtor)
+        self.upload(rows=[
+            ['PREVIEW-1', 10, 'ЧСИ', '02.10.2026'],
+            ['PREVIEW-1', 20, 'ЧСИ', '02.10.2026'],
+            ['PREVIEW-2', 10, 'ЧСИ', '02.10.2026'],
+            ['PREVIEW-3', 10, 'ЧСИ', '02.10.2026'],
+        ])
+        summary = self.client.get(self.url).context['summary']
+        self.assertEqual(summary['contract_count'], 3)
+        self.assertEqual(summary['unique_iin_count'], 2)
+
     def test_removed_contract_blocks_confirmation_without_partial_writes(self):
         record = self.upload()
         self.debt.delete()
@@ -177,6 +204,24 @@ class ImportPreviewTests(TestCase):
         self.assertContains(response, 'Подтвердите, что проверили')
         self.assertNotContains(response, '<html')
         self.assertFalse(Payment.objects.exists())
+
+    def test_modal_confirmation_returns_result_for_toast_without_redirect(self):
+        record = self.upload()
+        response = self.client.post(self.url, {'action': 'confirm', 'reviewed': 'yes'}, headers={'X-Import-Modal': '1'})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()['status'], Import.Status.COMPLETED)
+        self.assertIn('Добавлено строк: 1', response.json()['message'])
+        self.assertEqual(Payment.objects.count(), 1)
+        record.refresh_from_db()
+        self.assertEqual(record.status, Import.Status.COMPLETED)
+
+    def test_modal_cancellation_returns_result_for_toast(self):
+        record = self.upload()
+        response = self.client.post(self.url, {'action': 'cancel'}, headers={'X-Import-Modal': '1'})
+        self.assertEqual(response.json()['status'], Import.Status.CANCELLED)
+        self.assertFalse(Payment.objects.exists())
+        record.refresh_from_db()
+        self.assertEqual(record.status, Import.Status.CANCELLED)
 
     def test_one_error_blocks_confirmation_even_when_count_is_stale(self):
         record = self.upload(rows=[['PREVIEW-1', 10, 'ЧСИ', '02.10.2026'],

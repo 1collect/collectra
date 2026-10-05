@@ -14,6 +14,7 @@
     A.dropdown.close();
     dialog.returnValue = 'cancel';
     dialog.showModal();
+    A.emit('modal:shown', { dialog });
   }
   function close(dialog, value = 'cancel') {
     if (dialog && dialog.dataset.busy === 'true') return;

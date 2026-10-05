@@ -206,7 +206,7 @@ class ImportUploadForm(forms.Form):
         }),
     )
     file = forms.FileField(
-        label='Файл XLSX',
+        label='Файл XLSX (до 20 МБ)',
         widget=forms.ClearableFileInput(attrs={
             'class': 'form-control',
             'accept': '.xlsx',
