@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const upload = document.getElementById('import-upload-modal');
   const isReload = performance.getEntriesByType('navigation')[0]?.type === 'reload';
   if (isReload) {
+    A.storage.remove('imports.filtersExpanded');
     if (location.search) {
       location.replace(location.pathname);
       return;
@@ -15,6 +16,31 @@ document.addEventListener('DOMContentLoaded', () => {
   let controller;
   let generation = 0;
   const tableContainer = document.querySelector('[data-import-status-url]');
+  const filterToggle = document.querySelector('[data-import-filter-toggle]');
+  const filterPanel = filterToggle && document.getElementById(filterToggle.getAttribute('aria-controls'));
+  if (filterPanel) {
+    const storageKey = 'imports.filtersExpanded';
+    const setExpanded = expanded => {
+      filterPanel.classList.toggle('is-open', expanded);
+      filterPanel.inert = !expanded;
+      filterToggle.setAttribute('aria-expanded', String(expanded));
+    };
+    const savedExpanded = isReload ? false : A.storage.get(storageKey, null);
+    if (typeof savedExpanded === 'boolean') {
+      filterPanel.style.transition = 'none';
+      setExpanded(savedExpanded);
+      filterPanel.getBoundingClientRect();
+      filterPanel.style.removeProperty('transition');
+    }
+    filterToggle.addEventListener('click', () => {
+      const expanded = filterToggle.getAttribute('aria-expanded') !== 'true';
+      setExpanded(expanded);
+      A.storage.set(storageKey, expanded);
+    });
+  }
+  document.getElementById('import-filters')?.addEventListener('change', event => {
+    if (event.currentTarget.checkValidity()) event.currentTarget.requestSubmit();
+  });
   document.querySelector('[data-import-page-size]')?.addEventListener('change', event => {
     event.target.form.requestSubmit();
   });

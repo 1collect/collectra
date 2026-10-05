@@ -1,6 +1,8 @@
 from django.contrib.auth.models import Permission, User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
+from datetime import datetime
 
 from .models import Import, ImportType
 
@@ -28,13 +30,40 @@ class ImportPaginationTests(TestCase):
         self.assertContains(response, 'Записи с 1 до 10 из 43')
         self.assertContains(response, '?per_page=10&amp;page=2')
 
-    def test_removed_filters_are_ignored(self):
+    def test_filters_individually_and_together(self):
+        record = Import.objects.first()
+        author = User.objects.create_user('other-author')
+        kind = ImportType.objects.get(code='payments')
+        Import.objects.filter(pk=record.pk).update(
+            import_type=kind, created_by=author, status=Import.Status.FAILED,
+            created_at=timezone.make_aware(datetime(2020, 1, 15, 12)),
+        )
+        filters = {'import_type': str(kind.pk), 'author': str(author.pk), 'status': Import.Status.FAILED,
+                   'date_from': '2020-01-15', 'date_to': '2020-01-15'}
+        for params in [{'import_type': kind.pk}, {'author': author.pk}, {'status': Import.Status.FAILED},
+                       {'date_to': '2020-01-15'}, {'date_from': '2020-01-15', 'date_to': '2020-01-15'}, filters]:
+            with self.subTest(params=params):
+                response = self.client.get(reverse('imports:list'), params)
+                self.assertEqual([item.pk for item in response.context['imports']], [record.pk])
+                self.assertTrue(response.context['filters_active'])
+                status = self.client.get(reverse('imports:status'), params).json()
+                self.assertEqual(status['count'], 1)
+                self.assertEqual(status['html'].count('data-import-id='), 1)
+
+    def test_filter_pagination_and_invalid_values(self):
+        params = {'status': Import.Status.COMPLETED, 'per_page': 10}
+        response = self.client.get(reverse('imports:list'), params)
+        self.assertContains(response, '?per_page=10&amp;status=completed&amp;page=2')
+        data = self.client.get(reverse('imports:status'), params).json()
+        self.assertIn('?per_page=10&amp;status=completed&amp;page=2', data['pagination_html'])
         response = self.client.get(reverse('imports:list'), {
             'author': 'bad', 'import_type': 'bad', 'status': 'bad', 'date_from': 'bad',
         })
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['page_obj'].paginator.count, 43)
-        self.assertNotContains(response, 'Фильтры')
+        self.assertTrue(response.context['import_filters'].errors)
+        response = self.client.get(reverse('imports:list'), {'date_from': '2020-02-01', 'date_to': '2020-01-01'})
+        self.assertContains(response, 'Дата окончания должна быть не раньше даты начала.')
 
     def test_pages_are_disjoint_and_numbering_continues(self):
         first = self.client.get(reverse('imports:list'))

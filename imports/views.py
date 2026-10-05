@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
 from django.db import transaction
-from django.http import FileResponse, JsonResponse
+from django.http import FileResponse, JsonResponse, QueryDict
 from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET
 
 from .forms import (
-    CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
+    ImportFilterForm, CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
     ImportUploadForm, PaymentChangeForm, PaymentRefundForm, WriteOffForm,
     ExpenseCreateForm,
 )
@@ -42,6 +42,13 @@ def add_progress(import_record):
     return import_record
 
 
+def list_query_string(request):
+    """Keep active list filters when moving between result pages."""
+    query = request.GET.copy()
+    query.pop('page', None)
+    return query.urlencode()
+
+
 def import_page_context(request):
     page_sizes = (10, 20, 50, 100)
     try:
@@ -51,6 +58,19 @@ def import_page_context(request):
     if page_size not in page_sizes:
         page_size = 10
     records = Import.objects.select_related('import_type', 'created_by').order_by('-created_at', '-pk')
+    filters = ImportFilterForm(request.GET)
+    filters.is_valid()
+    for name, lookup in [('import_type', 'import_type'), ('status', 'status'),
+                         ('date_from', 'created_at__date__gte'), ('date_to', 'created_at__date__lte'),
+                         ('author', 'created_by')]:
+        value = filters.cleaned_data.get(name)
+        if value:
+            records = records.filter(**{lookup: value})
+    query = QueryDict(mutable=True)
+    query['per_page'] = page_size
+    for name in filters.fields:
+        if request.GET.get(name):
+            query[name] = request.GET[name]
     page = Paginator(records, page_size).get_page(request.GET.get('page'))
     for import_record in page:
         add_progress(import_record)
@@ -59,7 +79,9 @@ def import_page_context(request):
         'page_obj': page,
         'page_size': page_size,
         'page_sizes': page_sizes,
-        'import_query_string': f'per_page={page_size}',
+        'import_filters': filters,
+        'filters_active': any(request.GET.get(name) for name in filters.fields),
+        'import_query_string': query.urlencode(),
         'page_numbers': list(page.paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
         'import_row_offset': page.start_index() - 1 if page.paginator.count else 0,
     }

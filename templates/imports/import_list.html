@@ -10,10 +10,23 @@
         <h1 class="flex-1">Импорты</h1>
         <div class="import-header-actions">
         <div class="import-table-settings{% if perms.imports.add_import %} import-table-settings-separated{% endif %}">
-        {% if page_sizes %}<form id="import-filters" method="get" action="{% url 'imports:list' %}" class="rows-control"><select class="form-control" id="import-page-size" name="per_page" aria-label="Количество строк на странице" title="Количество строк на странице" data-import-page-size>{% for size in page_sizes %}<option value="{{ size }}"{% if size == page_size %} selected{% endif %}>{{ size }} строк</option>{% endfor %}</select></form>{% endif %}
+        <button class="btn import-filter-toggle{% if filters_active %} btn-outline-primary{% endif %}" type="button" data-import-filter-toggle aria-label="Фильтры{% if filters_active %}: есть активные{% endif %}" title="Фильтры{% if filters_active %}: есть активные{% endif %}" aria-controls="import-filter-panel" aria-expanded="{% if filters_active %}true{% else %}false{% endif %}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"></path><circle cx="9" cy="7" r="3"></circle><circle cx="15" cy="17" r="3"></circle></svg><span>Фильтры</span>{% if filters_active %}<span class="import-filter-indicator" aria-hidden="true"></span>{% endif %}<svg class="icon import-filter-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></button>
+        {% if page_sizes %}<div class="rows-control"><select class="form-control" id="import-page-size" name="per_page" form="import-filters" aria-label="Количество строк на странице" title="Количество строк на странице" data-import-page-size>{% for size in page_sizes %}<option value="{{ size }}"{% if size == page_size %} selected{% endif %}>{{ size }} строк</option>{% endfor %}</select></div>{% endif %}
         </div>
         {% if perms.imports.add_import %}<button class="btn btn-primary" data-modal-open="import-upload-modal" type="button"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Новый импорт</button>{% endif %}
         </div>
+    </div>
+    <div id="import-filter-panel" class="import-filter-panel{% if filters_active %} is-open{% endif %}"{% if not filters_active %} inert{% endif %}>
+    <div class="import-filter-clip">
+    <form id="import-filters" class="table-advanced import-filter-grid" method="get" action="{% url 'imports:list' %}">
+        <div class="import-filter-fields">
+        {% for field in import_filters %}{% if field.name != 'date_from' and field.name != 'date_to' %}<div class="form-field"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endif %}{% endfor %}
+        <div class="form-field import-filter-date-start"><label class="form-label" for="{{ import_filters.date_from.id_for_label }}">Дата с</label>{{ import_filters.date_from }}{% for error in import_filters.date_from.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+        <div class="form-field"><label class="form-label" for="{{ import_filters.date_to.id_for_label }}">Дата по</label>{{ import_filters.date_to }}{% for error in import_filters.date_to.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+        </div>
+        {% if filters_active %}<div class="import-filter-actions"><a class="btn btn-ghost" href="{% url 'imports:list' %}?per_page={{ page_size }}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"></path></svg>Сбросить</a></div>{% endif %}
+    </form>
+    </div>
     </div>
     <div class="p-0 table-container import-table-container" data-import-status-url="{% url 'imports:status' %}" tabindex="0" role="region" aria-label="Список импортов">
         <table class="table table-bordered table-compact import-table">
