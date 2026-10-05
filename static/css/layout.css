@@ -6,11 +6,6 @@
 .brand:hover { text-decoration: none; }
 .brand-logo { display: block; width: 90px; max-width: calc(100% - 34px); height: auto; overflow: visible; }
 .brand-version { margin-left: auto; font: var(--text-caption) var(--font-sans); color: #98a8c0; }
-.workspace { display: flex; gap: 9px; align-items: center; padding: 15px 16px 13px; }
-.workspace-icon { height: 28px; width: 28px; border: 1px solid #46546a; border-radius: 4px; display: grid; place-items: center; font-size: var(--text-small); color: #e0e7f3; }
-.workspace-label { line-height: 1.4; font-size: var(--text-small); }
-.workspace-label strong { color: #e5ebf5; font-size: var(--text-body); font-weight: 500; display: block; }
-.workspace-label span { color: var(--sidebar-muted); }
 .sidebar-nav { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 0 9px 12px; scrollbar-width: thin; }
 .nav-group-title { margin: 16px 9px 6px; color: var(--sidebar-muted); font-size: var(--text-caption); letter-spacing: .6px; font-weight: 600; }
 .nav-link { width: 100%; display: flex; align-items: center; gap: 9px; min-height: var(--control-height); padding: var(--space-2) var(--space-3); margin: 2px 0; border-radius: 4px; text-align: left; color: var(--sidebar-text); background: transparent; white-space: nowrap; }
@@ -51,7 +46,7 @@
 .sidebar-collapsed .sidebar { width: var(--sidebar-collapsed-width); }
 .sidebar-collapsed .shell-main { margin-left: var(--sidebar-collapsed-width); }
 .sidebar-collapsed .brand { padding: 0 16px; }
-.sidebar-collapsed .brand-logo, .sidebar-collapsed .brand-version, .sidebar-collapsed .workspace,
+.sidebar-collapsed .brand-logo, .sidebar-collapsed .brand-version,
 .sidebar-collapsed .nav-group-title, .sidebar-collapsed .nav-link > span, .sidebar-collapsed .nav-link .chevron,
 .sidebar-collapsed .sidebar-status, .sidebar-collapsed .submenu { display: none; }
 .sidebar-collapsed .sidebar-nav { padding-top: 12px; }

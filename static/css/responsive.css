@@ -25,7 +25,6 @@
   .shell-main, .sidebar-collapsed .shell-main { margin-left: 0; }
   .sidebar-collapsed .brand { padding: 0 17px; }
   .sidebar-collapsed .brand-logo, .sidebar-collapsed .brand-version, .sidebar-collapsed .nav-group-title { display: block; }
-  .sidebar-collapsed .workspace { display: flex; }
   .sidebar-collapsed .nav-link > span { display: inline; }
   .sidebar-collapsed .nav-link .chevron { display: block; }
   .sidebar-collapsed .sidebar-status { display: flex; }

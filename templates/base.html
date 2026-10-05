@@ -15,13 +15,6 @@
         <a class="brand" href="{% url 'dashboard' %}">
             {% include "partials/collectra_logo.svg" %}
         </a>
-        <div class="workspace">
-            <div class="workspace-icon">ПЛ</div>
-            <div class="workspace-label">
-                <strong>Платежи</strong>
-                <span>Панель управления</span>
-            </div>
-        </div>
         <nav class="sidebar-nav">
             <div class="nav-group-title">УПРАВЛЕНИЕ ДОСТУПОМ</div>
             {% if perms.auth.view_user %}
