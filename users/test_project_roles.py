@@ -38,7 +38,7 @@ class ProjectRoleTests(TestCase):
 
     def test_coordinator_can_enter_edit_cancel_and_export(self):
         self.select_role('Координатор')
-        for code in ('add_import', 'add_debt', 'change_debt', 'add_payment', 'change_payment', 'add_writeoff', 'change_writeoff', 'add_paymentrefund', 'change_paymentrefund', 'export_debt'):
+        for code in ('add_import', 'add_debt', 'add_payment', 'change_payment', 'add_writeoff', 'change_writeoff', 'add_paymentrefund', 'change_paymentrefund', 'export_debt'):
             self.assertTrue(self.user.has_perm('imports.' + code), code)
         response = self.client.post(reverse('imports:payment_new'), {
             'debt': self.debt.pk, 'amount': '25', 'status': 'individual', 'payment_date': '2026-10-02',

@@ -11,7 +11,6 @@ FORM_ROUTES = {
     'users:group_new': 'users:groups',
     'users:group_edit': 'users:groups',
     'imports:debt_new': 'imports:debts',
-    'imports:debt_edit': 'imports:debts',
     'imports:payment_new': 'imports:payments',
     'imports:payment_edit': 'imports:payments',
     'imports:expense_new': 'imports:expenses',
@@ -43,8 +42,6 @@ def form_modal_context(request):
         kwargs['kind'] = match.kwargs['kind']
     elif match.view_name == 'imports:document_add':
         route, kwargs = 'imports:debt_detail', {'debt_id': match.kwargs['debt_id']}
-    elif match.view_name == 'imports:debt_edit':
-        route, kwargs = 'imports:debt_detail', {'debt_id': match.kwargs['pk']}
     elif match.view_name == 'imports:operation_edit':
         route = 'imports:writeoffs' if match.kwargs['kind'] == 'writeoff' else 'imports:refunds'
     return {'form_modal_page': True, 'form_modal_return_url': reverse(route, kwargs=kwargs)}

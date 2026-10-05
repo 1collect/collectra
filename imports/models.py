@@ -272,6 +272,7 @@ class Debt(models.Model):
 
     class Meta:
         db_table = 'debts'
+        default_permissions = ('add', 'view')
         ordering = ['contract_number']
         verbose_name = 'задолженность'
         verbose_name_plural = 'задолженности'

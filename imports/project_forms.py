@@ -27,8 +27,8 @@ class DebtorForm(StyledForm):
             if choices: self.fields[name] = forms.ChoiceField(label=self.fields[name].label, choices=[('', '—'), *choices], required=False, widget=forms.Select(attrs={'class': 'form-control'}))
 
 
-class DebtForm(StyledForm):
-    reason = forms.CharField(label='Основание создания / корректировки', widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
+class DebtCreateForm(StyledForm):
+    reason = forms.CharField(label='Основание создания', widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
     class Meta:
         model = Debt
         fields = ('debtor', 'contract_number', 'collection_agency', 'original_creditor', 'cession', 'registry_number', 'registry_date', 'dbz_start_date', 'dbz_end_date', 'issued_credit_amount', 'overdue_days_at_registry_date', *PURCHASE_FIELDS, 'manual_closed_at')

@@ -14,7 +14,7 @@ def create_project_roles(sender, using='default', **kwargs):
         readonly = permissions.filter(content_type__app_label='imports', codename__startswith='view_').exclude(codename='view_actionlog')
         export = permissions.filter(content_type__app_label='imports', codename='export_debt')
         coordinator_codes = [
-            'add_import', 'add_debtor', 'change_debtor', 'add_debt', 'change_debt',
+            'add_import', 'add_debtor', 'change_debtor', 'add_debt',
             'add_payment', 'change_payment', 'add_expense', 'change_expense',
             'add_writeoff', 'change_writeoff', 'add_paymentrefund', 'change_paymentrefund',
             'add_financialchangerequest', 'add_casedocument',

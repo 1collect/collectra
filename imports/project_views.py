@@ -19,7 +19,7 @@ from .operations import cancel_record, delete_record
 from .services import recalculate_debt, recalculate_payment
 
 CATALOGS = {'debtors': (m.Debtor, f.DebtorForm, 'Заёмщики'), 'creditors': (m.Creditor, f.CreditorForm, 'Первичные кредиторы'), 'cessions': (m.Cession, f.CessionForm, 'Договоры цессии'), 'accounts': (m.CompanyAccount, f.CompanyAccountForm, 'Счета компаний'), 'references': (m.ReferenceValue, f.ReferenceForm, 'Справочники')}
-RECORDS = {'debt': m.Debt, 'payment': m.Payment, 'expense': m.Expense, 'writeoff': m.WriteOff, 'refund': m.PaymentRefund}
+RECORDS = {'payment': m.Payment, 'expense': m.Expense, 'writeoff': m.WriteOff, 'refund': m.PaymentRefund}
 
 
 def check(request, permission):
@@ -74,18 +74,16 @@ def catalog_delete(request, kind, pk):
     return render(request, 'imports/project_form.html', {'form': form, 'title': 'Удалить: ' + str(obj)})
 
 
-def debt_edit(request, pk=None):
-    check(request, 'imports.' + ('change_debt' if pk else 'add_debt'))
-    debt = get_object_or_404(m.Debt, pk=pk) if pk else m.Debt()
-    old = {field.name: str(getattr(debt, field.name)) for field in m.Debt._meta.fields} if pk else {}
-    form = f.DebtForm(request.POST if request.method == 'POST' else None, instance=debt)
+def debt_create(request):
+    check(request, 'imports.add_debt')
+    form = f.DebtCreateForm(request.POST if request.method == 'POST' else None)
     if request.method == 'POST' and form.is_valid():
         with transaction.atomic():
             debt = form.save()
             recalculate_debt(debt, source='manual_correction', actor=request.user)
-            log_action('corrected' if pk else 'created', debt, reason=form.cleaned_data['reason'], details={'old': old, 'new': {field.name: str(getattr(debt, field.name)) for field in m.Debt._meta.fields}})
+            log_action('created', debt, reason=form.cleaned_data['reason'], details={'new': {field.name: str(getattr(debt, field.name)) for field in m.Debt._meta.fields}})
         return redirect('imports:debt_detail', debt_id=debt.pk)
-    return render(request, 'imports/project_form.html', {'form': form, 'title': 'Изменить ДБЗ' if pk else 'Новый ДБЗ'})
+    return render(request, 'imports/project_form.html', {'form': form, 'title': 'Новый ДБЗ'})
 
 
 @permission_required('imports.change_payment')
