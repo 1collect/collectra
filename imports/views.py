@@ -2,7 +2,7 @@ from datetime import date
 
 from django.core.paginator import Paginator
 from django.contrib import messages
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
 from django.db import transaction
@@ -145,12 +145,27 @@ def import_upload(request):
     form = ImportUploadForm(request.POST or None, request.FILES or None, user=request.user)
     if request.method == 'POST' and form.is_valid():
         uploaded_file = form.cleaned_data['file']
-        import_record = Import.objects.create(
-            import_type=form.cleaned_data['import_type'],
-            file_name=uploaded_file.name[:255],
-            file_size=uploaded_file.size,
-            created_by=request.user,
-        )
+        from .lifecycle import reserve_import
+        try:
+            import_record = reserve_import(
+                import_type=form.cleaned_data['import_type'], uploaded_file=uploaded_file, user=request.user,
+            )
+        except ValidationError as error:
+            form.add_error('import_type', error)
+        else:
+            return start_import_check(request, import_record, uploaded_file)
+
+    if request.user.has_perm('imports.view_import'):
+        context = import_workspace_context(request)
+        context['upload_form'] = form
+        context['open_upload_modal'] = True
+        return render(request, 'imports/import_list.html', context)
+
+    return render(request, 'imports/import_upload.html', {'form': form})
+
+
+def start_import_check(request, import_record, uploaded_file):
+    try:
         if request.headers.get('X-Import-Async') == '1':
             from .background import queue_check
             queue_check(import_record, uploaded_file)
@@ -160,14 +175,15 @@ def import_upload(request):
             return redirect('imports:preview', import_id=import_record.pk)
         messages.error(request, import_record.error_message)
         return redirect('imports:list')
-
-    if request.user.has_perm('imports.view_import'):
-        context = import_workspace_context(request)
-        context['upload_form'] = form
-        context['open_upload_modal'] = True
-        return render(request, 'imports/import_list.html', context)
-
-    return render(request, 'imports/import_upload.html', {'form': form})
+    except Exception:
+        # Failed file storage must not leave a type reserved forever.
+        Import.objects.filter(pk=import_record.pk, status=Import.Status.NEW).update(
+            status=Import.Status.FAILED, completed_at=timezone.now(),
+            error_message='Не удалось сохранить файл для проверки. Загрузите его заново.',
+        )
+        if import_record.check_file:
+            import_record.check_file.delete(save=False)
+        raise
 
 
 @permission_required('imports.view_import')

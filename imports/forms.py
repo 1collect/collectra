@@ -222,6 +222,12 @@ class ImportUploadForm(forms.Form):
         if user is not None and not user.has_perm('imports.add_writeoff'):
             self.fields['import_type'].queryset = self.fields['import_type'].queryset.exclude(code='writeoffs')
 
+    def clean_import_type(self):
+        from .lifecycle import ensure_type_available
+        import_type = self.cleaned_data['import_type']
+        ensure_type_available(import_type)
+        return import_type
+
     def clean_file(self):
         uploaded_file = self.cleaned_data['file']
         if not uploaded_file.name.lower().endswith('.xlsx'):
