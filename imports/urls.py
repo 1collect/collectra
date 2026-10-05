@@ -7,6 +7,7 @@ from . import reports
 app_name = 'imports'
 
 urlpatterns = [
+    path('templates/', views.import_templates, name='templates'),
     path('templates/<str:code>/', project.import_template, name='import_template'),
     path('reports/', reports.report, name='reports'),
     path('analytics/', reports.analytics, name='analytics'),

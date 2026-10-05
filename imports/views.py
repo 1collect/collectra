@@ -104,12 +104,29 @@ def import_list(request):
     )
 
 
+@permission_required('imports.add_import')
+@require_GET
+def import_templates(request):
+    from .services import IMPORT_HANDLERS
+    types = ImportUploadForm(user=request.user).fields['import_type'].queryset.filter(code__in=IMPORT_HANDLERS)
+    descriptions = {
+        'contracts': 'Загрузка договоров и данных должников.',
+        'payments': 'Загрузка платежей по договорам.',
+        'expenses': 'Загрузка расходов по договорам.',
+        'writeoffs': 'Загрузка списаний задолженности.',
+    }
+    return render(request, 'imports/import_templates.html', {
+        'templates': [{'name': kind.name, 'code': kind.code, 'description': descriptions.get(kind.code, kind.description)}
+                      for kind in types],
+    })
+
+
 @permission_required('imports.view_import')
 @require_GET
 def import_download(request, import_id):
     from .files import build_import_workbook, import_download_name
     record = get_object_or_404(Import.objects.select_related('import_type'), pk=import_id)
-    response = FileResponse(build_import_workbook(record), as_attachment=True,
+    response = FileResponse(build_import_workbook(record, include_status=request.GET.get('with_errors') == '1'), as_attachment=True,
                             filename=import_download_name(record),
                             content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
     response['Cache-Control'] = 'no-store'

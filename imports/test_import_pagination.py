@@ -27,7 +27,7 @@ class ImportPaginationTests(TestCase):
         self.assertEqual(len(response.context['imports']), 10)
         self.assertEqual(response.context['page_obj'].paginator.count, 43)
         self.assertContains(response, '<option value="10" selected>10 строк</option>')
-        self.assertContains(response, 'Всего импортов: <strong>43</strong>')
+        self.assertContains(response, 'Записи с 1 до 10 из 43')
         self.assertContains(response, '?per_page=10&amp;page=2')
 
     def test_filters_individually_and_together(self):
@@ -71,8 +71,10 @@ class ImportPaginationTests(TestCase):
         self.assertFalse(set(record.pk for record in first.context['imports']) &
                          set(record.pk for record in second.context['imports']))
         self.assertContains(second, 'class="font-mono import-id-column">11</td>')
+        self.assertContains(second, 'Записи с 11 до 20 из 43')
         last = self.client.get(reverse('imports:list'), {'page': 5})
         self.assertEqual(len(last.context['imports']), 3)
+        self.assertContains(last, 'Записи с 41 до 43 из 43')
         self.assertContains(last, 'class="font-mono import-id-column">43</td>')
 
     def test_size_selection_and_invalid_parameters(self):
@@ -112,13 +114,13 @@ class ImportPaginationTests(TestCase):
 
     def test_empty_list_and_single_page_controls(self):
         response = self.client.get(reverse('imports:list'), {'per_page': 50})
-        self.assertContains(response, 'Всего импортов: <strong>43</strong>')
+        self.assertContains(response, 'Записи с 1 до 43 из 43')
         self.assertNotContains(response, 'aria-label="Страницы импортов"')
         data = self.client.get(reverse('imports:status'), {'per_page': 50}).json()
         self.assertNotIn('aria-label="Страницы импортов"', data['pagination_html'])
         Import.objects.all().delete()
         response = self.client.get(reverse('imports:list'))
-        self.assertContains(response, 'Всего импортов: <strong>0</strong>')
+        self.assertContains(response, 'Записей: 0')
         self.assertContains(response, 'Ничего не найдено')
         self.assertNotContains(response, 'aria-label="Страницы импортов"')
         self.assertNotContains(response, 'Загрузите первый XLSX-файл')

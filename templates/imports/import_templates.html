@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block title %}Шаблоны{% endblock %}
+{% block page_name %}import-templates{% endblock %}
+{% block content %}
+<section class="panel import-history" aria-label="Шаблоны импорта">
+    <div class="panel-header"><h1>Шаблоны</h1></div>
+    <div class="table-container" tabindex="0" role="region" aria-label="Доступные шаблоны">
+        <table class="table table-bordered">
+            <thead><tr><th scope="col">№</th><th scope="col">Тип импорта</th><th scope="col">Назначение</th><th scope="col">Формат</th><th scope="col" class="cell-actions">Действие</th></tr></thead>
+            <tbody>
+                {% for template in templates %}
+                <tr>
+                    <td class="font-mono">{{ forloop.counter }}</td>
+                    <td>{{ template.name }}</td>
+                    <td class="cell-text">{{ template.description }}</td>
+                    <td>XLSX</td>
+                    <td class="cell-actions"><a class="btn btn-sm" href="{% url 'imports:import_template' template.code %}" aria-label="Скачать шаблон: {{ template.name }}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4"></path></svg>Скачать</a></td>
+                </tr>
+                {% empty %}<tr><td colspan="5"><div class="empty-state"><strong>Нет доступных шаблонов</strong></div></td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

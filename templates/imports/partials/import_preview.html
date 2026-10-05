@@ -37,7 +37,9 @@
     <form action="{% url 'imports:preview' import_record.pk %}" method="post" class="panel import-preview__actions" data-import-confirm>
         {% csrf_token %}
         <input type="hidden" name="reviewed" value="yes">
-        <div class="panel-footer"><span class="{% if has_errors %}text-danger{% else %}text-muted{% endif %}">{% if has_errors %}Импорт заблокирован до исправления ошибок{% else %}К импорту: {{ import_record.successful_items }} записей{% endif %}</span><button type="button" class="btn" data-modal-close>Закрыть</button><button type="submit" class="btn btn-danger" name="action" value="cancel" formnovalidate>Отменить импорт</button><button type="submit" class="btn btn-primary" name="action" value="confirm" disabled{% if not has_errors and import_record.successful_items %} data-confirm-delay="5"{% endif %}>Подтвердить импорт{% if not has_errors and import_record.successful_items %} (5 с){% endif %}</button></div>
+        <div class="panel-footer"><span class="{% if has_errors %}text-danger{% else %}text-muted{% endif %}">{% if has_errors %}Импорт заблокирован до исправления ошибок{% else %}К импорту: {{ import_record.successful_items }} записей{% endif %}</span>{% if has_errors and perms.imports.view_import %}{% include 'imports/partials/import_error_download.html' %}{% endif %}<button type="button" class="btn" data-modal-close>Закрыть</button><button type="submit" class="btn btn-danger" name="action" value="cancel" formnovalidate>Отменить импорт</button><button type="submit" class="btn btn-primary" name="action" value="confirm" disabled{% if not has_errors and import_record.successful_items %} data-confirm-delay="5"{% endif %}>Подтвердить импорт{% if not has_errors and import_record.successful_items %} (5 с){% endif %}</button></div>
     </form>
+    {% elif has_errors and perms.imports.view_import %}
+    <div class="modal-footer">{% include 'imports/partials/import_error_download.html' %}<button type="button" class="btn" data-modal-close>Закрыть</button></div>
     {% endif %}
 </div>

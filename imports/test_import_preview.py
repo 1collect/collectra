@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment, WriteOff
-from .services import CONTRACT_IMPORT_COLUMNS, EXPENSE_IMPORT_COLUMNS, PAYMENT_IMPORT_COLUMNS, WRITEOFF_IMPORT_COLUMNS
+from .services import CONTRACT_IMPORT_COLUMNS, EXPENSE_IMPORT_COLUMNS, PAYMENT_IMPORT_COLUMNS, WRITEOFF_IMPORT_COLUMNS, import_preview_summary
 from .tests import xlsx_file
 
 
@@ -203,7 +203,7 @@ class ImportPreviewTests(TestCase):
         self.assertEqual(record.status, Import.Status.REVIEW)
 
     def test_preview_opens_confirmation_modal_with_error_details(self):
-        self.upload(rows=[['PREVIEW-1', '100', 'ЧСИ', '02.10.2026'],
+        record = self.upload(rows=[['PREVIEW-1', '100', 'ЧСИ', '02.10.2026'],
                           ['MISSING', '900', 'ЧСИ', '02.10.2026']])
         response = self.client.get(self.url)
         self.assertContains(response, 'id="import-preview-modal"')
@@ -211,8 +211,26 @@ class ImportPreviewTests(TestCase):
         self.assertNotContains(response, 'open data-auto-open')
         self.assertContains(response, 'Подтверждение импорта')
         self.assertContains(response, 'Строк с ошибками')
+        self.assertContains(response, reverse('imports:download', args=[record.pk]) + '?with_errors=1')
+        self.assertContains(response, 'Скачать файл с ошибками')
+        self.assertContains(response, 'Исходные данные с колонкой «Ошибка»')
         self.assertEqual(response.context['summary']['errors'][0]['row_number'], 3)
         self.assertEqual(response.context['summary']['total'], Decimal('100'))
+
+    def test_download_report_button_is_hidden_for_import_without_errors(self):
+        self.upload()
+        response = self.client.get(self.url, headers={'X-Import-Modal': '1'})
+        self.assertNotContains(response, '?with_errors=1')
+
+    def test_error_report_download_available_after_cancellation_to_viewer(self):
+        record = self.upload(rows=[['MISSING', '100', 'ЧСИ', '02.10.2026']])
+        self.client.post(self.url, {'action': 'cancel'})
+        viewer = User.objects.create_user('error-report-viewer')
+        viewer.user_permissions.add(Permission.objects.get(codename='view_import'))
+        self.client.force_login(viewer)
+        response = self.client.get(self.url, headers={'X-Import-Modal': '1'})
+        self.assertContains(response, reverse('imports:download', args=[record.pk]) + '?with_errors=1')
+        self.assertNotContains(response, 'data-import-confirm')
 
     def test_modal_preview_returns_only_confirmation_content(self):
         self.upload()
@@ -222,6 +240,32 @@ class ImportPreviewTests(TestCase):
         self.assertNotContains(response, '<html')
         self.assertNotContains(response, 'import-preview__rows')
         self.assertEqual(response.headers['Cache-Control'], 'no-store')
+
+    def test_saved_preview_summary_requires_only_one_small_query(self):
+        record = self.upload(rows=[['PREVIEW-1', '100', 'ЧСИ', '02.10.2026'],
+                                   ['MISSING', '900', 'ЧСИ', '02.10.2026']])
+        self.assertIn('preview_summary', record.metadata)
+        with self.assertNumQueries(1):
+            summary = import_preview_summary(record)
+        self.assertEqual(summary['total'], Decimal('100'))
+        self.assertEqual(summary['dates'][0]['date'], date(2026, 10, 2))
+        self.assertEqual(summary['dates'][0]['amount'], Decimal('100'))
+        self.assertEqual(summary['errors'][0]['count'], 1)
+        self.assertEqual(record.items.count(), 2)
+        self.assertFalse(Payment.objects.exists())
+
+    def test_legacy_summary_is_cached_without_changing_saved_rows(self):
+        record = self.upload()
+        record.metadata.pop('preview_summary')
+        record.save(update_fields=['metadata'])
+        rows = list(record.items.values('pk', 'data', 'status', 'error_message'))
+        summary = import_preview_summary(record)
+        record.refresh_from_db()
+        self.assertIn('preview_summary', record.metadata)
+        with self.assertNumQueries(1):
+            self.assertEqual(import_preview_summary(record), summary)
+        self.assertEqual(list(record.items.values('pk', 'data', 'status', 'error_message')), rows)
+        self.assertFalse(Payment.objects.exists())
 
     def test_summary_groups_all_errors_and_keeps_rare_errors_after_first_ten_rows(self):
         record = self.upload()

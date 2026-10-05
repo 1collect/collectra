@@ -49,6 +49,46 @@ document.addEventListener('DOMContentLoaded', () => {
   let refreshQueued = false;
   let statusUnavailable = false;
   const knownStatuses = new Map(Array.from(tableContainer?.querySelectorAll('[data-import-id]') || [], row => [row.dataset.importId, row.dataset.importStatus]));
+  document.addEventListener('click', async event => {
+    const link = event.target.closest('[data-import-download]');
+    if (!link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    event.preventDefault();
+    if (link.getAttribute('aria-busy') === 'true') return;
+    const original = Array.from(link.childNodes, node => node.cloneNode(true));
+    link.setAttribute('aria-busy', 'true');
+    link.setAttribute('aria-disabled', 'true');
+    link.textContent = 'Подготовка файла…';
+    A.toast('info', 'Подготовка отчёта', 'Большой файл может готовиться около минуты. Дождитесь начала скачивания.');
+    try {
+      const response = await fetch(link.href, { credentials: 'same-origin' });
+      if (!response.ok || response.redirected || !(response.headers.get('Content-Type') || '').includes('spreadsheetml')) {
+        throw new Error('Не удалось скачать отчёт. Повторите попытку.');
+      }
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const download = document.createElement('a');
+      const disposition = response.headers.get('Content-Disposition') || '';
+      const encodedName = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+      const plainName = disposition.match(/filename="([^"]+)"/i);
+      let filename = link.dataset.downloadName || 'import-errors.xlsx';
+      if (encodedName) {
+        try { filename = decodeURIComponent(encodedName[1]); } catch (_) { /* Keep the fallback name. */ }
+      } else if (plainName) filename = plainName[1];
+      download.href = url;
+      download.download = filename;
+      document.body.append(download);
+      download.click();
+      download.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      A.toast('success', 'Отчёт готов', 'Файл с ошибками отправлен на скачивание.');
+    } catch (error) {
+      A.toast('error', 'Ошибка скачивания', error.message);
+    } finally {
+      link.removeAttribute('aria-busy');
+      link.removeAttribute('aria-disabled');
+      link.replaceChildren(...original);
+    }
+  });
   document.querySelectorAll('[data-import-notifications] [data-toast-type]').forEach(item => {
     A.toast(item.dataset.toastType, 'Импорт', item.textContent.trim());
   });

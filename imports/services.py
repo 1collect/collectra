@@ -2,9 +2,11 @@ from copy import copy
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from zipfile import BadZipFile
+import json
 
 from django.db import transaction
-from django.db.models import Count, Min, Sum
+from django.db.models import Count, Max, Q, Sum
+from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
@@ -759,6 +761,9 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False, pro
                 'sheet': worksheet.title,
                 'columns': list(columns) if import_record.import_type.code == 'writeoffs' else [column for column in columns if column in header_positions],
             }
+            summary = _build_import_preview_summary(import_record, items)
+            signature = [len(items), failed_items, max(item.pk for item in items)]
+            import_record.metadata['preview_summary'] = _pack_preview_summary(summary, signature)
             import_record.save(update_fields=(
                 'status',
                 'total_items',
@@ -809,7 +814,36 @@ IMPORT_HANDLERS.update({
 })
 
 
+def _pack_preview_summary(summary, signature):
+    return {'version': 1, 'signature': signature,
+            'data': json.loads(json.dumps(summary, cls=DjangoJSONEncoder))}
+
+
+def _unpack_preview_summary(data):
+    summary = copy(data)
+    summary['total'] = Decimal(summary['total'])
+    summary['dates'] = [{**group, 'date': date.fromisoformat(group['date']), 'amount': Decimal(group['amount'])}
+                        for group in summary['dates']]
+    summary['categories'] = [{**group, 'amount': Decimal(group['amount'])} for group in summary['categories']]
+    return summary
+
+
 def import_preview_summary(import_record):
+    counts = import_record.items.aggregate(count=Count('pk'), failed=Count('pk', filter=Q(status=ImportItem.Status.FAILED)), last_id=Max('pk'))
+    signature = [counts['count'], counts['failed'], counts['last_id']]
+    cached = import_record.metadata.get('preview_summary', {})
+    if cached.get('version') == 1 and cached.get('signature') == signature:
+        return _unpack_preview_summary(cached['data'])
+    summary = _build_import_preview_summary(import_record)
+    if import_record.status not in (Import.Status.NEW, Import.Status.PROCESSING):
+        metadata = {**import_record.metadata, 'preview_summary': _pack_preview_summary(summary, signature)}
+        # Avoid overwriting metadata from a concurrently claimed check.
+        if Import.objects.filter(pk=import_record.pk, metadata=import_record.metadata, status=import_record.status).update(metadata=metadata):
+            import_record.metadata = metadata
+    return summary
+
+
+def _build_import_preview_summary(import_record, items=None):
     """Contract totals cover the full file; financial totals cover valid rows."""
     code = import_record.import_type.code
     total = Decimal('0')
@@ -817,7 +851,10 @@ def import_preview_summary(import_record):
     by_status = {}
     contracts = set()
     iins = set()
-    for item in import_record.items.all():
+    errors = {}
+    if items is None:
+        items = import_record.items.only('data', 'status', 'error_message', 'row_number').iterator(chunk_size=1000)
+    for item in items:
         data = item.data
         if code == 'contracts':
             try:
@@ -828,6 +865,9 @@ def import_preview_summary(import_record):
                 if file_amount.is_finite():
                     total += file_amount
         if item.status == ImportItem.Status.FAILED:
+            group = errors.setdefault(item.error_message, {'error_message': item.error_message, 'count': 0, 'row_number': item.row_number})
+            group['count'] += 1
+            group['row_number'] = min(group['row_number'], item.row_number)
             continue
         contracts.add(data['ДБЗ'])
         if code == 'contracts':
@@ -867,9 +907,7 @@ def import_preview_summary(import_record):
         'unique_iin_count': len(iins),
         'dates': [by_date[key] for key in sorted(by_date)],
         'categories': [{'label': label, 'amount': amount} for label, amount in by_status.items()],
-        'errors': list(import_record.items.filter(status=ImportItem.Status.FAILED).values(
-            'error_message',
-        ).annotate(count=Count('pk'), row_number=Min('row_number')).order_by('row_number')),
+        'errors': sorted(errors.values(), key=lambda group: group['row_number']),
         'total_label': {'payments': 'Сумма платежей к добавлению', 'expenses': 'Сумма расходов к добавлению',
                         'writeoffs': 'Общая сумма списаний',
                         'contracts': 'Сумма задолженности в строках файла'}.get(code, 'Общая сумма'),

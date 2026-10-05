@@ -30,12 +30,40 @@ class ImportDownloadTests(TestCase):
     def setUp(self):
         self.client.force_login(self.user)
 
-    def download(self):
-        response = self.client.get(reverse('imports:download', args=[self.record.pk]))
+    def download(self, **params):
+        response = self.client.get(reverse('imports:download', args=[self.record.pk]), params)
         self.assertEqual(response.status_code, 200)
         content = b''.join(response.streaming_content)
         response.close()
         return response, load_workbook(BytesIO(content))
+
+    def test_error_report_appends_only_error_and_preserves_source_rows(self):
+        self.failed.error_message = 'Неверный ИИН'
+        self.failed.save(update_fields=['error_message'])
+        _, book = self.download(with_errors='1')
+        sheet = book.active
+        self.assertEqual([cell.value for cell in sheet[1]], [*self.columns, 'Ошибка'])
+        self.assertEqual(sheet.max_column, len(self.columns) + 1)
+        self.assertIsNone(sheet['E2'].value)
+        self.assertEqual(sheet['E4'].value, 'Неверный ИИН')
+        self.assertEqual(sheet['A2'].value, '001')
+        self.assertEqual(sheet['C2'].value, '=1+1')
+        self.assertEqual(sheet['C2'].data_type, 's')
+        self.assertIsNone(sheet['A3'].value)
+        self.assertIsNone(sheet['E3'].value)
+        self.assertTrue(sheet['E4'].alignment.wrap_text)
+        book.close()
+
+    def test_error_report_keeps_formula_like_errors_literal_and_handles_empty_error(self):
+        _, book = self.download(with_errors='1')
+        self.assertEqual(book.active['E4'].value, 'Ошибка')
+        book.close()
+        self.failed.error_message = '=HYPERLINK("https://example.com")'
+        self.failed.save(update_fields=['error_message'])
+        _, book = self.download(with_errors='1')
+        self.assertEqual(book.active['E4'].value, self.failed.error_message)
+        self.assertEqual(book.active['E4'].data_type, 's')
+        book.close()
 
     def test_saved_rows_headers_and_identifiers_are_preserved(self):
         response, book = self.download()
@@ -63,6 +91,17 @@ class ImportDownloadTests(TestCase):
         self.assertEqual(second.active['C2'].value, 'Обновлённое имя')
         first.close()
         second.close()
+
+    def test_streaming_export_preserves_excel_error_like_text_and_value_types(self):
+        self.first.data = {'ДБЗ': '#N/A', 'ИИН': '000000000001', 'ФИО': 'Обычный текст', 'Сумма': 123.45}
+        self.first.save(update_fields=['data'])
+        _, book = self.download(with_errors='1')
+        self.assertEqual(book.active['A2'].value, '#N/A')
+        self.assertEqual(book.active['A2'].data_type, 's')
+        self.assertEqual(book.active['B2'].value, '000000000001')
+        self.assertEqual(book.active['D2'].value, 123.45)
+        self.assertIsNone(book.active['E2'].value)
+        book.close()
 
     def test_legacy_import_without_metadata_uses_saved_headers(self):
         self.record.metadata = {}
