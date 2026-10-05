@@ -90,17 +90,11 @@ class DebtListTests(TestCase):
         self.assertContains(response, 'DBZ-ACTIVE')
         self.assertContains(response, 'DBZ-REPAID')
 
-    def test_page_filters_by_search_and_status(self):
-        response = self.client.get(reverse('imports:debts'), {
-            'q': 'Иванов',
-            'status': Debt.Status.ACTIVE,
-        })
-
-        self.assertContains(response, 'debt-search')
+    def test_removed_filters_do_not_change_contract_list(self):
+        response = self.client.get(reverse('imports:debts'), {'q': 'Иванов', 'status': Debt.Status.ACTIVE})
         self.assertContains(response, 'DBZ-ACTIVE')
-        self.assertNotContains(response, 'DBZ-REPAID')
-        self.assertEqual(response.context['query'], 'Иванов')
-        self.assertEqual(response.context['status'], Debt.Status.ACTIVE)
+        self.assertContains(response, 'DBZ-REPAID')
+        self.assertNotContains(response, 'debt-search')
 
     def test_user_without_permission_gets_403(self):
         other_user = User.objects.create_user('no-access', password='test-password')
@@ -430,28 +424,27 @@ class ExpensePaymentImportTests(TestCase):
                 self.assertIn(column, record.items.get().error_message)
                 self.assertFalse(Payment.objects.exists())
 
-    def test_expenses_accept_seven_fields_and_zero_amounts(self):
+    def test_expenses_accept_all_amount_fields_and_zero_amounts(self):
         record = self.upload_financial_file(self.expense_type, EXPENSE_REQUIRED_COLUMNS,
-            [['DBZ-FINANCE', 1200, 0, 0, 0, 0, '02.10.2026']],
+            [['DBZ-FINANCE', 1200, 0, 0, 0, 0]],
         )
         self.assertEqual(record.successful_items, 1)
         self.assertEqual(record.failed_items, 0)
         expense = Expense.objects.get()
         self.assertEqual(expense.state_duty, Decimal('1200.00'))
         self.assertEqual(expense.additional_expenses, Decimal('0.00'))
-        self.assertEqual(expense.expense_date, date(2026, 10, 2))
-        self.assertNotIn('Дополнительные расходы', record.metadata['columns'])
+        self.assertEqual(expense.expense_date, date.today())
 
     def test_expenses_accept_claim_security_spelling_from_user(self):
         headers = ['Обесечение иска' if h == 'Обеспечение иска' else h for h in EXPENSE_REQUIRED_COLUMNS]
         record = self.upload_financial_file(self.expense_type, headers,
-            [['DBZ-FINANCE', 0, 0, 0, 0, 150, date(2026, 10, 2)]],
+            [['DBZ-FINANCE', 0, 0, 0, 0, 150]],
         )
         self.assertEqual(record.successful_items, 1)
         self.assertEqual(Expense.objects.get().claim_security, Decimal('150.00'))
 
     def test_every_expense_column_is_required(self):
-        values = ['DBZ-FINANCE', 0, 0, 0, 0, 0, '02.10.2026']
+        values = ['DBZ-FINANCE', 0, 0, 0, 0, 0]
         for index, column in enumerate(EXPENSE_REQUIRED_COLUMNS):
             with self.subTest(column=column):
                 record = self.upload_financial_file(self.expense_type,
@@ -465,24 +458,17 @@ class ExpensePaymentImportTests(TestCase):
     def test_every_expense_value_is_required(self):
         for index, column in enumerate(EXPENSE_REQUIRED_COLUMNS):
             with self.subTest(column=column):
-                values = ['DBZ-FINANCE', 0, 0, 0, 0, 0, '02.10.2026']
+                values = ['DBZ-FINANCE', 0, 0, 0, 0, 0]
                 values[index] = None
                 record = self.upload_financial_file(self.expense_type, EXPENSE_REQUIRED_COLUMNS, [values])
                 self.assertEqual(record.failed_items, 1)
                 self.assertIn(column, record.items.get().error_message)
                 self.assertFalse(Expense.objects.exists())
 
-    def test_optional_expense_value_may_be_blank(self):
-        record = self.upload_financial_file(self.expense_type, EXPENSE_IMPORT_COLUMNS,
-            [['DBZ-FINANCE', 0, 0, 0, 0, 0, None, '02.10.2026']],
-        )
-        self.assertEqual(record.successful_items, 1)
-        self.assertEqual(Expense.objects.get().additional_expenses, Decimal('0.00'))
-
     def test_invalid_financial_rows_block_entire_file(self):
         scenarios = [
             (self.payment_type, PAYMENT_IMPORT_COLUMNS, ['DBZ-FINANCE', 100, 'ЧСИ', '03.10.2026'], Payment),
-            (self.expense_type, EXPENSE_REQUIRED_COLUMNS, ['DBZ-FINANCE', 10, 20, 30, 40, 50, '03.10.2026'], Expense),
+            (self.expense_type, EXPENSE_REQUIRED_COLUMNS, ['DBZ-FINANCE', 10, 20, 30, 40, 50], Expense),
         ]
         for import_type, headers, valid, model in scenarios:
             with self.subTest(kind=import_type.code):
@@ -490,18 +476,22 @@ class ExpensePaymentImportTests(TestCase):
                 unknown[0] = 'DBZ-UNKNOWN'
                 bad_number = valid.copy()
                 bad_number[1] = 'не число'
-                bad_date = valid.copy()
-                bad_date[-1] = '31.02.2026'
-                record = self.upload_financial_file(import_type, headers, [valid, unknown, bad_number, bad_date])
+                rows = [valid, unknown, bad_number]
+                if import_type == self.payment_type:
+                    bad_date = valid.copy()
+                    bad_date[-1] = '31.02.2026'
+                    rows.append(bad_date)
+                record = self.upload_financial_file(import_type, headers, rows)
                 self.assertEqual(record.status, Import.Status.REVIEW)
-                self.assertEqual(record.total_items, 4)
+                self.assertEqual(record.total_items, len(rows))
                 self.assertEqual(record.successful_items, 1)
-                self.assertEqual(record.failed_items, 3)
+                self.assertEqual(record.failed_items, len(rows) - 1)
                 self.assertEqual(model.objects.count(), 0)
                 errors = list(record.items.filter(status=ImportItem.Status.FAILED).values_list('error_message', flat=True))
                 self.assertIn('не найден', errors[0])
                 self.assertIn('число', errors[1])
-                self.assertIn('дату', errors[2])
+                if import_type == self.payment_type:
+                    self.assertIn('дату', errors[2])
 
     def test_duplicate_payment_amount_columns_are_rejected(self):
         record = self.upload_financial_file(self.payment_type,
@@ -514,7 +504,7 @@ class ExpensePaymentImportTests(TestCase):
 
     def test_xlsx_creates_expense_for_existing_contract(self):
         values = [
-            'DBZ-FINANCE', 1200, 300, 200, 100, 50, 25, date(2026, 10, 2),
+            'DBZ-FINANCE', 1200, 300, 200, 100, 50,
         ]
 
         response = upload_and_confirm(self, {
@@ -530,8 +520,8 @@ class ExpensePaymentImportTests(TestCase):
         self.assertEqual(expense.debt, self.debt)
         self.assertEqual(expense.state_duty, 1200)
         self.assertEqual(expense.claim_security, 50)
-        self.assertEqual(expense.additional_expenses, 25)
-        self.assertEqual(expense.expense_date, date(2026, 10, 2))
+        self.assertEqual(expense.additional_expenses, 0)
+        self.assertEqual(expense.expense_date, date.today())
 
     def test_unknown_contract_blocks_entire_payment_file(self):
         values = [

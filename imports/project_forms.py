@@ -1,7 +1,7 @@
 from decimal import Decimal
 from django import forms
-from .models import Debtor, Debt, Creditor, Cession, CompanyAccount, ReferenceValue, Payment, PaymentRefund, WriteOff
-from .balances import CATEGORY_LABELS, PURCHASE_FIELDS
+from .models import Debtor, Creditor, Cession, CompanyAccount, ReferenceValue, Payment, PaymentRefund, WriteOff
+from .balances import CATEGORY_LABELS
 from .ledger import allocation_values
 
 
@@ -25,28 +25,6 @@ class DebtorForm(StyledForm):
             choices = [(r.code if name == 'kato' and r.code else r.name, r.name) for r in refs]
             if current and current not in dict(choices): choices.append((current, current))
             if choices: self.fields[name] = forms.ChoiceField(label=self.fields[name].label, choices=[('', '—'), *choices], required=False, widget=forms.Select(attrs={'class': 'form-control'}))
-
-
-class DebtCreateForm(StyledForm):
-    reason = forms.CharField(label='Основание создания', widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
-    class Meta:
-        model = Debt
-        fields = ('debtor', 'contract_number', 'collection_agency', 'original_creditor', 'cession', 'registry_number', 'registry_date', 'dbz_start_date', 'dbz_end_date', 'issued_credit_amount', 'overdue_days_at_registry_date', *PURCHASE_FIELDS, 'manual_closed_at')
-    def clean(self):
-        data = super().clean()
-        for name in (*PURCHASE_FIELDS, 'issued_credit_amount'):
-            if data.get(name) is not None and data[name] < 0: self.add_error(name, 'Сумма не может быть отрицательной.')
-        if data.get('cession') and data.get('original_creditor') and data['cession'].creditor_id != data['original_creditor'].pk:
-            self.add_error('cession', 'Кредитор договора цессии должен совпадать с первичным кредитором.')
-        if data.get('dbz_start_date') and data.get('dbz_end_date') and data['dbz_end_date'] < data['dbz_start_date']:
-            self.add_error('dbz_end_date', 'Дата окончания не может быть раньше начала.')
-        return data
-    def save(self, commit=True):
-        obj = super().save(commit=False)
-        obj.purchase_total_debt = sum((getattr(obj, f) for f in PURCHASE_FIELDS), Decimal('0'))
-        if obj.cession_id: obj.original_creditor = obj.cession.creditor
-        if commit: obj.save()
-        return obj
 
 
 class CreditorForm(StyledForm):

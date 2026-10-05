@@ -30,12 +30,11 @@ class ImportTemplatePageTests(TestCase):
         self.assertLess(listing, templates)
         self.assertContains(response, 'nav-link active" href="' + reverse('imports:templates') + '"')
 
-    def test_only_active_supported_templates_with_writeoff_permission(self):
-        self.user.user_permissions.add(Permission.objects.get(codename='add_writeoff'))
+    def test_only_active_supported_templates_are_listed(self):
         ImportType.objects.filter(code='payments').update(is_active=False)
         ImportType.objects.create(name='Unsupported', code='unsupported')
         response = self.client.get(reverse('imports:templates'))
-        self.assertContains(response, reverse('imports:import_template', args=['writeoffs']))
+        self.assertNotContains(response, reverse('imports:import_template', args=['writeoffs']))
         self.assertNotContains(response, reverse('imports:import_template', args=['payments']))
         self.assertNotContains(response, 'Unsupported')
 

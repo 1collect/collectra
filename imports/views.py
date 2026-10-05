@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
 from django.db import transaction
-from django.http import FileResponse, JsonResponse, QueryDict
+from django.http import FileResponse, JsonResponse
 from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -15,12 +15,11 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET
 
 from .forms import (
-    ImportFilterForm,
     CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
     ImportUploadForm, PaymentChangeForm, PaymentRefundForm, WriteOffForm,
-    PaymentCreateForm, ExpenseCreateForm,
+    ExpenseCreateForm,
 )
-from .balances import apply_balance, calculate_balance, filter_by_current_status, CATEGORY_LABELS, PURCHASE_FIELDS
+from .balances import apply_balance, calculate_balance, CATEGORY_LABELS, PURCHASE_FIELDS
 from .models import (
     CollectionAgency, Counterparty, Debt, Expense, FinancialChangeRequest, Import, ImportItem,
     Payment, PaymentRefund, WriteOff,
@@ -43,13 +42,6 @@ def add_progress(import_record):
     return import_record
 
 
-def list_query_string(request):
-    """Keep active list filters when moving between result pages."""
-    query = request.GET.copy()
-    query.pop('page', None)
-    return query.urlencode()
-
-
 def import_page_context(request):
     page_sizes = (10, 20, 50, 100)
     try:
@@ -59,19 +51,6 @@ def import_page_context(request):
     if page_size not in page_sizes:
         page_size = 10
     records = Import.objects.select_related('import_type', 'created_by').order_by('-created_at', '-pk')
-    filters = ImportFilterForm(request.GET)
-    filters.is_valid()
-    for name, lookup in [('import_type', 'import_type'), ('status', 'status'),
-                         ('date_from', 'created_at__date__gte'), ('date_to', 'created_at__date__lte'),
-                         ('author', 'created_by')]:
-        value = filters.cleaned_data.get(name)
-        if value:
-            records = records.filter(**{lookup: value})
-    query = QueryDict(mutable=True)
-    query['per_page'] = page_size
-    for name in filters.fields:
-        if request.GET.get(name):
-            query[name] = request.GET[name]
     page = Paginator(records, page_size).get_page(request.GET.get('page'))
     for import_record in page:
         add_progress(import_record)
@@ -80,9 +59,7 @@ def import_page_context(request):
         'page_obj': page,
         'page_size': page_size,
         'page_sizes': page_sizes,
-        'import_filters': filters,
-        'filters_active': any(request.GET.get(name) for name in filters.fields),
-        'import_query_string': query.urlencode(),
+        'import_query_string': f'per_page={page_size}',
         'page_numbers': list(page.paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
         'import_row_offset': page.start_index() - 1 if page.paginator.count else 0,
     }
@@ -113,7 +90,6 @@ def import_templates(request):
         'contracts': 'Загрузка договоров и данных должников.',
         'payments': 'Загрузка платежей по договорам.',
         'expenses': 'Загрузка расходов по договорам.',
-        'writeoffs': 'Загрузка списаний задолженности.',
     }
     return render(request, 'imports/import_templates.html', {
         'templates': [{'name': kind.name, 'code': kind.code, 'description': descriptions.get(kind.code, kind.description)}
@@ -263,18 +239,6 @@ def debt_list(request):
         'counterparty',
         'import_item__import_record',
     ).order_by('contract_number')
-    query = request.GET.get('q', '').strip()
-    status = request.GET.get('status', '').strip()
-    if query:
-        debts = debts.filter(
-            Q(contract_number__icontains=query)
-            | Q(debtor__full_name__icontains=query)
-            | Q(debtor__iin__icontains=query)
-        )
-    if status in Debt.Status.values:
-        debts = filter_by_current_status(debts, status)
-    else:
-        status = ''
     page_obj = Paginator(debts, 25).get_page(request.GET.get('page'))
     page_obj.object_list = list(page_obj.object_list.prefetch_related('payments__refunds', 'expenses', 'writeoffs'))
     for debt in page_obj.object_list:
@@ -282,10 +246,7 @@ def debt_list(request):
 
     template = 'imports/partials/debt_register.html' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'imports/debt_list.html'
     response = render(request, template, {
-        'page_obj': page_obj, 'query': query, 'status': status,
-        'status_choices': Debt.Status.choices,
-        'query_string': list_query_string(request),
-        'filters_active': bool(query or status),
+        'page_obj': page_obj,
     })
     response['Cache-Control'] = 'no-store'
     return response
@@ -328,17 +289,9 @@ def _financial_list(request, *, model, title, kind):
     if not request.user.has_perm(permission):
         raise PermissionDenied
     records = model.objects.select_related('debt', 'debt__debtor', 'import_item__import_record')
-    query = request.GET.get('q', '').strip()
-    if query:
-        records = records.filter(
-            Q(debt__contract_number__icontains=query)
-            | Q(debt__debtor__full_name__icontains=query)
-            | Q(debt__debtor__iin__icontains=query)
-        )
     page_obj = Paginator(records, 25).get_page(request.GET.get('page'))
     return render(request, 'imports/financial_list.html', {
-        'page_obj': page_obj, 'query': query, 'title': title, 'kind': kind,
-        'query_string': list_query_string(request), 'filters_active': bool(query),
+        'page_obj': page_obj, 'title': title, 'kind': kind,
     })
 
 
@@ -346,33 +299,26 @@ def payment_list(request):
     return _financial_list(request, model=Payment, title='Платежи', kind='payment')
 
 
-def _financial_create(request, *, form_class, kind, title):
-    form = form_class(
+def _expense_create(request):
+    form = ExpenseCreateForm(
         request.POST if request.method == 'POST' else None,
-        initial={f'{kind}_date': timezone.localdate()},
+        initial={'expense_date': timezone.localdate()},
     )
     if request.method == 'POST' and form.is_valid():
         with transaction.atomic():
             Debt.objects.select_for_update().get(pk=form.cleaned_data['debt'].pk)
             record = form.save()
             recalculate_debt(record.debt_id)
-        messages.success(request, 'Платёж создан.' if kind == 'payment' else 'Расход создан.')
-        if request.user.has_perm(f'imports.view_{kind}'):
-            return redirect(f'imports:{kind}s')
-        return redirect(f'imports:{kind}_new')
+        messages.success(request, 'Расход создан.')
+        return redirect('imports:expenses')
     return render(request, 'imports/financial_create.html', {
-        'form': form, 'kind': kind, 'title': title,
+        'form': form, 'kind': 'expense', 'title': 'Новый расход',
     })
-
-
-@permission_required('imports.add_payment')
-def payment_create(request):
-    return _financial_create(request, form_class=PaymentCreateForm, kind='payment', title='Новый платёж')
 
 
 @permission_required('imports.add_expense')
 def expense_create(request):
-    return _financial_create(request, form_class=ExpenseCreateForm, kind='expense', title='Новый расход')
+    return _expense_create(request)
 
 
 def expense_list(request):
@@ -382,16 +328,8 @@ def expense_list(request):
 @permission_required('imports.view_writeoff')
 def writeoff_list(request):
     records = WriteOff.objects.select_related('debt', 'debt__debtor', 'created_by', 'import_item__import_record')
-    query = request.GET.get('q', '').strip()
-    if query:
-        records = records.filter(
-            Q(debt__contract_number__icontains=query)
-            | Q(debt__debtor__full_name__icontains=query)
-            | Q(debt__debtor__iin__icontains=query)
-        )
     return render(request, 'imports/writeoff_list.html', {
         'page_obj': Paginator(records, 25).get_page(request.GET.get('page')),
-        'query': query, 'query_string': list_query_string(request),
     })
 
 
@@ -524,14 +462,8 @@ def financial_change_list(request):
     changes = FinancialChangeRequest.objects.select_related(
         'payment__debt', 'expense__debt', 'requested_by', 'reviewed_by',
     )
-    status = request.GET.get('status', FinancialChangeRequest.Status.PENDING)
-    if status in FinancialChangeRequest.Status.values:
-        changes = changes.filter(status=status)
-    else:
-        status = ''
     return render(request, 'imports/financial_change_list.html', {
-        'changes': changes, 'status': status,
-        'status_choices': FinancialChangeRequest.Status.choices,
+        'changes': changes,
     })
 
 
@@ -571,26 +503,9 @@ def refund_list(request):
         'created_by',
         'import_item__import_record', 'payment__import_item__import_record',
     )
-    query = request.GET.get('q', '').strip()
-    status = request.GET.get('status', '').strip()
-    if query:
-        refunds = refunds.filter(
-            Q(payment__debt__contract_number__icontains=query)
-            | Q(reason__icontains=query)
-            | Q(created_by__username__icontains=query)
-            | Q(created_by__first_name__icontains=query)
-            | Q(created_by__last_name__icontains=query)
-        )
-    if status in PaymentRefund.Status.values:
-        refunds = refunds.filter(status=status)
-    else:
-        status = ''
     page_obj = Paginator(refunds, 25).get_page(request.GET.get('page'))
     return render(request, 'imports/refund_list.html', {
-        'page_obj': page_obj, 'query': query, 'status': status,
-        'status_choices': PaymentRefund.Status.choices,
-        'query_string': list_query_string(request),
-        'filters_active': bool(query or status),
+        'page_obj': page_obj,
     })
 
 
@@ -620,9 +535,9 @@ def refund_create(request):
 
 @permission_required('imports.view_collectionagency')
 def collection_agency_list(request):
-    agencies = CollectionAgency.objects.all()
+    agencies = CollectionAgency.objects.annotate(debt_count=Count('debt'))
     return render(request, 'imports/collection_agency_list.html', {
-        'page_obj': Paginator(agencies, 25).get_page(request.GET.get('page')),
+        'agencies': agencies,
     })
 
 
@@ -644,11 +559,15 @@ def collection_agency_edit(request, agency_id=None):
 @permission_required('imports.delete_collectionagency')
 def collection_agency_delete(request, agency_id):
     agency = get_object_or_404(CollectionAgency, pk=agency_id)
+    has_debts = agency.debt_set.exists()
     if request.method == 'POST':
+        if has_debts:
+            messages.error(request, 'Нельзя удалить КА: к нему привязаны договоры.')
+            return redirect('imports:collection_agencies')
         agency.delete()
         messages.success(request, 'Коллекторское агентство удалено.')
         return redirect('imports:collection_agencies')
-    return render(request, 'imports/collection_agency_delete.html', {'agency': agency})
+    return render(request, 'imports/collection_agency_delete.html', {'agency': agency, 'has_debts': has_debts})
 
 
 @permission_required('imports.view_counterparty')
@@ -656,16 +575,8 @@ def counterparty_list(request):
     counterparties = Counterparty.objects.annotate(
         debt_count=Count('debts'),
     )
-    query = request.GET.get('q', '').strip()
-    if query:
-        counterparties = counterparties.filter(name__icontains=query)
-    page_obj = Paginator(counterparties.order_by('name'), 25).get_page(
-        request.GET.get('page')
-    )
     return render(request, 'imports/counterparty_list.html', {
-        'page_obj': page_obj, 'query': query,
-        'query_string': list_query_string(request),
-        'filters_active': bool(query),
+        'counterparties': counterparties.order_by('name'),
     })
 
 
@@ -698,7 +609,11 @@ def counterparty_edit(request, counterparty_id=None):
 @permission_required('imports.delete_counterparty')
 def counterparty_delete(request, counterparty_id):
     counterparty = get_object_or_404(Counterparty, pk=counterparty_id)
+    has_debts = counterparty.debts.exists()
     if request.method == 'POST':
+        if has_debts:
+            messages.error(request, 'Нельзя удалить контрагента: к нему привязаны договоры.')
+            return redirect('imports:counterparties')
         try:
             counterparty.delete()
         except ProtectedError:
@@ -712,5 +627,5 @@ def counterparty_delete(request, counterparty_id):
 
     return render(request, 'imports/counterparty_delete.html', {
         'counterparty': counterparty,
-        'has_debts': counterparty.debts.exists(),
+        'has_debts': has_debts,
     })

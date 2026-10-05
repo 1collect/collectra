@@ -3,6 +3,7 @@ from decimal import Decimal
 from io import BytesIO
 from unittest.mock import patch
 from django.contrib.auth.models import Permission, User
+from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
@@ -147,24 +148,20 @@ class ProjectFeaturesTests(TestCase):
         self.assertEqual(calculate_balance(self.debt)['outstanding_amount'], 1000)
         self.assertEqual(ActionLog.objects.filter(action='cancelled').count(), 2)
 
-    def test_physical_deletion_removes_financial_details_and_keeps_minimal_log(self):
+    def test_physical_deletion_of_payments_is_unavailable(self):
         payment = self.payment()
         pk = payment.pk
         self.assertTrue(payment.value_history.exists())
-        delete_record(payment, actor=self.user, reason='Дубликат')
-        self.assertFalse(Payment.objects.filter(pk=pk).exists())
-        events = ActionLog.objects.filter(object_type='payment', object_id=str(pk))
-        self.assertEqual(events.count(), 1)
-        self.assertEqual(events.get().action, 'deleted')
-        self.assertEqual(events.get().details, {})
-        self.assertEqual(calculate_balance(self.debt)['outstanding_amount'], 1000)
+        with self.assertRaises(ValidationError):
+            delete_record(payment, actor=self.user, reason='Дубликат')
+        self.assertTrue(Payment.objects.filter(pk=pk).exists())
 
     def test_non_admin_cannot_delete_or_run_full_recalculation(self):
         reader = User.objects.create_user('reader')
-        reader.user_permissions.add(*Permission.objects.filter(codename__in=['delete_payment', 'recalculate_debt', 'view_debt']))
+        reader.user_permissions.add(*Permission.objects.filter(codename__in=['recalculate_debt', 'view_debt']))
         self.client.force_login(reader)
         payment = self.payment()
-        self.assertEqual(self.client.post(reverse('imports:operation_action', args=['payment', payment.pk, 'delete']), {'reason': 'Test'}).status_code, 403)
+        self.assertEqual(self.client.post(reverse('imports:operation_action', args=['payment', payment.pk, 'delete']), {'reason': 'Test'}).status_code, 404)
         self.assertEqual(self.client.post(reverse('imports:recalculate')).status_code, 403)
 
     def test_extended_import_creates_relations_borrower_and_own_expenses(self):
@@ -200,8 +197,9 @@ class ProjectFeaturesTests(TestCase):
         self.assertEqual(period_bounds({'period': 'quarter', 'day': date(2026, 10, 2)}), (date(2026, 10, 1), date(2026, 12, 31)))
 
     def test_remaining_pages_render_and_removed_pages_are_unroutable(self):
-        for name in ('recalculate', 'debt_new'):
+        for name in ('recalculate',):
             self.assertEqual(self.client.get(reverse('imports:' + name)).status_code, 200)
+        self.assertEqual(self.client.get('/imports/contracts/new/').status_code, 404)
         for path in ('/imports/reports/', '/imports/analytics/', '/imports/journal/', '/imports/catalog/debtors/', '/imports/catalog/creditors/', '/imports/catalog/cessions/', '/imports/catalog/accounts/', '/imports/catalog/references/'):
             self.assertEqual(self.client.get(path).status_code, 404)
 

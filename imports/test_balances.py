@@ -72,17 +72,6 @@ class DynamicBalanceTests(TestCase):
         Payment.objects.create(debt=self.debt, amount=100, status='individual', payment_date=date(2026, 10, 3))
         self.assertEqual(calculate_balance(self.debt)['closed_at'], date(2026, 10, 3))
 
-    def test_status_filter_uses_live_operations_before_pagination(self):
-        Payment.objects.create(debt=self.debt, amount=1000, status='individual', payment_date=date(2026, 10, 1))
-        response = self.client.get(reverse('imports:debts'), {'status': 'closed'})
-        self.assertEqual(response.context['page_obj'].paginator.count, 1)
-        self.assertEqual(response.context['page_obj'][0].status, 'closed_paid')
-        Expense.objects.create(debt=self.debt, state_duty=100, expense_date=date(2026, 10, 2))
-        response = self.client.get(reverse('imports:debts'), {'status': 'closed'})
-        self.assertEqual(response.context['page_obj'].paginator.count, 0)
-        response = self.client.get(reverse('imports:debts'), {'status': 'active'})
-        self.assertEqual(response.context['page_obj'].paginator.count, 1)
-
     def test_full_writeoff_distribution_survives_refund_in_its_original_categories(self):
         payment = Payment.objects.create(debt=self.debt, amount=650, status='individual', payment_date=date(2026, 10, 1))
         writeoff = create_writeoff(debt_id=self.debt.pk, kind='full', category='',

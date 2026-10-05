@@ -2,7 +2,7 @@ from django.contrib.auth.models import Permission, User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import CollectionAgency
+from .models import CollectionAgency, Debt, Debtor
 
 
 class CollectionAgencyTests(TestCase):
@@ -39,16 +39,27 @@ class CollectionAgencyTests(TestCase):
         self.assertIn('name', response.context['form'].errors)
         self.assertEqual(CollectionAgency.objects.count(), 1)
 
-    def test_pagination(self):
+    def test_all_agencies_are_shown(self):
         for number in range(26):
             CollectionAgency.objects.create(name=f'Agency {number:02}')
         CollectionAgency.objects.create(name='Other')
         url = reverse('imports:collection_agencies')
         response = self.client.get(url)
-        self.assertEqual(response.context['page_obj'].paginator.count, 27)
-        self.assertContains(response, '?page=2')
-        response = self.client.get(url, {'page': 2})
-        self.assertEqual(len(response.context['page_obj']), 2)
+        self.assertEqual(len(response.context['agencies']), 27)
+        self.assertContains(response, 'Agency 25')
+        self.assertContains(response, 'Other')
+
+    def test_agency_with_contract_cannot_be_deleted(self):
+        agency = CollectionAgency.objects.create(name='Protected Agency')
+        debt = Debt.objects.create(
+            collection_agency=agency,
+            debtor=Debtor.objects.create(full_name='Должник', iin='900101300099'),
+            contract_number='AGENCY-PROTECTED',
+        )
+        delete_url = reverse('imports:collection_agency_delete', args=[agency.pk])
+        self.assertContains(self.client.get(delete_url), 'Удаление невозможно')
+        self.assertRedirects(self.client.post(delete_url), reverse('imports:collection_agencies'))
+        self.assertTrue(CollectionAgency.objects.filter(pk=agency.pk).exists())
 
     def test_view_permission_does_not_allow_changes(self):
         agency = CollectionAgency.objects.create(**self.data)

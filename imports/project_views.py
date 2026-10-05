@@ -23,18 +23,6 @@ def check(request, permission):
     if not request.user.is_authenticated or not request.user.has_perm(permission): raise PermissionDenied
 
 
-def debt_create(request):
-    check(request, 'imports.add_debt')
-    form = f.DebtCreateForm(request.POST if request.method == 'POST' else None)
-    if request.method == 'POST' and form.is_valid():
-        with transaction.atomic():
-            debt = form.save()
-            recalculate_debt(debt, source='manual_correction', actor=request.user)
-            log_action('created', debt, reason=form.cleaned_data['reason'], details={'new': {field.name: str(getattr(debt, field.name)) for field in m.Debt._meta.fields}})
-        return redirect('imports:debt_detail', debt_id=debt.pk)
-    return render(request, 'imports/project_form.html', {'form': form, 'title': 'Новый ДБЗ'})
-
-
 @permission_required('imports.change_payment')
 def payment_distribution(request, pk):
     payment = get_object_or_404(m.Payment, pk=pk)
@@ -84,6 +72,7 @@ def operation_edit(request, kind, pk):
 
 def operation_action(request, kind, pk, action):
     if kind not in RECORDS or action not in ('cancel', 'delete'): raise Http404
+    if kind == 'payment' and action == 'delete': raise Http404
     model = RECORDS[kind]
     check(request, 'imports.' + ('delete_' if action == 'delete' else 'change_') + model._meta.model_name)
     if action == 'delete' and not is_system_administrator(request.user): raise PermissionDenied
@@ -115,7 +104,7 @@ def full_recalculation(request):
 def import_template(request, code):
     from .services import IMPORT_HANDLERS
     from .reports import export_rows
-    if code not in IMPORT_HANDLERS: raise Http404
+    if code not in IMPORT_HANDLERS or code == 'writeoffs': raise Http404
     columns = [c for c in IMPORT_HANDLERS[code][0] if c != 'Дополнительные расходы']
     response = export_rows([], 'xlsx', 'Шаблон', headers=columns)
     response['Content-Disposition'] = f'attachment; filename="template-{code}.xlsx"'

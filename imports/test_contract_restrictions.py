@@ -43,9 +43,10 @@ class ContractRestrictionsTests(TestCase):
         permissions = Permission.objects.filter(content_type__app_label='imports',
                                                 content_type__model='debt')
         self.assertFalse(permissions.filter(codename__in=['change_debt', 'delete_debt']).exists())
-        for code in ('add_debt', 'view_debt', 'export_debt', 'recalculate_debt'):
+        for code in ('view_debt', 'export_debt', 'recalculate_debt'):
             self.assertTrue(permissions.filter(codename=code).exists())
-        self.assertEqual(self.client.get(reverse('imports:debt_new')).status_code, 200)
+        self.assertFalse(permissions.filter(codename='add_debt').exists())
+        self.assertEqual(self.client.get('/imports/contracts/new/').status_code, 404)
 
     def test_financial_services_cannot_cancel_or_delete_contracts(self):
         for operation in (cancel_record, delete_record):

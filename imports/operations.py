@@ -42,17 +42,17 @@ def cancel_record(record, *, actor, reason):
 
 @transaction.atomic
 def delete_record(record, *, actor, reason):
-    if isinstance(record, Debt):
-        raise ValidationError('Удаление договоров недоступно.')
+    if isinstance(record, (Debt, Payment)):
+        raise ValidationError('Удаление договоров и платежей недоступно.')
     if not is_system_administrator(actor): raise ValidationError('Физическое удаление доступно только администратору.')
     if not reason.strip(): raise ValidationError('Укажите причину удаления.')
     if isinstance(record, PaymentRefund): debt_id = record.payment.debt_id
     else: debt_id = record.debt_id
     name, identifier = record._meta.model_name, str(record.pk)
     # Delete detailed financial history rather than retaining a full deleted record.
-    if isinstance(record, (Payment, Expense, WriteOff)):
+    if isinstance(record, (Expense, WriteOff)):
         FinancialRecordHistory.objects.filter(**{name: record}).delete()
-        if name in ('payment', 'expense'): FinancialChangeRequest.objects.filter(**{name: record}).delete()
+        if name == 'expense': FinancialChangeRequest.objects.filter(expense=record).delete()
     if isinstance(record, Payment):
         if record.refunds.exists(): raise ValidationError('Сначала удалите возвраты этого платежа.')
     payment = record.payment if isinstance(record, PaymentRefund) else None

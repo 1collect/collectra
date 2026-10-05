@@ -270,7 +270,7 @@ class Debt(ImportSourceModel):
 
     class Meta:
         db_table = 'debts'
-        default_permissions = ('add', 'view')
+        default_permissions = ('view',)
         ordering = ['contract_number']
         verbose_name = 'задолженность'
         verbose_name_plural = 'задолженности'
@@ -367,6 +367,7 @@ class Payment(AuditedFinancialRecord):
     )
 
     class Meta:
+        default_permissions = ('change', 'view')
         db_table = 'payments'
         ordering = ['-payment_date', '-id']
         verbose_name = 'платёж'

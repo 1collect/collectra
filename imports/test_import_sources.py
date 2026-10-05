@@ -81,7 +81,7 @@ class ImportSourceTests(TestCase):
         self.assertEqual(debt.expenses.get().import_item, item)
 
     def test_expense_source(self):
-        record = self.upload('expenses', [['SOURCE-1', 10, 20, 30, 40, 50, 60, '02.10.2026']])
+        record = self.upload('expenses', [['SOURCE-1', 10, 20, 30, 40, 50]])
         self.assertEqual(Expense.objects.get().import_item, record.items.get())
 
     def test_writeoff_source_after_confirmation(self):

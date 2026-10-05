@@ -10,8 +10,6 @@ FORM_ROUTES = {
     'users:role_edit': 'users:roles',
     'users:group_new': 'users:groups',
     'users:group_edit': 'users:groups',
-    'imports:debt_new': 'imports:debts',
-    'imports:payment_new': 'imports:payments',
     'imports:payment_edit': 'imports:payments',
     'imports:expense_new': 'imports:expenses',
     'imports:expense_edit': 'imports:expenses',
@@ -23,6 +21,8 @@ FORM_ROUTES = {
     'imports:collection_agency_edit': 'imports:collection_agencies',
     'imports:counterparty_new': 'imports:counterparties',
     'imports:counterparty_edit': 'imports:counterparties',
+    'imports:collection_agency_delete': 'imports:collection_agencies',
+    'imports:counterparty_delete': 'imports:counterparties',
 }
 
 COMPACT_FORM_ROUTES = {
@@ -30,6 +30,8 @@ COMPACT_FORM_ROUTES = {
     'imports:collection_agency_edit',
     'imports:counterparty_new',
     'imports:counterparty_edit',
+    'imports:collection_agency_delete',
+    'imports:counterparty_delete',
 }
 
 

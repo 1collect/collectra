@@ -9,14 +9,6 @@
 </div>
 <section class="panel">
     <div class="panel-header"><h2>Реестр списаний <span class="badge">{{ page_obj.paginator.count }}</span></h2></div>
-    <div class="panel-body">
-        <form method="get" class="flex gap-2">
-            <label class="sr-only" for="writeoff-search">Поиск по договору, ФИО или ИИН</label>
-            <input class="form-control" id="writeoff-search" name="q" value="{{ query }}" placeholder="Договор, ФИО или ИИН" type="search">
-            <button class="btn" type="submit">Найти</button>
-            {% if query %}<a class="btn" href="{% url 'imports:writeoffs' %}">Сбросить</a>{% endif %}
-        </form>
-    </div>
     <div class="p-0 table-container">
         <table class="table table-bordered table-compact">
             <thead><tr><th scope="col">Договор</th><th scope="col">Тип списания</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма</th><th scope="col">Дата списания</th><th scope="col">Создал</th><th scope="col">Действия</th></tr></thead>
@@ -36,9 +28,9 @@
     {% if page_obj.paginator.num_pages > 1 %}
     <div class="table-footer"><span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
         <nav class="pagination" aria-label="Страницы списаний">
-            {% if page_obj.has_previous %}<a class="page-btn" href="?{% if query_string %}{{ query_string }}&amp;{% endif %}page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}
+            {% if page_obj.has_previous %}<a class="page-btn" href="?page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}
             <span class="page-btn" aria-current="page">{{ page_obj.number }}</span>
-            {% if page_obj.has_next %}<a class="page-btn" href="?{% if query_string %}{{ query_string }}&amp;{% endif %}page={{ page_obj.next_page_number }}">Далее</a>{% endif %}
+            {% if page_obj.has_next %}<a class="page-btn" href="?page={{ page_obj.next_page_number }}">Далее</a>{% endif %}
         </nav>
     </div>
     {% endif %}

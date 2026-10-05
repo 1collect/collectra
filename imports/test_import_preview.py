@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .models import Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment, WriteOff
-from .services import CONTRACT_IMPORT_COLUMNS, EXPENSE_IMPORT_COLUMNS, PAYMENT_IMPORT_COLUMNS, WRITEOFF_IMPORT_COLUMNS, import_preview_summary
+from .services import CONTRACT_IMPORT_COLUMNS, EXPENSE_IMPORT_COLUMNS, PAYMENT_IMPORT_COLUMNS, WRITEOFF_IMPORT_COLUMNS, import_preview_summary, process_xlsx_import
 from .tests import xlsx_file
 
 
@@ -24,6 +24,15 @@ class ImportPreviewTests(TestCase):
                    'contracts': CONTRACT_IMPORT_COLUMNS, 'writeoffs': WRITEOFF_IMPORT_COLUMNS}[code]
         if code == 'writeoffs' and rows:
             rows = [list(row) + [None, 'Основание тестового списания'] for row in rows]
+        if code == 'writeoffs':
+            record = Import.objects.create(
+                import_type=ImportType.objects.get(code=code),
+                file_name='writeoffs.xlsx', created_by=self.user,
+            )
+            process_xlsx_import(record, xlsx_file(columns, rows or [['PREVIEW-1', 'Полное', '', '', '02.10.2026']]), preview_only=True)
+            record.refresh_from_db()
+            self.url = reverse('imports:preview', args=[record.pk])
+            return record
         response = self.client.post(reverse('imports:new'), {
             'import_type': ImportType.objects.get(code=code).pk,
             'file': xlsx_file(columns, rows or [['PREVIEW-1', '100.25', 'ЧСИ', '02.10.2026']]),
@@ -115,9 +124,9 @@ class ImportPreviewTests(TestCase):
         self.assertFalse(self.debt.payments.exists())
 
     def test_expense_summary_includes_all_amount_columns(self):
-        self.upload('expenses', [['PREVIEW-1', 10, 20, 30, 40, 50, 60, '02.10.2026']])
+        self.upload('expenses', [['PREVIEW-1', 10, 20, 30, 40, 50]])
         self.assertFalse(Expense.objects.exists())
-        self.assertEqual(self.client.get(self.url).context['summary']['total'], Decimal('210'))
+        self.assertEqual(self.client.get(self.url).context['summary']['total'], Decimal('150'))
         self.confirm()
         self.assertEqual(Expense.objects.count(), 1)
 

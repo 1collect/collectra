@@ -8,19 +8,18 @@
     <div class="page-actions">{% if perms.imports.add_counterparty %}<a data-form-modal data-form-modal-compact aria-haspopup="dialog" class="btn btn-primary" href="{% url 'imports:counterparty_new' %}"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Добавить</a>{% endif %}</div>
 </div>
 <section class="panel">
-    <div class="panel-header"><h2>Реестр контрагентов <span class="badge">{{ page_obj.paginator.count }}</span></h2><span class="badge badge-neutral">По 25 записей</span></div>
+    <div class="panel-header"><h2>Реестр контрагентов <span class="badge">{{ counterparties|length }}</span></h2></div>
     <div class="p-0 table-container"><table class="table table-bordered table-compact">
         <thead><tr><th scope="col">№</th><th scope="col">Название</th><th scope="col" class="cell-number">Договоров</th><th scope="col" class="cell-actions">Действия</th></tr></thead>
-        <tbody>{% for counterparty in page_obj %}<tr>
-            <td class="font-mono import-id-column">{{ page_obj.start_index|add:forloop.counter|add:"-1" }}</td>
+        <tbody>{% for counterparty in counterparties %}<tr>
+            <td class="font-mono import-id-column">{{ forloop.counter }}</td>
             <td class="cell-text"><strong>{{ counterparty.name }}</strong></td>
             <td class="cell-number"><span class="badge {% if counterparty.debt_count %}badge-info{% else %}badge-neutral{% endif %}">{{ counterparty.debt_count }}</span></td>
             <td class="cell-actions"><div class="flex gap-2">
                 {% if perms.imports.change_counterparty %}<a data-form-modal data-form-modal-compact aria-haspopup="dialog" class="btn btn-sm" href="{% url 'imports:counterparty_edit' counterparty.id %}">Изменить</a>{% endif %}
-                {% if perms.imports.delete_counterparty %}{% if counterparty.debt_count %}<span aria-disabled="true" class="btn btn-sm" title="Есть привязанные договоры">Удалить</span>{% else %}<a class="btn btn-sm btn-danger" href="{% url 'imports:counterparty_delete' counterparty.id %}">Удалить</a>{% endif %}{% endif %}
+                {% if perms.imports.delete_counterparty %}{% if counterparty.debt_count %}<span aria-disabled="true" class="btn btn-sm" title="Есть привязанные договоры">Удалить</span>{% else %}<a data-form-modal data-form-modal-compact aria-haspopup="dialog" class="btn btn-sm btn-danger" href="{% url 'imports:counterparty_delete' counterparty.id %}">Удалить</a>{% endif %}{% endif %}
             </div></td>
         </tr>{% empty %}<tr><td colspan="4"><div class="empty-state"><h3>Ничего не найдено</h3></div></td></tr>{% endfor %}</tbody>
     </table></div>
-    {% if page_obj.paginator.num_pages > 1 %}<div class="table-footer"><span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span><nav aria-label="Страницы контрагентов" class="pagination">{% if page_obj.has_previous %}<a class="page-btn" href="?page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}<span aria-current="page" class="page-btn">{{ page_obj.number }}</span>{% if page_obj.has_next %}<a class="page-btn" href="?page={{ page_obj.next_page_number }}">Далее</a>{% endif %}</nav></div>{% endif %}
 </section>
 {% endblock %}

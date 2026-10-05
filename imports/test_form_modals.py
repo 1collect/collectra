@@ -14,8 +14,7 @@ class FormModalTests(TestCase):
         self.client.force_login(self.admin)
 
     def test_direct_form_links_render_modal(self):
-        for route in ('users:role_new', 'users:group_new', 'imports:debt_new',
-                      'imports:payment_new', 'imports:expense_new',
+        for route in ('users:role_new', 'users:group_new', 'imports:expense_new',
                       'imports:writeoff_new', 'imports:refund_new',
                       'imports:counterparty_new', 'imports:collection_agency_new'):
             with self.subTest(route=route):

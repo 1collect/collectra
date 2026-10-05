@@ -29,8 +29,6 @@ EXPENSE_IMPORT_COLUMNS = (
     'Нотариальные расходы',
     'Почтовые расходы',
     'Обеспечение иска',
-    'Дополнительные расходы',
-    'Дата расхода',
 )
 
 PAYMENT_IMPORT_COLUMNS = ('ДБЗ', 'Платеж', 'Статус платежа', 'Дата платежа')
@@ -39,9 +37,7 @@ WRITEOFF_REQUIRED_COLUMNS = ('ДБЗ', 'Тип списания', 'Дата сп
 
 TEXT_COLUMNS = {'ДБЗ', 'ИИН', 'ФИО'}
 CONTRACT_REQUIRED_COLUMNS = ('ДБЗ', 'ИИН', 'ФИО')
-EXPENSE_REQUIRED_COLUMNS = tuple(
-    column for column in EXPENSE_IMPORT_COLUMNS if column != 'Дополнительные расходы'
-)
+EXPENSE_REQUIRED_COLUMNS = EXPENSE_IMPORT_COLUMNS
 PAYMENT_REQUIRED_COLUMNS = ('ДБЗ', 'Платеж', 'Статус платежа', 'Дата платежа')
 
 FINANCIAL_HEADER_ALIASES = {
@@ -68,7 +64,6 @@ EXPENSE_COLUMN_FIELDS = {
     'Нотариальные расходы': 'notary_expenses',
     'Почтовые расходы': 'postal_expenses',
     'Обеспечение иска': 'claim_security',
-    'Дополнительные расходы': 'additional_expenses',
 }
 
 
@@ -148,7 +143,7 @@ def expense_values(data):
     values = {
         'debt': debt_for_contract(data['ДБЗ']),
         **decimal_values(data, EXPENSE_COLUMN_FIELDS),
-        'expense_date': parse_date(data['Дата расхода'], 'Дата расхода'),
+        'expense_date': timezone.localdate(),
     }
     if any(values[f] < 0 for f in EXPENSE_COLUMN_FIELDS.values()):
         raise ImportValidationError('Суммы расходов не могут быть отрицательными.')
@@ -884,7 +879,7 @@ def _build_import_preview_summary(import_record, items=None):
             by_status[label] = by_status.get(label, Decimal('0')) + amount
         elif code == 'expenses':
             amount = sum((Decimal(data[column] or '0') for column in EXPENSE_COLUMN_FIELDS), Decimal('0'))
-            event_date = parse_date(data['Дата расхода'], 'Дата расхода')
+            event_date = timezone.localdate()
         elif code == 'writeoffs':
             amount = Decimal(data['Сумма списания'])
             event_date = parse_date(data['Дата списания'], 'Дата списания')

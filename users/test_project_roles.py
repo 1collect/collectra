@@ -30,20 +30,16 @@ class ProjectRoleTests(TestCase):
         self.select_role('Аналитик')
         for route in ('debts', 'payments', 'expenses', 'writeoffs', 'refunds'):
             self.assertEqual(self.client.get(reverse('imports:' + route)).status_code, 200)
-        for route in ('payment_new', 'expense_new', 'writeoff_new', 'refund_new', 'new', 'debt_new'):
+        for route in ('expense_new', 'writeoff_new', 'refund_new', 'new'):
             self.assertEqual(self.client.post(reverse('imports:' + route), {}).status_code, 403)
         self.assertFalse(self.user.has_perm('imports.change_payment'))
         self.assertFalse(Payment.objects.exists())
 
     def test_coordinator_can_enter_edit_cancel_and_export(self):
         self.select_role('Координатор')
-        for code in ('add_import', 'add_debt', 'add_payment', 'change_payment', 'add_writeoff', 'change_writeoff', 'add_paymentrefund', 'change_paymentrefund', 'export_debt'):
+        for code in ('add_import', 'change_payment', 'add_writeoff', 'change_writeoff', 'add_paymentrefund', 'change_paymentrefund', 'export_debt'):
             self.assertTrue(self.user.has_perm('imports.' + code), code)
-        response = self.client.post(reverse('imports:payment_new'), {
-            'debt': self.debt.pk, 'amount': '25', 'status': 'individual', 'payment_date': '2026-10-02',
-        })
-        self.assertEqual(response.status_code, 302)
-        payment = Payment.objects.get()
+        payment = Payment.objects.create(debt=self.debt, amount=25, status='individual', payment_date=date(2026, 10, 2))
         self.assertEqual(self.client.get(reverse('imports:payment_distribution', args=[payment.pk])).status_code, 200)
         response = self.client.post(reverse('imports:operation_action', args=['payment', payment.pk, 'cancel']), {'reason': 'Ошибка'})
         self.assertEqual(response.status_code, 302)
@@ -56,7 +52,8 @@ class ProjectRoleTests(TestCase):
         urls = [reverse('users:list'), reverse('users:roles'), reverse('imports:recalculate'),
                 reverse('imports:operation_action', args=['payment', payment.pk, 'delete'])]
         for url in urls:
-            self.assertEqual(self.client.post(url, {'reason': 'Test'}).status_code, 403, url)
+            expected = 404 if url.endswith('/delete/') else 403
+            self.assertEqual(self.client.post(url, {'reason': 'Test'}).status_code, expected, url)
         self.assertTrue(Payment.objects.filter(pk=payment.pk).exists())
         self.assertFalse(self.user.has_perm('imports.approve_financialchangerequest'))
 
@@ -70,8 +67,8 @@ class ProjectRoleTests(TestCase):
         self.assertEqual(response.url, reverse('imports:debts'))
         payment = Payment.objects.create(debt=self.debt, amount=20, status='individual', payment_date=date(2026, 10, 2))
         response = self.client.post(reverse('imports:operation_action', args=['payment', payment.pk, 'delete']), {'reason': 'Ошибка'})
-        self.assertEqual(response.status_code, 302)
-        self.assertFalse(Payment.objects.filter(pk=payment.pk).exists())
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Payment.objects.filter(pk=payment.pk).exists())
 
     def test_administrative_permission_alone_does_not_bypass_operation_permissions(self):
         self.user.user_permissions.add(Permission.objects.get(codename='administer_system'))
