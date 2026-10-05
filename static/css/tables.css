@@ -11,6 +11,7 @@
 .table-bordered th + th, .table-bordered td + td { border-left: 1px solid var(--border-color); }
 .table-compact td { height: var(--row-height); }
 .table .cell-number { text-align: right; font-variant-numeric: tabular-nums; }
+.table.debt-register .cell-number { text-align: left; }
 .table th.cell-number { min-width: 8rem; max-width: 12rem; }
 .table .cell-date { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table .cell-text { min-width: 14rem; max-width: 24rem; white-space: normal; overflow-wrap: anywhere; }

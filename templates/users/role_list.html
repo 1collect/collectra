@@ -13,10 +13,10 @@
         <div class="panel-header"><h2>{{ role.name }}</h2><span class="badge">{{ role.permissions.count }}</span></div>
         <div class="panel-body">
             <p class="text-sm text-secondary mb-3">Назначено прав: {{ role.permissions.count }}</p>
-            <ul class="simple-list">{% for permission in role.permissions.all|slice:':5' %}<li>{{ permission.name }}</li>{% empty %}<li class="text-muted">Права пока не назначены</li>{% endfor %}</ul>
+            <ul class="simple-list">{% for permission in role.permissions.all|slice:':5' %}<li>{{ permission.name }}</li>{% empty %}<li class="text-muted">Ничего не найдено</li>{% endfor %}</ul>
             {% if perms.users.change_role %}<a data-form-modal aria-haspopup="dialog" class="btn btn-sm mt-3" href="{% url 'users:role_edit' role.id %}">Настроить роль <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"></path></svg></a>{% endif %}
         </div>
     </section>
-{% empty %}<section class="panel"><div class="panel-body"><p class="text-muted">Ролей пока нет. Создайте первую роль и назначьте ей права.</p></div></section>{% endfor %}
+{% empty %}<section class="panel"><div class="panel-body"><p class="text-muted">Ничего не найдено</p></div></section>{% endfor %}
 </div>
 {% endblock %}

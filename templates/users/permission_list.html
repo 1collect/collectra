@@ -6,6 +6,6 @@
 <div class="page-header"><div><div class="page-eyebrow">Управление доступом</div><h1>Права доступа</h1></div></div>
 <section class="panel">
     <div class="panel-header"><h2>Права доступа</h2><span class="badge">{{ permissions|length }}</span></div>
-    <div class="p-0 table-container"><table class="table table-bordered table-compact"><thead><tr><th scope="col">Название</th><th scope="col">Код</th></tr></thead><tbody>{% for permission in permissions %}<tr><td>{{ permission.display_name }}</td><td class="font-mono">{{ permission.codename }}</td></tr>{% empty %}<tr><td colspan="2">Права пока не созданы.</td></tr>{% endfor %}</tbody></table></div>
+    <div class="p-0 table-container"><table class="table table-bordered table-compact"><thead><tr><th scope="col">Название</th><th scope="col">Код</th></tr></thead><tbody>{% for permission in permissions %}<tr><td>{{ permission.display_name }}</td><td class="font-mono">{{ permission.codename }}</td></tr>{% empty %}<tr><td colspan="2">Ничего не найдено</td></tr>{% endfor %}</tbody></table></div>
 </section>
 {% endblock %}

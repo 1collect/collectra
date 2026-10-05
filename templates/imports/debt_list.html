@@ -10,7 +10,6 @@
 <section class="panel">
     <div class="panel-header"><h2>Реестр договоров <span class="badge">{{ page_obj.paginator.count }}</span></h2><span class="badge badge-neutral">По 25 записей</span></div>
     <div class="panel-body">
-        <p class="text-muted">Общая сумма включает задолженность по выкупу и наши расходы. Текущий остаток учитывает платежи, списания и возвраты. <span data-balance-status role="status">Автообновление включено.</span></p>
     </div>
     <div data-live-balances>{% include 'imports/partials/debt_register.html' %}</div>
 </section>

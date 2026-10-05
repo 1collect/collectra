@@ -16,7 +16,7 @@
                     <td>XLSX</td>
                     <td class="cell-actions"><a class="btn btn-sm" href="{% url 'imports:import_template' template.code %}" aria-label="Скачать шаблон: {{ template.name }}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4"></path></svg>Скачать</a></td>
                 </tr>
-                {% empty %}<tr><td colspan="5"><div class="empty-state"><strong>Нет доступных шаблонов</strong></div></td></tr>{% endfor %}
+                {% empty %}<tr><td colspan="5"><div class="empty-state"><strong>Ничего не найдено</strong></div></td></tr>{% endfor %}
             </tbody>
         </table>
     </div>
