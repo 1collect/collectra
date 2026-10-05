@@ -11,5 +11,5 @@
                     <td class="import-action">{% if item.status == 'new' or item.status == 'processing' %}<span class="text-xs text-muted">Проверка файла</span>{% elif item.status == 'review' and item.created_by_id == request.user.pk and perms.imports.add_import %}<a class="btn btn-sm btn-primary" data-import-preview aria-haspopup="dialog" href="{% url 'imports:preview' item.pk %}">Проверить</a>{% else %}<a class="btn btn-sm" data-import-preview aria-haspopup="dialog" href="{% url 'imports:preview' item.pk %}">Открыть</a>{% endif %}</td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="7"><div class="empty-state"><strong>Импортов пока нет</strong></div></td></tr>
+                <tr><td colspan="7"><div class="empty-state"><strong>Ничего не найдено</strong></div></td></tr>
                 {% endfor %}

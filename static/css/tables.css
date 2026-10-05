@@ -54,17 +54,37 @@
 .table td[colspan] .empty-state { position: sticky; left: 0; width: calc(100cqw - var(--space-5)); max-width: 100%; }
 
 /* Import history: keep the record key visible while the wide table scrolls. */
-.import-history .panel-header h2 { font-size: 16px; }
+.import-header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-left: auto; }
+.import-table-settings { display: flex; align-items: center; gap: 8px; }
+.import-table-settings-separated { border-right: 1px solid var(--border-color); padding-right: 16px; }
+.import-header-actions .btn-primary .icon { color: var(--on-primary); }
+.import-filter-toggle { position: relative; }
+.import-filter-indicator { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--primary); }
+.import-filter-toggle .import-filter-chevron { width: 12px; height: 12px; transition: transform 240ms ease; }
+.import-filter-toggle[aria-expanded="true"] .import-filter-chevron { transform: rotate(180deg); }
+.import-history .panel-header h1 { font-size: 18px; }
+@media (max-width: 600px) { .import-history .panel-header h1 { flex-basis: 100%; } }
 .import-history .rows-control { margin: 0; align-self: center; }
-.import-history .rows-control select { appearance: none; width: 76px; height: 36px; font-size: 16px; line-height: normal; padding: 0 26px 0 10px; text-align: left; text-align-last: left; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
+.import-history .rows-control select { appearance: none; width: auto; min-width: 108px; height: var(--control-height); font-size: var(--text-small); line-height: normal; padding: 0 28px 0 10px; text-align: left; text-align-last: left; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
 .import-history .rows-control select option { text-align: left; }
 .import-filter-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 240ms ease; }
 .import-filter-panel.is-open { grid-template-rows: 1fr; }
 .import-filter-clip { min-height: 0; overflow: hidden; }
-.import-history .import-filter-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 16px; margin: 0; background: var(--bg-panel); border-bottom-color: var(--border-strong); }
+.import-history .import-filter-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); gap: 24px; padding: 16px; margin: 0; background: var(--bg-panel); border-bottom-color: var(--border-strong); }
+.import-filter-fields { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; min-width: 0; }
 .import-history .import-filter-grid .form-field { width: auto; }
-.import-filter-actions { grid-column: 1 / -1; }
-@media (max-width: 600px) { .import-history .import-filter-grid { grid-template-columns: minmax(0, 1fr); } }
+.import-filter-date-start { grid-column: 1; }
+.import-filter-actions { align-self: end; justify-self: end; }
+@media (max-width: 1100px) { .import-history .import-filter-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+@media (max-width: 600px) {
+  .import-history .panel-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  .import-history .panel-header h1 { grid-column: 1; grid-row: 1; }
+  .import-header-actions { display: contents; }
+  .import-header-actions > .btn-primary { grid-column: 2; grid-row: 1; }
+  .import-table-settings { grid-column: 1 / -1; grid-row: 2; justify-self: end; }
+  .import-table-settings-separated { border-right: 0; padding-right: 0; }
+  .import-filter-fields { grid-template-columns: minmax(0, 1fr); }
+}
 @media (prefers-reduced-motion: reduce) { .import-filter-panel { transition: none; } }
 .import-table { width: 100%; table-layout: auto; }
 .import-table th, .import-table td { text-align: left; }

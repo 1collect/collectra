@@ -26,7 +26,7 @@ class ImportPaginationTests(TestCase):
         response = self.client.get(reverse('imports:list'))
         self.assertEqual(len(response.context['imports']), 10)
         self.assertEqual(response.context['page_obj'].paginator.count, 43)
-        self.assertContains(response, '<option value="10" selected>10</option>')
+        self.assertContains(response, '<option value="10" selected>10 строк</option>')
         self.assertContains(response, 'Всего импортов: <strong>43</strong>')
         self.assertContains(response, '?per_page=10&amp;page=2')
 
@@ -119,7 +119,7 @@ class ImportPaginationTests(TestCase):
         Import.objects.all().delete()
         response = self.client.get(reverse('imports:list'))
         self.assertContains(response, 'Всего импортов: <strong>0</strong>')
-        self.assertContains(response, 'Импортов пока нет')
+        self.assertContains(response, 'Ничего не найдено')
         self.assertNotContains(response, 'aria-label="Страницы импортов"')
         self.assertNotContains(response, 'Загрузите первый XLSX-файл')
         self.assertEqual(response.context['import_row_offset'], 0)

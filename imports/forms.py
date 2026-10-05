@@ -15,6 +15,7 @@ class ImportFilterForm(forms.Form):
     date_to = forms.DateField(label='Дата по', required=False, widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'))
 
     def __init__(self, *args, **kwargs):
+        kwargs.setdefault('auto_id', 'import-filter-%s')
         super().__init__(*args, **kwargs)
         self.fields['author'].queryset = get_user_model().objects.filter(pk__in=Import.objects.values('created_by_id')).order_by('username')
         for field in self.fields.values():

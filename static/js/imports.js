@@ -4,6 +4,11 @@ document.addEventListener('DOMContentLoaded', () => {
   const upload = document.getElementById('import-upload-modal');
   const isReload = performance.getEntriesByType('navigation')[0]?.type === 'reload';
   if (isReload) {
+    A.storage.remove('imports.filtersExpanded');
+    if (location.search) {
+      location.replace(location.pathname);
+      return;
+    }
     [preview, upload].forEach(dialog => {
       if (dialog?.open) dialog.close();
     });
@@ -20,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
       filterPanel.inert = !expanded;
       filterToggle.setAttribute('aria-expanded', String(expanded));
     };
-    const savedExpanded = A.storage.get(storageKey, null);
+    const savedExpanded = isReload ? false : A.storage.get(storageKey, null);
     if (typeof savedExpanded === 'boolean') {
       filterPanel.style.transition = 'none';
       setExpanded(savedExpanded);

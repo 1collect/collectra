@@ -105,13 +105,6 @@
 .import-preview__check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
 .import-preview__check input { margin-top: 3px; flex-shrink: 0; }
 .import-preview .panel-header { flex-wrap: wrap; overflow-wrap: anywhere; }
-.import-page-header { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; }
-.import-page-header > div:first-child { grid-column: 2; text-align: center; }
-.import-page-header .page-actions { grid-column: 3; justify-self: end; padding-top: 0; }
-@media (max-width: 600px) {
-  .import-page-header { grid-template-columns: minmax(0, 1fr); }
-  .import-page-header > div:first-child, .import-page-header .page-actions { grid-column: 1; }
-}
 dialog.import-preview-modal { width: min(800px, calc(var(--viewport-width) - 28px)); }
 .import-preview-modal .modal-header { position: sticky; top: 0; z-index: 2; background: var(--bg-panel); }
 .import-preview-modal .stat-value { font-size: clamp(20px, calc(var(--viewport-width) * .03), 28px); overflow-wrap: anywhere; }
