@@ -11,7 +11,7 @@
     <div class="panel-header"><h2>История возвратов <span class="badge">{{ page_obj.paginator.count }}</span></h2></div>
     <div class="p-0 table-container">
         <table class="table table-bordered table-compact">
-            <thead><tr><th scope="col">Договор</th><th scope="col">Исходный платёж</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма возврата</th><th scope="col">Дата</th><th scope="col">Основание</th><th scope="col">Статус</th><th scope="col">Создал</th></tr></thead>
+            <thead><tr><th scope="col">Договор</th><th scope="col">Исходный платёж</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма возврата</th><th scope="col">Дата</th><th scope="col">Основание</th><th scope="col">Создал</th></tr></thead>
             <tbody>
             {% for refund in page_obj %}
                 <tr>
@@ -21,10 +21,9 @@
                     <td class="cell-number"><strong>{{ refund.amount|floatformat:2 }}</strong></td>
                     <td class="cell-date">{{ refund.refund_date|date:'d.m.Y' }}</td>
                     <td class="cell-text">{{ refund.reason }}</td>
-                    <td><span class="badge {% if refund.status == 'active' %}badge-success{% else %}badge-neutral{% endif %}">{{ refund.get_status_display }}</span></td>
                     <td>{{ refund.created_by.get_full_name|default:refund.created_by.username }}{% if perms.imports.change_paymentrefund %}<a class="btn btn-sm" href="{% url 'imports:operation_edit' 'refund' refund.pk %}">Изменить</a><a class="btn btn-sm" href="{% url 'imports:operation_action' 'refund' refund.pk 'cancel' %}">Отменить</a>{% endif %}{% if perms.users.administer_system %}<a class="btn btn-sm" href="{% url 'imports:operation_action' 'refund' refund.pk 'delete' %}">Удалить</a>{% endif %}</td>
                 </tr>
-            {% empty %}<tr><td colspan="8"><div class="empty-state"><h3>Возвратов пока нет</h3><p>Создайте возврат вручную для исходного платежа.</p></div></td></tr>{% endfor %}
+            {% empty %}<tr><td colspan="7"><div class="empty-state"><h3>Возвратов пока нет</h3><p>Создайте возврат вручную для исходного платежа.</p></div></td></tr>{% endfor %}
             </tbody>
         </table>
     </div>

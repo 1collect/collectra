@@ -28,7 +28,7 @@
                     <td class="cell-number">{{ item.amount|floatformat:2 }}</td>
                     <td class="cell-date">{{ item.writeoff_date|date:'d.m.Y' }}</td>
                     <td>{{ item.created_by.get_full_name|default:item.created_by.username }}</td>
-                    <td><a class="btn btn-sm" href="{% url 'imports:writeoff_history' item.pk %}">История</a>{% if perms.imports.change_writeoff %}<a class="btn btn-sm" href="{% url 'imports:operation_edit' 'writeoff' item.pk %}">Изменить</a><a class="btn btn-sm" href="{% url 'imports:operation_action' 'writeoff' item.pk 'cancel' %}">Отменить</a>{% endif %}{% if perms.users.administer_system %}<a class="btn btn-sm" href="{% url 'imports:operation_action' 'writeoff' item.pk 'delete' %}">Удалить</a>{% endif %}<br>{{ item.get_operation_status_display }} · {{ item.reason }}</td>
+                    <td><a class="btn btn-sm" href="{% url 'imports:writeoff_history' item.pk %}">История</a>{% if perms.imports.change_writeoff %}<a class="btn btn-sm" href="{% url 'imports:operation_edit' 'writeoff' item.pk %}">Изменить</a><a class="btn btn-sm" href="{% url 'imports:operation_action' 'writeoff' item.pk 'cancel' %}">Отменить</a>{% endif %}{% if perms.users.administer_system %}<a class="btn btn-sm" href="{% url 'imports:operation_action' 'writeoff' item.pk 'delete' %}">Удалить</a>{% endif %}<br>{{ item.reason }}</td>
                 </tr>
             {% empty %}<tr><td colspan="7"><div class="empty-state"><h3>Списания не найдены</h3></div></td></tr>{% endfor %}</tbody>
         </table>

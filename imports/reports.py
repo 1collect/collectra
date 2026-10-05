@@ -72,16 +72,16 @@ def report_rows(data):
         writeoffs = [w for w in debt.writeoffs.all() if w.operation_status != 'cancelled' and w.writeoff_date <= end and (start is None or w.writeoff_date >= start)]
         if any(data.get(key) and bool(items) != (data[key] == 'yes') for key, items in [('payments', payments), ('writeoffs', writeoffs)]): continue
         refunded = sum((r.amount for p in debt.payments.all() for r in p.refunds.all() if p.operation_status != 'cancelled' and r.status == 'active' and r.refund_date <= end and (start is None or r.refund_date >= start)), Decimal('0'))
-        rows.append({'debt': debt, 'balance': b, 'status_label': dict(Debt.Status.choices).get(b['status'], b['status']), 'paid': sum((p.amount for p in payments), Decimal('0')), 'refunded': refunded, 'written': sum((w.amount for w in writeoffs), Decimal('0'))})
+        rows.append({'debt': debt, 'balance': b, 'paid': sum((p.amount for p in payments), Decimal('0')), 'refunded': refunded, 'written': sum((w.amount for w in writeoffs), Decimal('0'))})
     return rows, start, end
 
 
-HEADERS = ['ДБЗ', 'ИИН', 'ФИО', 'КА', 'Кредитор', 'Статус', 'Поступления за период', 'Возвраты за период', 'Списания за период', 'Остаток на конец', 'Переплата', *CATEGORY_LABELS.values(), 'Дата закрытия']
+HEADERS = ['ДБЗ', 'ИИН', 'ФИО', 'КА', 'Кредитор', 'Поступления за период', 'Возвраты за период', 'Списания за период', 'Остаток на конец', 'Переплата', *CATEGORY_LABELS.values(), 'Дата закрытия']
 
 
 def values(row):
     debt, b = row['debt'], row['balance']
-    return [debt.contract_number, debt.debtor.iin, debt.debtor.full_name, str(debt.collection_agency or ''), str(debt.original_creditor or ''), dict(Debt.Status.choices).get(b['status'], b['status']), row['paid'], row['refunded'], row['written'], b['outstanding_amount'], b['overpayment_amount'], *[b['current'][f] for f in CATEGORY_LABELS], b['closed_at'] or '']
+    return [debt.contract_number, debt.debtor.iin, debt.debtor.full_name, str(debt.collection_agency or ''), str(debt.original_creditor or ''), row['paid'], row['refunded'], row['written'], b['outstanding_amount'], b['overpayment_amount'], *[b['current'][f] for f in CATEGORY_LABELS], b['closed_at'] or '']
 
 
 def safe_cell(value):
@@ -162,15 +162,13 @@ def analytics(request):
     rows, _, end = report_rows({'period': 'all'})
     totals = {'count': len(rows), 'outstanding': Decimal('0'), 'overpayment': Decimal('0'), 'paid': Decimal('0'), 'written': Decimal('0'), 'review': 0}
     categories = dict.fromkeys(CATEGORY_LABELS, Decimal('0'))
-    statuses = {}
     agencies = {}
     for row in rows:
         b = row['balance']
         for key, field in [('outstanding', 'outstanding_amount'), ('overpayment', 'overpayment_amount'), ('paid', 'paid_amount'), ('written', 'written_off_amount')]: totals[key] += b[field]
         totals['review'] += int(b.get('needs_manual_review', False))
-        statuses[b['status']] = statuses.get(b['status'], 0) + 1
         agency = str(row['debt'].collection_agency or 'КА не указано')
         agencies[agency] = agencies.get(agency, Decimal('0')) + b['outstanding_amount']
         for key in categories: categories[key] += b['current'][key]
     bars = [{'label': CATEGORY_LABELS[key], 'amount': value, 'percent': float(value / max(max(categories.values()), Decimal('1')) * 100)} for key, value in categories.items()]
-    return render(request, 'imports/analytics.html', {'totals': totals, 'bars': bars, 'statuses': [(dict(Debt.Status.choices).get(key, key), count) for key, count in statuses.items()], 'agencies': agencies.items(), 'day': end})
+    return render(request, 'imports/analytics.html', {'totals': totals, 'bars': bars, 'agencies': agencies.items(), 'day': end})

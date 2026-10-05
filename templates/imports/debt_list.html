@@ -15,10 +15,6 @@
         <p class="text-muted">Общая сумма включает задолженность по выкупу и наши расходы. Текущий остаток учитывает платежи, списания и возвраты. <span data-balance-status role="status">Автообновление включено.</span></p>
         <form method="get" class="form-inline">
             <input id="debt-search" class="form-control" type="search" name="q" value="{{ query }}" placeholder="ДБЗ, ФИО или ИИН" aria-label="Поиск договоров">
-            <select class="form-control" name="status" aria-label="Статус договора">
-                <option value="">Все статусы</option>
-                {% for value, label in status_choices %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
-            </select>
             <button class="btn btn-primary" type="submit">Найти</button>
         </form>
     </div>

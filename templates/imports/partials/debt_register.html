@@ -1,6 +1,6 @@
     <div class="p-0 table-container">
         <table class="table table-bordered table-compact">
-            <thead><tr><th scope="col" class="record-key">ДБЗ</th><th scope="col">ФИО</th><th scope="col">ИИН</th><th scope="col" class="cell-number">Основной долг</th><th scope="col" class="cell-number">Вознаграждение</th><th scope="col" class="cell-number">Пеня/Штрафы</th><th scope="col" class="cell-number">Дебиторская задолженность</th><th scope="col" class="cell-number">Гос.пошлина</th><th scope="col" class="cell-number">Представительские расходы</th><th scope="col" class="cell-number">Нотариальные расходы</th><th scope="col" class="cell-number">Почтовые расходы</th><th scope="col" class="cell-number">Обеспечение иска</th><th scope="col" class="cell-number">Дополнительные расходы</th><th scope="col" class="cell-number">Общая сумма задолженности</th><th scope="col" class="cell-number">Оплачено</th><th scope="col" class="cell-number">Списано</th><th scope="col" class="cell-number">Остаток</th><th scope="col" class="cell-number">Переплата</th><th scope="col">Статус</th><th scope="col">Дата закрытия</th></tr></thead>
+            <thead><tr><th scope="col" class="record-key">ДБЗ</th><th scope="col">ФИО</th><th scope="col">ИИН</th><th scope="col" class="cell-number">Основной долг</th><th scope="col" class="cell-number">Вознаграждение</th><th scope="col" class="cell-number">Пеня/Штрафы</th><th scope="col" class="cell-number">Дебиторская задолженность</th><th scope="col" class="cell-number">Гос.пошлина</th><th scope="col" class="cell-number">Представительские расходы</th><th scope="col" class="cell-number">Нотариальные расходы</th><th scope="col" class="cell-number">Почтовые расходы</th><th scope="col" class="cell-number">Обеспечение иска</th><th scope="col" class="cell-number">Дополнительные расходы</th><th scope="col" class="cell-number">Общая сумма задолженности</th><th scope="col" class="cell-number">Оплачено</th><th scope="col" class="cell-number">Списано</th><th scope="col" class="cell-number">Остаток</th><th scope="col" class="cell-number">Переплата</th><th scope="col">Дата закрытия</th></tr></thead>
             <tbody>
             {% for debt in page_obj %}
                 <tr>
@@ -22,10 +22,9 @@
                     <td class="cell-number">{{ debt.written_off_amount|floatformat:2 }}</td>
                     <td class="cell-number">{{ debt.outstanding_amount|floatformat:2 }}</td>
                     <td class="cell-number">{{ debt.overpayment_amount|floatformat:2 }}</td>
-                    <td><span class="badge {% if debt.status == 'closed' or debt.status == 'closed_paid' or debt.status == 'closed_written_off' or debt.status == 'closed_mixed' %}badge-success{% else %}badge-warning{% endif %}">{{ debt.get_status_display }}</span></td>
                     <td class="cell-date">{{ debt.closed_at|date:'d.m.Y'|default:'—' }}</td>
                 </tr>
-            {% empty %}<tr><td colspan="20"><div class="empty-state"><h3>Договоры не найдены</h3></div></td></tr>{% endfor %}
+            {% empty %}<tr><td colspan="19"><div class="empty-state"><h3>Договоры не найдены</h3></div></td></tr>{% endfor %}
             </tbody>
         </table>
     </div>
