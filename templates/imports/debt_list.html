@@ -6,7 +6,7 @@
 {% block content %}
 <div class="page-header">
     <div><div class="page-eyebrow">Данные / Задолженности</div><h1>Договоры</h1></div>
-    {% if perms.imports.add_debt %}<a class="btn btn-primary" href="{% url 'imports:debt_new' %}">Добавить ДБЗ</a>{% endif %}
+    {% if perms.imports.add_debt %}<a data-form-modal aria-haspopup="dialog" class="btn btn-primary" href="{% url 'imports:debt_new' %}">Добавить ДБЗ</a>{% endif %}
     <a class="btn" href="{% url 'imports:reports' %}">Отчёты и выгрузки</a>
 </div>
 <section class="panel">

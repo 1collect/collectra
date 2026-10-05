@@ -1,6 +1,8 @@
-(() => {
-    const form = document.getElementById('writeoff-form');
-    if (!form) return;
+(function (A) {
+  A.initWriteoffs = function (root = document) {
+    const form = root.querySelector('#writeoff-form');
+    if (!form || form.dataset.initialized) return;
+    form.dataset.initialized = 'true';
     const kind = form.querySelector('[name="kind"]');
     const syncFields = () => {
         const partial = kind.value === 'partial';
@@ -14,4 +16,6 @@
     };
     kind.addEventListener('change', syncFields);
     syncFields();
-})();
+  };
+  document.addEventListener('DOMContentLoaded', () => A.initWriteoffs());
+})(window.Admin);

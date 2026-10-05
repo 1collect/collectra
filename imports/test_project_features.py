@@ -186,7 +186,8 @@ class ProjectFeaturesTests(TestCase):
             if format == 'pdf': self.assertTrue(response.content.startswith(b'%PDF'))
             elif format == 'xlsx':
                 book = load_workbook(BytesIO(response.content))
-                self.assertEqual(book.active.cell(2, 10).value, 300)
+                headers = [cell.value for cell in book.active[1]]
+                self.assertEqual(book.active.cell(2, headers.index('Остаток на конец') + 1).value, 300)
             else: self.assertIn(self.debt.contract_number, response.content.decode('utf-8-sig'))
 
     def test_period_boundaries(self):

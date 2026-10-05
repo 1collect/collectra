@@ -5,7 +5,7 @@
 {% block content %}
 <div class="page-header">
     <div><div class="page-eyebrow">Управление доступом</div><h1>Группы прав</h1></div>
-    <div class="page-actions">{% if perms.users.add_permissiongroup %}<a class="btn btn-primary" href="{% url 'users:group_new' %}"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Создать группу</a>{% endif %}</div>
+    <div class="page-actions">{% if perms.users.add_permissiongroup %}<a data-form-modal aria-haspopup="dialog" class="btn btn-primary" href="{% url 'users:group_new' %}"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Создать группу</a>{% endif %}</div>
 </div>
 <div class="grid-3">
 {% for group in groups %}
@@ -14,7 +14,7 @@
         <div class="panel-body">
             <p class="text-sm text-secondary mb-3">Сгруппировано прав: {{ group.permissions.count }}</p>
             <ul class="simple-list">{% for permission in group.permissions.all|slice:':5' %}<li>{{ permission.name }}</li>{% empty %}<li class="text-muted">Права пока не назначены</li>{% endfor %}</ul>
-            {% if perms.users.change_permissiongroup %}<a class="btn btn-sm mt-3" href="{% url 'users:group_edit' group.id %}">Настроить группу <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"></path></svg></a>{% endif %}
+            {% if perms.users.change_permissiongroup %}<a data-form-modal aria-haspopup="dialog" class="btn btn-sm mt-3" href="{% url 'users:group_edit' group.id %}">Настроить группу <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"></path></svg></a>{% endif %}
         </div>
     </section>
 {% empty %}<section class="panel"><div class="panel-body"><p class="text-muted">Групп пока нет. Создайте первую группу и добавьте в неё права.</p></div></section>{% endfor %}

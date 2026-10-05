@@ -5,7 +5,7 @@
 {% block content %}
 <div class="page-header">
     <div><div class="page-eyebrow">Справочники</div><h1>Коллекторские агентства</h1></div>
-    <div class="page-actions">{% if perms.imports.add_collectionagency %}<a class="btn btn-primary" href="{% url 'imports:collection_agency_new' %}">Добавить агентство</a>{% endif %}</div>
+    <div class="page-actions">{% if perms.imports.add_collectionagency %}<a data-form-modal aria-haspopup="dialog" class="btn btn-primary" href="{% url 'imports:collection_agency_new' %}">Добавить агентство</a>{% endif %}</div>
 </div>
 <section class="panel">
     <div class="panel-header"><h2>Реестр агентств <span class="badge">{{ page_obj.paginator.count }}</span></h2><span class="badge badge-neutral">По 25 записей</span></div>
@@ -21,7 +21,7 @@
             <td class="font-mono">{{ agency.bin }}</td>
             <td>{{ agency.phone|default:'—' }}</td><td>{{ agency.email|default:'—' }}</td><td class="cell-text">{{ agency.address|default:'—' }}</td>
             <td class="cell-actions"><div class="flex gap-2">
-                {% if perms.imports.change_collectionagency %}<a class="btn btn-sm" href="{% url 'imports:collection_agency_edit' agency.pk %}">Изменить</a>{% endif %}
+                {% if perms.imports.change_collectionagency %}<a data-form-modal aria-haspopup="dialog" class="btn btn-sm" href="{% url 'imports:collection_agency_edit' agency.pk %}">Изменить</a>{% endif %}
                 {% if perms.imports.delete_collectionagency %}<a class="btn btn-sm btn-danger" href="{% url 'imports:collection_agency_delete' agency.pk %}">Удалить</a>{% endif %}
             </div></td>
         </tr>{% empty %}<tr><td colspan="6"><div class="empty-state"><h3>Агентства не найдены</h3><p>{% if query %}Попробуйте другое наименование или БИН.{% else %}Добавьте первое коллекторское агентство.{% endif %}</p></div></td></tr>{% endfor %}</tbody>

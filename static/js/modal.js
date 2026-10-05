@@ -16,6 +16,7 @@
     dialog.showModal();
   }
   function close(dialog, value = 'cancel') {
+    if (dialog && dialog.dataset.busy === 'true') return;
     if (dialog && dialog.open) {
       dialog.close(value);
       // Settle before the queued native close event. Reopening immediately is safe.
@@ -51,6 +52,7 @@
       dialog.addEventListener('pointerdown', event => { pointerOutside = outside(event); });
       dialog.addEventListener('click', event => { if (pointerOutside && outside(event)) close(dialog); pointerOutside = false; });
       dialog.addEventListener('cancel', event => {
+        if (dialog.dataset.busy === 'true') { event.preventDefault(); return; }
         if (dialog.id === 'confirm-dialog') { event.preventDefault(); close(dialog); }
       });
       dialog.addEventListener('close', () => {

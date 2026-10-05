@@ -1,6 +1,8 @@
-(() => {
-    const mode = document.querySelector('[name="mode"]');
-    if (!mode) return;
+(function (A) {
+  A.initDistribution = function (root = document) {
+    const mode = root.querySelector('[name="mode"]');
+    if (!mode || mode.dataset.initialized) return;
+    mode.dataset.initialized = 'true';
     const form = mode.form;
     const fields = [...form.querySelectorAll('.form-field')].filter(row => !row.contains(mode));
     function update() {
@@ -15,4 +17,6 @@
     }
     mode.addEventListener('change', update);
     update();
-})();
+  };
+  document.addEventListener('DOMContentLoaded', () => A.initDistribution());
+})(window.Admin);

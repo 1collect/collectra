@@ -21,7 +21,7 @@
                     <td class="cell-actions">
                         {% if perms.auth.change_user %}
                         <div class="flex gap-2 justify-end">
-                            <a class="btn btn-sm" href="{% url 'users:edit' user_obj.id %}">Изменить</a>
+                            <a data-form-modal aria-haspopup="dialog" class="btn btn-sm" href="{% url 'users:edit' user_obj.id %}">Изменить</a>
                             {% if user_obj != request.user %}<form method="post" action="{% url 'users:toggle_active' user_obj.id %}">{% csrf_token %}<button class="btn btn-sm {% if user_obj.is_active %}btn-danger{% endif %}" type="submit">{% if user_obj.is_active %}Заблокировать{% else %}Восстановить{% endif %}</button></form>{% endif %}
                         </div>
                         {% else %}—{% endif %}

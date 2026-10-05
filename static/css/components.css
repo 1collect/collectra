@@ -139,6 +139,11 @@ dialog.modal { width: min(460px, calc(100vw - 28px)); max-height: calc(100dvh - 
 dialog.modal::backdrop { background: var(--overlay); }
 dialog.modal-sm { width: min(350px, calc(100vw - 28px)); }
 dialog.modal-lg { width: min(750px, calc(100vw - 28px)); }
+dialog.modal-form { width: min(1000px, calc(100vw - 28px)); }
+.modal-form > .modal-header { position: sticky; top: 0; z-index: 1; background: var(--bg-panel); }
+.modal-form .modal-body > .panel:last-child { margin-bottom: 0; }
+.modal-form .form-grid { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
+.modal-form .grid-3 { grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); }
 .modal-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: var(--space-3) var(--space-4); border-bottom: 1px solid var(--border-color); }
 .modal-header h2 { font-size: var(--text-body); }
 .modal-body { padding: var(--space-5); }

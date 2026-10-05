@@ -124,14 +124,29 @@
         </header>
         <main class="content" id="main-content" tabindex="-1">
             {% if messages %}{% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} mb-3">{{ message }}</div>{% endfor %}{% endif %}
+            {% if form_modal_page %}
+            <dialog class="modal modal-form" id="record-form-modal" data-form-auto-open data-return-url="{{ form_modal_return_url }}" aria-labelledby="record-form-title">
+                <div class="modal-header"><h2 id="record-form-title" data-form-title>Добавление и редактирование</h2><button class="btn btn-icon btn-ghost" type="button" data-modal-close aria-label="Закрыть">✕</button></div>
+                <div class="modal-body" data-form-body>
+            {% endif %}
             {% block content %}{% endblock %}
+            {% if form_modal_page %}</div></dialog>{% endif %}
         </main>
         <footer class="statusbar"><span>Collectra / Компактный режим</span></footer>
     </div>
+    {% if not form_modal_page %}
+    <dialog class="modal modal-form" id="record-form-modal" aria-labelledby="record-form-title">
+        <div class="modal-header"><h2 id="record-form-title" data-form-title>Добавление и редактирование</h2><button class="btn btn-icon btn-ghost" type="button" data-modal-close aria-label="Закрыть">✕</button></div>
+        <div class="modal-body" data-form-body></div>
+    </dialog>
+    {% endif %}
     <script defer src="{% static 'js/core.js' %}"></script>
     <script defer src="{% static 'js/sidebar.js' %}"></script>
     <script defer src="{% static 'js/dropdown.js' %}"></script>
     <script defer src="{% static 'js/modal.js' %}"></script>
+    <script defer src="{% static 'js/distribution.js' %}"></script>
+    <script defer src="{% static 'js/writeoffs.js' %}"></script>
+    <script defer src="{% static 'js/form-modals.js' %}"></script>
     <script defer src="{% static 'js/integration.js' %}"></script>
     {% block scripts %}{% endblock %}
 </body>

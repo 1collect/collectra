@@ -50,6 +50,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'imports.audit.FinancialAuditMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
+    'config.form_modals.FormModalMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
@@ -73,6 +74,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'config.form_modals.form_modal_context',
             ],
         },
     },
