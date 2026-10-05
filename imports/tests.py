@@ -154,7 +154,7 @@ class ImportItemsViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'DBZ-001')
         self.assertContains(response, 'DBZ-002')
-        self.assertContains(response, 'Полезная нагрузка')
+        self.assertContains(response, 'Данные строки')
         self.assertContains(response, 'ИИН должен содержать 12 цифр.')
         self.assertContains(response, 'table-bordered')
 

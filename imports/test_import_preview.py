@@ -130,12 +130,12 @@ class ImportPreviewTests(TestCase):
         from .services import save_payment
         calls = 0
 
-        def fail_second(values):
+        def fail_second(values, *, import_item=None):
             nonlocal calls
             calls += 1
             if calls == 2:
                 raise ValueError('write failed')
-            save_payment(values)
+            save_payment(values, import_item=import_item)
 
         from .services import IMPORT_HANDLERS
         handler = (*IMPORT_HANDLERS['payments'][:3], fail_second)

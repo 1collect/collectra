@@ -31,13 +31,15 @@ def catalog(request, kind):
     model, _, title = CATALOGS[kind]
     check(request, 'imports.view_' + model._meta.model_name)
     objects = model.objects.all()
+    if kind == 'debtors':
+        objects = objects.select_related('import_item__import_record')
     query = request.GET.get('q', '').strip()
     if query:
         names = [field.name for field in model._meta.fields if field.get_internal_type() in ('CharField', 'TextField')]
         conditions = Q()
         for name in names: conditions |= Q(**{name + '__icontains': query})
         objects = objects.filter(conditions)
-    fields = [field for field in model._meta.fields if field.name != 'id']
+    fields = [field for field in model._meta.fields if field.name not in ('id', 'import_item')]
     page = Paginator(objects, 25).get_page(request.GET.get('page'))
     rows = [{'obj': obj, 'values': [getattr(obj, 'get_' + field.name + '_display')() if field.choices else getattr(obj, field.name) for field in fields]} for obj in page]
     return render(request, 'imports/catalog.html', {'title': title, 'kind': kind, 'fields': fields, 'rows': rows, 'page_obj': page, 'query': query, 'can_add': request.user.has_perm('imports.add_' + model._meta.model_name), 'can_edit': request.user.has_perm('imports.change_' + model._meta.model_name), 'can_delete': request.user.has_perm('imports.delete_' + model._meta.model_name)})

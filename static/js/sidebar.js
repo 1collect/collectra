@@ -3,7 +3,7 @@
   A.initSidebar = function () {
     const sidebar = A.$('.sidebar');
     if (!sidebar) return;
-    const media = window.matchMedia('(max-width: 800px)');
+    const media = window.matchMedia('(max-width: 880px)');
     const toggle = A.$('[data-sidebar-toggle]');
     let returnFocus = null;
     const setMobile = open => {

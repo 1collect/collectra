@@ -25,8 +25,9 @@
     const box = menu.getBoundingClientRect();
     const x = coordinates ? coordinates.x : (trigger.dataset.align === 'end' ? rect.right - box.width : rect.left);
     const y = coordinates ? coordinates.y : rect.bottom + 5;
-    menu.style.left = Math.max(8, Math.min(x, innerWidth - box.width - 8)) + 'px';
-    menu.style.top = Math.max(8, Math.min(y, innerHeight - box.height - 8)) + 'px';
+    const scale = parseFloat(getComputedStyle(document.documentElement).zoom) || 1;
+    menu.style.left = Math.max(8, Math.min(x, innerWidth - box.width - 8)) / scale + 'px';
+    menu.style.top = Math.max(8, Math.min(y, innerHeight - box.height - 8)) / scale + 'px';
     current = { trigger, menu, marker };
     const first = menu.querySelector('button:not([disabled]),a,input:not([disabled])');
     if (first && !menu.classList.contains('column-menu')) first.focus();

@@ -22,7 +22,7 @@
             <thead><tr><th scope="col">Договор</th><th scope="col">Тип списания</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма</th><th scope="col">Дата списания</th><th scope="col">Создал</th><th scope="col">Действия</th></tr></thead>
             <tbody>{% for item in page_obj %}
                 <tr>
-                    <td class="cell-text"><strong class="font-mono">{{ item.debt.contract_number }}</strong><br><span class="text-muted">{{ item.debt.debtor.full_name }}</span></td>
+                    <td class="cell-text"><strong class="font-mono">{{ item.debt.contract_number }}</strong><br><span class="text-muted">{{ item.debt.debtor.full_name }}</span>{% include 'imports/partials/import_source.html' with record=item %}</td>
                     <td>{{ item.get_kind_display }}</td>
                     <td>{% if item.kind == 'full' %}Весь остаток задолженности{% else %}{{ item.get_category_display }}{% endif %}</td>
                     <td class="cell-number">{{ item.amount|floatformat:2 }}</td>

@@ -6,8 +6,11 @@ from django.core.exceptions import PermissionDenied
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
 from django.db import transaction
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
+from django.urls import reverse
+from django.views.decorators.http import require_GET
 
 from .forms import (
     CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
@@ -68,12 +71,17 @@ def import_workspace_context(request, selected_import_id=None):
             columns = selected_import.import_type.expected_columns
 
         page_obj = Paginator(
-            selected_import.items.order_by('row_number'),
+            selected_import.items.order_by('row_number').prefetch_related(
+                'debt_records', 'debtor_records', 'payment_records', 'expense_records',
+                'writeoff_records', 'paymentrefund_records__payment__debt',
+            ),
             50,
         ).get_page(request.GET.get('page'))
+        from .provenance import source_records
         rows = [
             {
                 'item': item,
+                'source_records': source_records(item, request.user),
                 'payload': [
                     {'name': column, 'value': item.data.get(column, '—')}
                     for column in columns
@@ -108,6 +116,27 @@ def import_items(request, import_id):
         'imports/import_items.html',
         import_workspace_context(request, import_id),
     )
+
+
+@permission_required('imports.view_import')
+@require_GET
+def import_item(request, item_id):
+    item = get_object_or_404(ImportItem, pk=item_id)
+    position = item.import_record.items.filter(row_number__lt=item.row_number).count()
+    target = reverse('imports:items', args=[item.import_record_id])
+    return redirect(f'{target}?page={position // 50 + 1}#import-item-{item.pk}')
+
+
+@permission_required('imports.view_import')
+@require_GET
+def import_download(request, import_id):
+    from .files import build_import_workbook, import_download_name
+    record = get_object_or_404(Import.objects.select_related('import_type'), pk=import_id)
+    response = FileResponse(build_import_workbook(record), as_attachment=True,
+                            filename=import_download_name(record),
+                            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    response['Cache-Control'] = 'no-store'
+    return response
 
 
 @permission_required('imports.add_import')
@@ -179,6 +208,7 @@ def debt_list(request):
     debts = Debt.objects.select_related(
         'debtor',
         'counterparty',
+        'import_item__import_record',
     ).order_by('contract_number')
     query = request.GET.get('q', '').strip()
     status = request.GET.get('status', '').strip()
@@ -211,7 +241,7 @@ def debt_list(request):
 @permission_required('imports.view_debt')
 def debt_detail(request, debt_id):
     debt = get_object_or_404(
-        Debt.objects.select_related('debtor').prefetch_related('payments__refunds', 'expenses', 'writeoffs'),
+        Debt.objects.select_related('debtor', 'import_item__import_record').prefetch_related('payments__refunds', 'expenses', 'writeoffs'),
         pk=debt_id,
     )
     balance = calculate_balance(debt)
@@ -244,7 +274,7 @@ def _financial_list(request, *, model, title, kind):
         return redirect(f'/login/?next={request.path}')
     if not request.user.has_perm(permission):
         raise PermissionDenied
-    records = model.objects.select_related('debt', 'debt__debtor')
+    records = model.objects.select_related('debt', 'debt__debtor', 'import_item__import_record')
     query = request.GET.get('q', '').strip()
     if query:
         records = records.filter(
@@ -298,7 +328,7 @@ def expense_list(request):
 
 @permission_required('imports.view_writeoff')
 def writeoff_list(request):
-    records = WriteOff.objects.select_related('debt', 'debt__debtor', 'created_by')
+    records = WriteOff.objects.select_related('debt', 'debt__debtor', 'created_by', 'import_item__import_record')
     query = request.GET.get('q', '').strip()
     if query:
         records = records.filter(
@@ -338,7 +368,7 @@ def _financial_edit(request, *, model, form_class, record_id, kind, title):
         return redirect(f'/login/?next={request.path}')
     if not request.user.has_perm(f'imports.change_{model._meta.model_name}'):
         raise PermissionDenied
-    record = get_object_or_404(model.objects.select_related('debt'), pk=record_id)
+    record = get_object_or_404(model.objects.select_related('debt', 'import_item__import_record'), pk=record_id)
     form = form_class(request.POST or None, instance=record)
     if request.method == 'POST' and form.is_valid():
         try:
@@ -403,7 +433,7 @@ def _financial_history(request, *, model, record_id, kind, title):
         return redirect(f'/login/?next={request.path}')
     if not request.user.has_perm(f'imports.view_{model._meta.model_name}'):
         raise PermissionDenied
-    record = get_object_or_404(model.objects.select_related('debt'), pk=record_id)
+    record = get_object_or_404(model.objects.select_related('debt', 'import_item__import_record'), pk=record_id)
     changes = list(record.change_requests.select_related('requested_by', 'reviewed_by')) if kind != 'writeoff' else []
     for change in changes:
         change.changed_rows = _change_rows(change)
@@ -486,6 +516,7 @@ def refund_list(request):
         'payment',
         'payment__debt',
         'created_by',
+        'import_item__import_record', 'payment__import_item__import_record',
     )
     query = request.GET.get('q', '').strip()
     status = request.GET.get('status', '').strip()

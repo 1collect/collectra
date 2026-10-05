@@ -79,7 +79,7 @@
 .theme-preview-surface::after { content: ""; background: #f3f5f8; border-top: 10px solid #ffffff; }
 .theme-preview.dark .theme-preview-surface::after { background: #111822; border-top-color: #19222f; }
 .theme-preview.system .theme-preview-surface::after { background: linear-gradient(90deg, #f3f5f8 50%, #111822 50%); }
-.auth-page { min-height: 100dvh; display: grid; place-items: center; padding: 24px; }
+.auth-page { min-height: var(--viewport-dynamic-height); display: grid; place-items: center; padding: 24px; }
 .auth-wrapper { width: min(390px, 100%); }
 .auth-brand { display: flex; justify-content: center; align-items: center; margin-bottom: 20px; color: var(--text-primary); }
 .auth-card .panel-body { padding: var(--space-5); }
@@ -100,15 +100,15 @@
 .import-preview__check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
 .import-preview__check input { margin-top: 3px; flex-shrink: 0; }
 .import-preview .panel-header { flex-wrap: wrap; overflow-wrap: anywhere; }
-dialog.import-preview-modal { width: min(1100px, calc(100vw - 28px)); }
+dialog.import-preview-modal { width: min(1100px, calc(var(--viewport-width) - 28px)); }
 .import-preview-modal .modal-header { position: sticky; top: 0; z-index: 2; background: var(--bg-panel); }
-.import-preview-modal .stat-value { font-size: clamp(20px, 3vw, 28px); overflow-wrap: anywhere; }
+.import-preview-modal .stat-value { font-size: clamp(20px, calc(var(--viewport-width) * .03), 28px); overflow-wrap: anywhere; }
 .import-preview__errors { margin: 0; padding-left: 20px; }
 .import-preview__errors li + li { margin-top: 8px; }
 .import-preview__actions { position: sticky; bottom: -20px; z-index: 1; box-shadow: var(--shadow-float); }
 .import-preview__actions .panel-footer { flex-wrap: wrap; }
 .import-preview__actions .panel-footer > span { margin-right: auto; align-self: center; }
-@media (max-width: 600px) {
+@media (max-width: 660px) {
   .import-preview-modal .modal-body { padding: 12px; }
   .import-preview__stats { grid-template-columns: 1fr; }
   .import-preview__actions { bottom: -12px; }

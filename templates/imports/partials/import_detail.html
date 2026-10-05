@@ -1,27 +1,33 @@
 <section class="panel master-detail__detail"{% if selected_import %} data-import-id="{{ selected_import.pk }}"{% endif %}>
     {% if selected_import %}
     <div class="panel-header master-detail__detail-header">
-        <div class="min-w-0"><div class="text-xs text-muted">Выбранный импорт #{{ selected_import.pk }}</div><h2 class="truncate">{{ selected_import.file_name|default:'Файл не указан' }}</h2></div>
-        <span class="badge {% if selected_import.status == 'completed' %}badge-success{% elif selected_import.status == 'failed' %}badge-danger{% elif selected_import.status == 'processing' %}badge-warning{% else %}badge-neutral{% endif %}"><span class="status-dot"></span>{{ selected_import.get_status_display }}</span>
+        <h2 class="truncate" title="{{ selected_import.file_name|default:'Файл не указан' }}">{{ selected_import.file_name|default:'Файл не указан' }}</h2>
+        <div class="inline-flex items-center gap-2"><span class="text-xs text-secondary">Статус импорта:</span><span class="badge {% if selected_import.status == 'completed' %}badge-success{% elif selected_import.status == 'failed' %}badge-danger{% elif selected_import.status == 'processing' or selected_import.status == 'review' %}badge-warning{% else %}badge-neutral{% endif %}"><span class="status-dot"></span>{{ selected_import.get_status_display }}</span></div>
     </div>
-    <div class="master-detail__meta">
-        <span><strong>Тип:</strong> {{ selected_import.import_type.name }}</span>
-        <span><strong>Автор:</strong> {% if selected_import.created_by %}{{ selected_import.created_by.get_full_name|default:selected_import.created_by.username }}{% else %}—{% endif %}</span>
-        <span><strong>Загружен:</strong> {{ selected_import.created_at|date:'d.m.Y H:i' }}</span>
-    </div>
-    <div class="master-detail__summary">
-        <div class="card stat-card"><span class="stat-label">Всего строк</span><strong class="stat-value">{{ selected_import.total_items }}</strong><span class="stat-meta">В исходном файле</span></div>
-        <div class="card stat-card"><span class="stat-label">Успешно</span><strong class="stat-value text-success">{{ selected_import.successful_items }}</strong><span class="stat-meta">Обработанных строк</span></div>
-        <div class="card stat-card"><span class="stat-label">Ошибки</span><strong class="stat-value{% if selected_import.failed_items %} text-danger{% endif %}">{{ selected_import.failed_items }}</strong><span class="stat-meta">Требуют внимания</span></div>
+    <div class="table-container" tabindex="0" role="region" aria-label="Сведения об импорте">
+        <table class="table table-bordered table-compact">
+            <thead>
+                <tr><th scope="colgroup" colspan="3"><span class="text-primary">Сведения о файле</span></th><th scope="colgroup" colspan="3"><span class="text-primary">Статистика импорта</span></th></tr>
+                <tr><th scope="col">Тип импорта</th><th scope="col">Загрузил</th><th scope="col">Дата загрузки</th><th scope="col" class="cell-number">Всего строк</th><th scope="col" class="cell-number">Успешно</th><th scope="col" class="cell-number">С ошибками</th></tr>
+            </thead>
+            <tbody><tr>
+                <td>{{ selected_import.import_type.name }}</td>
+                <td class="cell-text">{% if selected_import.created_by %}{{ selected_import.created_by.get_full_name|default:selected_import.created_by.username }}{% else %}—{% endif %}</td>
+                <td class="cell-date"><time datetime="{{ selected_import.created_at|date:'c' }}">{{ selected_import.created_at|date:'d.m.Y H:i' }}</time></td>
+                <td class="cell-number"><strong>{{ selected_import.total_items }}</strong></td>
+                <td class="cell-number text-success"><strong>{{ selected_import.successful_items }}</strong></td>
+                <td class="cell-number{% if selected_import.failed_items %} text-danger{% endif %}"><strong>{{ selected_import.failed_items }}</strong></td>
+            </tr></tbody>
+        </table>
     </div>
     {% if selected_import.error_message %}<div class="master-detail__notice"><div class="alert alert-danger">{{ selected_import.error_message }}</div></div>{% endif %}
-    <div class="master-detail__section-header"><div><h3>Результат обработки</h3><span class="text-xs text-muted">Данные каждой строки импортированного файла</span></div>{% if page_obj %}<span class="badge">{{ page_obj.paginator.count }}</span>{% endif %}</div>
+    <div class="master-detail__section-header"><div><h3>Строки файла</h3><span class="text-xs text-muted">Исходные данные, статус проверки и причина ошибки</span></div>{% if page_obj %}<span class="badge">{{ page_obj.paginator.count }}</span>{% endif %}</div>
     <div class="table-container master-detail__scroll" tabindex="0" role="region" aria-label="Результат обработки импорта">
-        <table class="table table-bordered table-compact master-detail__table">
-            <thead><tr><th scope="col" class="master-detail__index-column">#</th><th scope="col">Полезная нагрузка</th><th scope="col" class="master-detail__status-column">Статус</th><th scope="col" class="master-detail__error-column">Ошибка</th></tr></thead>
+        <table class="table table-bordered table-compact table-striped master-detail__table">
+            <thead><tr><th scope="col" class="master-detail__index-column">#</th><th scope="col">Данные строки</th><th scope="col" class="master-detail__status-column">Статус</th><th scope="col" class="master-detail__error-column">Ошибка</th></tr></thead>
             <tbody>
                 {% for row in rows %}
-                <tr><td class="font-mono">{{ row.item.row_number }}</td><td>{% for field in row.payload %}<div class="key-value-line"><strong>{{ field.name }}:</strong> {{ field.value|default:'—' }}</div>{% empty %}—{% endfor %}</td><td><span class="badge {% if row.item.status == 'processed' %}badge-success{% elif row.item.status == 'failed' %}badge-danger{% else %}badge-neutral{% endif %}">{{ row.item.get_status_display }}</span></td><td>{% if row.item.error_message %}<span class="text-danger">{{ row.item.error_message }}</span>{% else %}—{% endif %}</td></tr>
+                <tr id="import-item-{{ row.item.pk }}"><td class="font-mono">{{ row.item.row_number }}</td><td>{% if row.source_records %}<div class="flex flex-wrap gap-2 mb-2">{% for source in row.source_records %}<a class="btn btn-sm" href="{{ source.url }}">{{ source.label }}</a>{% endfor %}</div>{% endif %}{% for field in row.payload %}<div class="key-value-line"><strong class="text-secondary">{{ field.name }}:</strong><span{% if field.name == 'ДБЗ' or field.name == 'ИИН' or field.name == 'ФИО' %} class="font-semibold"{% endif %}>{% if field.value == None or field.value == '' %}—{% else %}{{ field.value }}{% endif %}</span></div>{% empty %}—{% endfor %}</td><td><span class="badge {% if row.item.status == 'processed' %}badge-success{% elif row.item.status == 'failed' %}badge-danger{% else %}badge-neutral{% endif %}">{{ row.item.get_status_display }}</span></td><td>{% if row.item.error_message %}<span class="text-danger">{{ row.item.error_message }}</span>{% else %}—{% endif %}</td></tr>
                 {% empty %}
                 <tr><td colspan="4"><div class="empty-state">В этом импорте нет строк.</div></td></tr>
                 {% endfor %}

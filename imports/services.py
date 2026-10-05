@@ -8,6 +8,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
+from contract_generator.schema import CONTRACT_BASE_COLUMNS
 
 from .balances import apply_balance, calculate_balance, WRITEOFF_CATEGORIES
 from .audit import audit_user, log_action
@@ -17,20 +18,7 @@ from .models import (
 )
 
 
-CONTRACT_IMPORT_COLUMNS = (
-    'ДБЗ',
-    'ИИН',
-    'ФИО',
-    'Основной долг (выкуп)',
-    'Вознаграждение (выкуп)',
-    'Пеня/Штрафы (выкуп)',
-    'Дебиторская задолженность (выкуп)',
-    'Гос.пошлина (выкуп)',
-    'Представительские расходы (выкуп)',
-    'Нотариальные расходы (выкуп)',
-    'Почтовые расходы (выкуп)',
-    'Общая сумма задолженности (выкуп)',
-)
+CONTRACT_IMPORT_COLUMNS = CONTRACT_BASE_COLUMNS
 
 EXPENSE_IMPORT_COLUMNS = (
     'ДБЗ',
@@ -191,15 +179,15 @@ def payment_values(data):
 
 
 @transaction.atomic
-def save_contract(contract_number, iin, full_name, debt_values):
+def save_contract(contract_number, iin, full_name, debt_values, *, import_item=None):
     if Debt.objects.filter(contract_number=contract_number).exists():
-        raise ImportValidationError('ДБЗ уже существует. Повторная строка пропущена; используйте форму корректировки.')
+        raise ImportValidationError('ДБЗ уже существует. Повторная строка пропущена.')
     debt_values = dict(debt_values)
     borrower_values = debt_values.pop('_borrower', {})
     own_expenses = debt_values.pop('_own_expenses', {})
     debtor, created = Debtor.objects.get_or_create(
         iin=iin,
-        defaults={'full_name': full_name},
+        defaults={'full_name': full_name, 'import_item': import_item},
     )
     if not created and debtor.full_name != full_name:
         debtor.full_name = full_name
@@ -212,24 +200,28 @@ def save_contract(contract_number, iin, full_name, debt_values):
         defaults={
             'debtor': debtor,
             'counterparty': None,
+            'import_item': import_item,
             **debt_values,
         },
     )
     if not debt_created:
         raise ImportValidationError('ДБЗ уже существует. Повторная строка пропущена.')
     if any(own_expenses.values()):
-        Expense.objects.create(debt=debt, expense_date=debt.registry_date or timezone.localdate(), **own_expenses)
+        Expense.objects.create(debt=debt, import_item=import_item, expense_date=debt.registry_date or timezone.localdate(), **own_expenses)
     recalculate_debt(debt)
+    return debt
 
 
-def save_expense(values):
-    expense = Expense.objects.create(**values)
+def save_expense(values, *, import_item=None):
+    expense = Expense.objects.create(**values, import_item=import_item)
     recalculate_debt(expense.debt_id)
+    return expense
 
 
-def save_payment(values):
-    payment = Payment.objects.create(**values)
+def save_payment(values, *, import_item=None):
+    payment = Payment.objects.create(**values, import_item=import_item)
     recalculate_debt(payment.debt_id)
+    return payment
 
 
 class RefundValidationError(Exception):
@@ -301,7 +293,7 @@ class WriteOffValidationError(Exception):
 
 
 @transaction.atomic
-def create_writeoff(*, debt_id, kind, category='', writeoff_date, created_by, amount=None, distribution=None, reason=''):
+def create_writeoff(*, debt_id, kind, category='', writeoff_date, created_by, amount=None, distribution=None, reason='', import_item=None):
     debt = Debt.objects.select_for_update().get(pk=debt_id)
     if kind not in WriteOff.Kind.values:
         raise WriteOffValidationError('Выберите тип списания.')
@@ -341,6 +333,7 @@ def create_writeoff(*, debt_id, kind, category='', writeoff_date, created_by, am
     if amount <= 0:
         raise WriteOffValidationError('Нет доступной суммы для списания.')
     writeoff = WriteOff(
+        import_item=import_item,
         debt=debt, kind=kind, category=category, amount=amount,
         writeoff_date=writeoff_date, created_by=created_by, distribution=distribution, reason=reason,
     )
@@ -519,8 +512,8 @@ def cancel_payment_refund(refund_id, *, cancelled_by=None):
     return refund
 
 
-def save_contract_record(values):
-    save_contract(*values)
+def save_contract_record(values, *, import_item=None):
+    return save_contract(*values, import_item=import_item)
 
 
 def writeoff_values(data):
@@ -588,9 +581,9 @@ def reserve_writeoff(values, balances):
                                   writeoff_date=values['writeoff_date']))
 
 
-def save_imported_writeoff(values):
+def save_imported_writeoff(values, *, import_item=None):
     try:
-        return create_writeoff(**values, created_by=audit_user.get())
+        return create_writeoff(**values, created_by=audit_user.get(), import_item=import_item)
     except WriteOffValidationError as error:
         raise ImportValidationError(str(error)) from error
 
@@ -726,8 +719,10 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False):
             ImportItem.objects.bulk_create(items, batch_size=500)
             audit_token = audit_user.set(import_record.created_by)
             try:
-                for record in ([] if preview_only else records):
-                    save_func(record)
+                if not preview_only:
+                    accepted_items = [item for item in items if item.status == ImportItem.Status.PROCESSED]
+                    for item, record in zip(accepted_items, records, strict=True):
+                        save_func(record, import_item=item)
             finally:
                 audit_user.reset(audit_token)
             import_record.status = Import.Status.REVIEW if preview_only else Import.Status.COMPLETED
@@ -863,8 +858,8 @@ def confirm_import(import_id, *, user, cancel=False):
                 raise ImportValidationError('Остаток для списания изменился после проверки. Загрузите файл заново.')
     audit_token = audit_user.set(user)
     try:
-        for record in records:
-            save_func(record)
+        for item, record in zip(items, records, strict=True):
+            save_func(record, import_item=item)
     finally:
         audit_user.reset(audit_token)
     now = timezone.now()

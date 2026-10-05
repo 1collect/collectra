@@ -52,12 +52,14 @@ class CounterpartyAdmin(admin.ModelAdmin):
 
 @admin.register(Debtor)
 class DebtorAdmin(admin.ModelAdmin):
+    readonly_fields = ('import_item',)
     list_display = ('iin', 'full_name')
     search_fields = ('iin', 'full_name')
 
 
 @admin.register(Debt)
 class DebtAdmin(admin.ModelAdmin):
+    readonly_fields = ('import_item',)
     list_display = (
         'contract_number', 'debtor', 'counterparty', 'purchase_total_debt',
         'paid_amount', 'outstanding_amount', 'overpayment_amount', 'status', 'closed_at',
@@ -81,6 +83,7 @@ class DebtAdmin(admin.ModelAdmin):
 
 @admin.register(Expense)
 class ExpenseAdmin(admin.ModelAdmin):
+    readonly_fields = ('import_item',)
     list_display = (
         'debt',
         'expense_date',
@@ -98,6 +101,7 @@ class ExpenseAdmin(admin.ModelAdmin):
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
+    readonly_fields = ('import_item',)
     list_display = ('debt', 'amount', 'refunded_amount', 'refund_status', 'status', 'payment_date')
     list_filter = ('status', 'refund_status', 'payment_date')
     search_fields = ('debt__contract_number', 'debt__debtor__iin')
@@ -129,7 +133,7 @@ class PaymentRefundAdmin(admin.ModelAdmin):
     list_select_related = ('payment', 'payment__debt', 'created_by')
     readonly_fields = (
         'payment', 'amount', 'refund_date', 'reason', 'payment_category', 'status', 'created_by',
-        'created_at', 'cancelled_at',
+        'created_at', 'cancelled_at', 'import_item',
     )
 
     def has_add_permission(self, request):
@@ -144,7 +148,7 @@ class WriteOffAdmin(admin.ModelAdmin):
     list_display = ('debt', 'kind', 'category', 'amount', 'writeoff_date', 'created_by')
     list_filter = ('kind', 'category', 'writeoff_date')
     search_fields = ('debt__contract_number', 'debt__debtor__iin')
-    readonly_fields = ('debt', 'kind', 'category', 'amount', 'writeoff_date', 'created_by', 'created_at')
+    readonly_fields = ('debt', 'kind', 'category', 'amount', 'writeoff_date', 'created_by', 'created_at', 'import_item')
 
     def has_add_permission(self, request):
         return False

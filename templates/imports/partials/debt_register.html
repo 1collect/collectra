@@ -4,7 +4,7 @@
             <tbody>
             {% for debt in page_obj %}
                 <tr>
-                    <td class="record-key"><a class="font-mono" href="{% url 'imports:debt_detail' debt.pk %}">{{ debt.contract_number }}</a></td>
+                    <td class="record-key"><a class="font-mono" href="{% url 'imports:debt_detail' debt.pk %}">{{ debt.contract_number }}</a>{% include 'imports/partials/import_source.html' with record=debt %}</td>
                     <td class="cell-text">{{ debt.debtor.full_name }}</td>
                     <td class="font-mono">{{ debt.debtor.iin }}</td>
                     <td class="cell-number">{{ debt.current.principal|floatformat:2 }}</td>

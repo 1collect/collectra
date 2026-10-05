@@ -2,11 +2,9 @@
 from decimal import Decimal
 from .models import CollectionAgency, Creditor, Cession, CompanyAccount
 from .balances import CATEGORY_LABELS, PURCHASE_FIELDS
+from contract_generator.schema import BORROWER_COLUMNS, CASE_COLUMNS, OPENING_OWN_COLUMNS, CONTRACT_EXTRA_COLUMNS
 
-BORROWER_COLUMNS = {'Дата рождения': 'birth_date', 'Пол': 'gender', 'Тип документа': 'document_type', 'Дата выдачи документа': 'document_issue_date', 'Орган выдачи документа': 'document_issuer', 'Адрес проживания': 'residential_address', 'Регион': 'region', 'КАТО': 'kato'}
-CASE_COLUMNS = {'Номер реестра': 'registry_number', 'Дата реестра': 'registry_date', 'Дата начала ДБЗ': 'dbz_start_date', 'Дата окончания ДБЗ': 'dbz_end_date', 'Сумма выданного кредита': 'issued_credit_amount', 'Дни просрочки на дату реестра': 'overdue_days_at_registry_date'}
-OPENING_OWN_COLUMNS = {'Гос. пошлина наша': 'state_duty', 'Представительские расходы наши': 'representative_expenses', 'Нотариальные расходы наши': 'notary_expenses', 'Почтовые расходы наши': 'postal_expenses', 'Обеспечение иска наше': 'claim_security'}
-CONTRACT_EXTRAS = (*BORROWER_COLUMNS, 'Наименование КА', 'Первичный кредитор', 'Номер договора цессии', 'Дата договора цессии', *CASE_COLUMNS, *OPENING_OWN_COLUMNS)
+CONTRACT_EXTRAS = CONTRACT_EXTRA_COLUMNS
 PAYMENT_EXTRAS = ('ИИН', 'Номер счета', 'Дата перевода')
 WRITEOFF_EXTRAS = ('ИИН', 'Основание списания', *CATEGORY_LABELS.values())
 
@@ -32,15 +30,15 @@ def extend_contract(data, original):
     fields['_own_expenses'] = own
     for col, f in CASE_COLUMNS.items():
         if data.get(col):
-            if f.endswith('_date'): value = parse_date(data[col], col)
+            if f == 'overdue_days_at_registry_date':
+                try: value = int(data[col])
+                except ValueError: raise ImportValidationError('Дни просрочки должны быть целым числом.')
+                if value < 0: raise ImportValidationError('Дни просрочки не могут быть отрицательными.')
+            elif f.endswith('_date'): value = parse_date(data[col], col)
             elif f == 'issued_credit_amount':
                 try: value = Decimal(str(data[col]))
                 except ArithmeticError: raise ImportValidationError('Некорректная сумма кредита.')
                 if not value.is_finite() or value < 0: raise ImportValidationError('Сумма кредита должна быть неотрицательной.')
-            elif f == 'overdue_days_at_registry_date':
-                try: value = int(data[col])
-                except ValueError: raise ImportValidationError('Дни просрочки должны быть целым числом.')
-                if value < 0: raise ImportValidationError('Дни просрочки не могут быть отрицательными.')
             else: value = str(data[col])
             fields[f] = value
     for col, model, field in [('Наименование КА', CollectionAgency, 'collection_agency'), ('Первичный кредитор', Creditor, 'original_creditor')]:

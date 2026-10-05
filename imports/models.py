@@ -7,7 +7,16 @@ from django.utils import timezone
 from .audit import audit_user, record_snapshot
 
 
-class AuditedFinancialRecord(models.Model):
+class ImportSourceModel(models.Model):
+    import_item = models.ForeignKey('ImportItem', on_delete=models.PROTECT, null=True, blank=True,
+                                   editable=False, related_name='%(class)s_records',
+                                   verbose_name='Исходная строка импорта')
+
+    class Meta:
+        abstract = True
+
+
+class AuditedFinancialRecord(ImportSourceModel):
     class Meta:
         abstract = True
 
@@ -173,7 +182,7 @@ class CollectionAgency(models.Model):
         return f'{self.name} ({self.bin})'
 
 
-class Debtor(models.Model):
+class Debtor(ImportSourceModel):
     birth_date = models.DateField('Дата рождения', null=True, blank=True)
     gender = models.CharField('Пол', max_length=40, blank=True)
     document_type = models.CharField('Тип документа', max_length=100, blank=True)
@@ -200,7 +209,7 @@ class Debtor(models.Model):
         return f'{self.full_name} ({self.iin})'
 
 
-class Debt(models.Model):
+class Debt(ImportSourceModel):
     class Status(models.TextChoices):
         ACTIVE = 'active', 'Активен'
         CLOSED = 'closed', 'Закрыт'
@@ -576,7 +585,7 @@ class FinancialChangeRequest(models.Model):
         return f'{self.record_type} #{self.payment_id or self.expense_id} — {self.get_status_display()}'
 
 
-class PaymentRefund(models.Model):
+class PaymentRefund(ImportSourceModel):
     class Status(models.TextChoices):
         ACTIVE = 'active', 'Действует'
         CANCELLED = 'cancelled', 'Отменён'
