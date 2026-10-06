@@ -50,13 +50,13 @@ def list_query_string(request):
 
 
 def selected_page_size(request):
-    page_sizes = (15, 30, 50, 100)
+    page_sizes = (10, 20, 50, 100)
     try:
-        page_size = int(request.GET.get('per_page', 15))
+        page_size = int(request.GET.get('per_page', 20))
     except (ValueError, TypeError):
-        page_size = 15
+        page_size = 20
     if page_size not in page_sizes:
-        page_size = 15
+        page_size = 20
     return page_size, page_sizes
 
 

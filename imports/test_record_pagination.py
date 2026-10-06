@@ -42,11 +42,11 @@ class RecordPaginationTests(TestCase):
 
     def test_sizes_defaults_and_invalid_values_on_every_register(self):
         for route in self.routes:
-            for size in (None, 15, 30, 50, 100, 'bad', 10, 20, -5):
+            for size in (None, 10, 20, 50, 100, 'bad', 15, 30, -5):
                 with self.subTest(route=route, size=size):
                     response = self.client.get(reverse(f'imports:{route}'),
                                                {} if size is None else {'per_page': size})
-                    expected = size if size in (15, 30, 50, 100) else 15
+                    expected = size if size in (10, 20, 50, 100) else 20
                     self.assertEqual(response.status_code, 200)
                     self.assertEqual(response.context['page_size'], expected)
                     self.assertEqual(len(response.context['page_obj']), min(43, expected))
@@ -58,26 +58,26 @@ class RecordPaginationTests(TestCase):
         for route in self.routes:
             with self.subTest(route=route):
                 url = reverse(f'imports:{route}')
-                first = self.client.get(url, {'per_page': 30, 'q': 'test & value'})
-                second = self.client.get(url, {'per_page': 30, 'page': 2, 'q': 'test & value'})
-                self.assertContains(first, 'q=test+%26+value&amp;per_page=30&amp;page=2')
+                first = self.client.get(url, {'per_page': 10, 'q': 'test & value'})
+                second = self.client.get(url, {'per_page': 10, 'page': 5, 'q': 'test & value'})
+                self.assertContains(first, 'q=test+%26+value&amp;per_page=10&amp;page=2')
                 self.assertContains(first, 'name="q" value="test &amp; value"')
-                self.assertContains(second, 'Записи с 31 до 43 из 43')
-                self.assertContains(second, 'aria-current="page" aria-label="Страница 2"')
+                self.assertContains(second, 'Записи с 41 до 43 из 43')
+                self.assertContains(second, 'aria-current="page" aria-label="Страница 5"')
                 self.assertContains(second, 'disabled aria-label="Следующая страница"')
                 self.assertFalse({item.pk for item in first.context['page_obj']} &
                                  {item.pk for item in second.context['page_obj']})
-                self.assertEqual(len(second.context['page_obj']), 13)
+                self.assertEqual(len(second.context['page_obj']), 3)
                 self.assertEqual(self.client.get(url, {'page': 'bad'}).context['page_obj'].number, 1)
                 self.assertEqual(self.client.get(url, {'page': 999}).context['page_obj'].number, 3)
 
     def test_contract_refresh_keeps_pagination_and_current_balances(self):
-        response = self.client.get(reverse('imports:debts'), {'per_page': 30, 'page': 2},
+        response = self.client.get(reverse('imports:debts'), {'per_page': 10, 'page': 5},
                                    HTTP_X_REQUESTED_WITH='XMLHttpRequest')
-        self.assertContains(response, 'Записи с 31 до 43 из 43')
-        self.assertContains(response, '?per_page=30&amp;page=1')
+        self.assertContains(response, 'Записи с 41 до 43 из 43')
+        self.assertContains(response, '?per_page=10&amp;page=4')
         self.assertNotContains(response, '<!DOCTYPE html>')
-        self.assertEqual(len(response.context['page_obj']), 13)
+        self.assertEqual(len(response.context['page_obj']), 3)
         self.assertEqual(response.context['page_obj'][0].outstanding_amount, 995)
 
     def test_single_page_and_empty_lists_show_totals(self):
