@@ -1,5 +1,5 @@
 /* Entry point; the order is intentional. No framework or CDN is required. */
-@import url("variables.css?v=20261006-3");
+@import url("variables.css?v=20261006-4");
 @import url("reset.css?v=20261005-2");
 @import url("layout.css?v=20261005-8");
 @import url("components.css?v=20261006-1");
