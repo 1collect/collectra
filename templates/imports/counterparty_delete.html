@@ -4,8 +4,10 @@
 {% block heading %}Удаление контрагента{% endblock %}
 {% block content %}
 <div class="page-header"><div><div class="page-eyebrow">Справочники / Контрагенты</div><h1>Удаление контрагента</h1></div></div>
+<form method="post">{% csrf_token %}
 <section class="panel"><div class="panel-body">
     {% if has_debts %}<div class="alert alert-danger"><div><strong>Удаление невозможно.</strong> К контрагенту привязаны договоры. Сначала необходимо удалить или переназначить их.</div></div>
-    {% else %}<p>Вы уверены, что хотите удалить этого контрагента? Действие нельзя отменить.</p>{% endif %}
-</div><div class="panel-footer"><a class="btn" href="{% url 'imports:counterparties' %}">Отмена</a>{% if not has_debts %}<form method="post">{% csrf_token %}<button class="btn btn-danger" type="submit">Удалить контрагента</button></form>{% endif %}</div></section>
+    {% else %}<p>Удалить контрагента <strong>{{ counterparty.name }}</strong>? Действие нельзя отменить.</p>{% endif %}
+</div><div class="panel-footer"><a class="btn" href="{% url 'imports:counterparties' %}">Отмена</a>{% if not has_debts %}<button class="btn btn-danger" type="submit">Удалить контрагента</button>{% endif %}</div></section>
+</form>
 {% endblock %}

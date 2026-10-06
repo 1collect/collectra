@@ -3,6 +3,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from users.models import Role
+from .models import CollectionAgency, Counterparty, Debt, Debtor
 
 
 class FormModalTests(TestCase):
@@ -66,3 +67,36 @@ class FormModalTests(TestCase):
         response = self.client.get(reverse('imports:new'))
         self.assertContains(response, 'data-form-auto-open')
         self.assertContains(response, 'multipart/form-data')
+
+    def test_delete_confirmation_uses_compact_form_for_free_and_linked_records(self):
+        debtor = Debtor.objects.create(full_name='Test', iin='900101300333')
+        for model, route, relation in (
+            (Counterparty, 'imports:counterparty_delete', 'counterparty'),
+            (CollectionAgency, 'imports:collection_agency_delete', 'collection_agency'),
+        ):
+            with self.subTest(route=route):
+                record = model.objects.create(name='Удаляемая запись')
+                url = reverse(route, args=[record.pk])
+                response = self.client.get(url)
+                self.assertContains(response, 'modal-form-compact')
+                self.assertContains(response, '<form method="post">')
+                self.assertContains(response, record.name)
+                Debt.objects.create(debtor=debtor, contract_number=relation, **{relation: record})
+                response = self.client.get(url)
+                self.assertContains(response, '<form method="post">')
+                self.assertContains(response, 'Удаление невозможно')
+                self.assertNotContains(response, '<button class="btn btn-danger" type="submit">')
+                response = self.client.post(url, headers={'X-Form-Modal': '1'})
+                self.assertIn('redirect_url', response.json())
+                self.assertTrue(model.objects.filter(pk=record.pk).exists())
+
+    def test_modal_delete_redirects_to_list_after_confirmation(self):
+        for model, route, target in (
+            (Counterparty, 'imports:counterparty_delete', 'imports:counterparties'),
+            (CollectionAgency, 'imports:collection_agency_delete', 'imports:collection_agencies'),
+        ):
+            with self.subTest(route=route):
+                record = model.objects.create(name='Удаляемая запись')
+                response = self.client.post(reverse(route, args=[record.pk]), headers={'X-Form-Modal': '1'})
+                self.assertEqual(response.json(), {'redirect_url': reverse(target)})
+                self.assertFalse(model.objects.filter(pk=record.pk).exists())
