@@ -19,7 +19,7 @@ from .forms import (
     ImportUploadForm, PaymentChangeForm, PaymentRefundForm, WriteOffForm,
     ExpenseCreateForm,
 )
-from .balances import apply_balance, calculate_balance, filter_by_current_status, CATEGORY_LABELS, PURCHASE_FIELDS
+from .balances import apply_balance, calculate_balance, filter_by_current_status, CATEGORY_LABELS, PURCHASE_FIELDS, OWN_FIELDS, ZERO
 from .models import (
     CollectionAgency, Counterparty, Debt, Expense, FinancialChangeRequest, Import, ImportItem,
     Payment, PaymentRefund, WriteOff,
@@ -292,8 +292,16 @@ def debt_list(request):
     context.update(register_filter_context(request, filters))
     page_obj = context['page_obj']
     page_obj.object_list = list(page_obj.object_list.prefetch_related('payments__refunds', 'expenses', 'writeoffs'))
+    today = timezone.localdate()
     for debt in page_obj.object_list:
         apply_balance(debt, calculate_balance(debt))
+        expenses = [expense for expense in debt.expenses.all()
+                    if expense.operation_status != 'cancelled' and expense.expense_date <= today]
+        debt.accrued_expenses = {
+            field: sum((getattr(expense, field) for expense in expenses), ZERO)
+            for field in OWN_FIELDS
+        }
+        debt.total_debt_with_expenses = debt.purchase_total_debt + sum(debt.accrued_expenses.values(), ZERO)
 
     template = 'imports/partials/debt_register.html' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'imports/debt_list.html'
     response = render(request, template, context)
@@ -377,9 +385,6 @@ def _financial_list(request, *, model, title, kind):
                                       status_field='status' if kind == 'payment' else 'operation_status')
     context = record_page_context(request, records, label=f'Страницы: {title.lower()}')
     context.update(register_filter_context(request, filters))
-    if kind == 'expense':
-        context['add_url'] = reverse('imports:expense_new') if request.user.has_perm('imports.add_expense') else None
-        context['add_modal'] = True
     return render(request, 'imports/financial_list.html', context | {
         'title': title, 'kind': kind,
     })

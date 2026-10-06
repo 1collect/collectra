@@ -23,6 +23,27 @@
 .table .row-number-column { position: sticky; left: 0; z-index: 2; width: 48px; min-width: 48px; max-width: 48px; text-align: left; background: var(--table-row-background, var(--bg-panel)); }
 .table thead .row-number-column { z-index: 4; background: var(--bg-subtle); }
 .debt-register .record-key { left: 48px; }
+/* Change the table layout once; animate only visible content in JavaScript. */
+.table.debt-register [data-purchase-column] { display: none; min-width: 0; max-width: none; padding: 6px; font-size: .75rem; }
+.debt-register .purchase-column-content { display: block; width: 96px; overflow-wrap: anywhere; }
+.table.debt-register tbody td { height: 36px; padding-top: 4px; padding-bottom: 4px; }
+.table.debt-register.is-purchase-expanded [data-purchase-column] { display: table-cell; }
+.table.debt-register thead [data-purchase-column] { background: var(--bg-purchase-heading); }
+.table.debt-register tbody [data-purchase-column] { background: var(--bg-purchase-cell); }
+.table.debt-register tbody tr:nth-child(even) [data-purchase-column] { background: var(--bg-purchase-stripe); }
+.table.debt-register tbody tr:hover [data-purchase-column] { background: var(--bg-purchase-hover); }
+.table.debt-register tbody tr:is(.is-selected, :target) [data-purchase-column] { background: var(--primary-soft); }
+.table.debt-register .purchase-total-column { min-width: 16rem; max-width: none; }
+.purchase-breakdown-toggle { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--control-compact); padding: 0; font: inherit; font-weight: inherit; color: inherit; text-align: left; background: transparent; cursor: pointer; }
+.purchase-breakdown-toggle .icon { flex-shrink: 0; margin-left: auto; width: 16px; height: 16px; transition: transform 280ms ease; }
+.purchase-breakdown-toggle:hover { color: var(--primary); }
+.purchase-breakdown-toggle:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 3px; }
+.purchase-breakdown-toggle[aria-expanded="true"] .icon { transform: rotate(180deg); }
+.table.debt-register .fixed-actions-column { width: 92px; min-width: 92px; max-width: 92px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .purchase-breakdown-toggle .icon { transition: none; }
+}
 .table .fixed-actions-column { position: sticky; right: 0; z-index: 2; width: 1%; white-space: nowrap; text-align: right; background: var(--table-row-background, var(--bg-panel)); border-left: 1px solid var(--border-strong); }
 .table thead .fixed-actions-column { z-index: 4; background: var(--bg-subtle); }
 .table thead .record-key { z-index: 3; background: var(--bg-subtle); }

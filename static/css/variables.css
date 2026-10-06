@@ -27,6 +27,10 @@
   --bg-hover: #e6efff;
   --bg-table-stripe: #fafbfc;
   --bg-table-hover: #eef1f5;
+  --bg-purchase-heading: #e8e8e8;
+  --bg-purchase-cell: #f5f5f5;
+  --bg-purchase-stripe: #eeeeee;
+  --bg-purchase-hover: #e4e4e4;
   --bg-sidebar: #182231;
   --sidebar-text: #d5e2f5;
   --sidebar-muted: #b9cceb;
@@ -67,6 +71,10 @@
   --bg-hover: #273449;
   --bg-table-stripe: #202a37;
   --bg-table-hover: #273240;
+  --bg-purchase-heading: #343434;
+  --bg-purchase-cell: #262626;
+  --bg-purchase-stripe: #2c2c2c;
+  --bg-purchase-hover: #383838;
   --bg-sidebar: #101722;
   --sidebar-text: #b8c5d8;
   --sidebar-muted: #8596af;

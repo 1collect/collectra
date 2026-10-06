@@ -2,7 +2,7 @@
 {% block title %}{{ title }}{% endblock %}
 {% block heading %}{{ title }}{% endblock %}
 {% block content %}
-<div class="page-header"><div><div class="page-eyebrow">Финансы / Аудит</div><h1>{{ title }}</h1><p>Договор {{ record.debt.contract_number }} · Запись #{{ record.pk }}</p></div><div class="page-actions">{% if kind == 'payment' %}{% if perms.imports.change_payment %}<a data-form-modal aria-haspopup="dialog" class="btn btn-primary" href="{% url 'imports:payment_edit' record.pk %}">Изменить</a>{% endif %}<a class="btn" href="{% url 'imports:payments' %}">К платежам</a>{% elif kind == 'expense' %}{% if perms.imports.change_expense %}<a data-form-modal aria-haspopup="dialog" class="btn btn-primary" href="{% url 'imports:expense_edit' record.pk %}">Изменить</a>{% endif %}<a class="btn" href="{% url 'imports:expenses' %}">К расходам</a>{% else %}<a class="btn" href="{% url 'imports:writeoffs' %}">К списаниям</a>{% endif %}</div></div>
+<div class="page-header"><div><div class="page-eyebrow">Финансы / Аудит</div><h1>{{ title }}</h1><p>Договор {{ record.debt.contract_number }} · Запись #{{ record.pk }}</p></div><div class="page-actions">{% if kind == 'payment' %}<a class="btn" href="{% url 'imports:payments' %}">К платежам</a>{% elif kind == 'expense' %}<a class="btn" href="{% url 'imports:expenses' %}">К расходам</a>{% else %}<a class="btn" href="{% url 'imports:writeoffs' %}">К списаниям</a>{% endif %}</div></div>
 <section class="panel">
     <div class="panel-header"><h2>История значений <span class="badge">{{ history_page.paginator.count }}</span></h2></div>
     <div class="p-0 table-container"><table class="table table-bordered table-compact">

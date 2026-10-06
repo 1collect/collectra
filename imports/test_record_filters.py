@@ -97,7 +97,12 @@ class RecordFilterTests(TestCase):
                     self.assertEqual([item.pk for item in response.context['page_obj']], [record.pk])
                     self.assertTrue(response.context['filters_active'])
             response = self.client.get(reverse(f'imports:{route}'))
-            self.assertContains(response, f'href="{reverse("imports:" + create_route)}" data-form-modal')
+            if route == 'expenses':
+                self.assertNotContains(response, reverse('imports:expense_new'))
+                self.assertNotContains(response, reverse('imports:expense_edit', args=[record.pk]))
+                self.assertNotContains(response, reverse('imports:expense_history', args=[record.pk]))
+            else:
+                self.assertContains(response, f'href="{reverse("imports:" + create_route)}" data-form-modal')
             if route != 'expenses':
                 response = self.client.get(reverse(f'imports:{route}'), {'author': self.user.pk})
                 self.assertEqual(response.context['page_obj'].paginator.count, 2)

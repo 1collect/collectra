@@ -34,7 +34,8 @@ class DynamicBalanceTests(TestCase):
         self.assertEqual(shown.current['state_duty'], 80)
         self.assertEqual(shown.outstanding_amount, 410)
         self.assertEqual(sum(shown.current.values()), shown.outstanding_amount)
-        self.assertContains(response, 'Обеспечение иска')
+        self.assertContains(response, 'Общая сумма задолженности (выкуп)')
+        self.assertContains(response, 'purchase-column-content">600,00</span>')
         expense.state_duty = 180
         expense.save()
         response = self.client.get(reverse('imports:debts'))

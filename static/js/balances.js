@@ -30,13 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
           if (row) row.hidden = false;
           if (button) { button.setAttribute('aria-expanded', 'true'); button.textContent = 'Свернуть'; }
         });
+        const searchInput = container.querySelector('[data-contract-search]');
+        if (searchInput && contractSearch !== undefined) searchInput.value = contractSearch;
+        document.dispatchEvent(new Event('balances:updated'));
         container.querySelectorAll(scrollSelector).forEach((el, index) => {
           const position = positions[index];
           if (position) { el.scrollLeft = position[0]; el.scrollTop = position[1]; }
         });
-        const searchInput = container.querySelector('[data-contract-search]');
-        if (searchInput && contractSearch !== undefined) searchInput.value = contractSearch;
-        document.dispatchEvent(new Event('balances:updated'));
         lastContent = content;
         status = document.querySelector('[data-balance-status]');
         const count = document.querySelector('[data-record-count]');
