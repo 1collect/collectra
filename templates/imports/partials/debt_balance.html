@@ -6,7 +6,7 @@
             <input type="hidden" name="tab" value="{{ active_tab }}">
             <input type="hidden" name="per_page" value="{{ page_size }}">
             <div class="contract-picker-tools">
-                <label class="form-label" for="contract-search">Поиск договора</label>
+                <label class="sr-only" for="contract-search">Поиск договора</label>
                 <input id="contract-search" class="form-control" type="search" name="contract_search" value="{{ contract_search }}" placeholder="Номер ДБЗ" autocomplete="off" data-contract-search>
                 <div class="contract-picker-actions">
                     <button class="btn btn-sm" type="button" data-contract-select-all>Выбрать все</button>
