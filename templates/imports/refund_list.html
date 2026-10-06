@@ -15,7 +15,7 @@
             {% for refund in page_obj %}
                 <tr><td class="font-mono row-number-column">{{ page_obj.start_index|add:forloop.counter|add:"-1" }}</td>
                     <td><strong class="font-mono">{{ refund.payment.debt.contract_number }}</strong></td>
-                    <td class="cell-number">{{ refund.payment.amount|floatformat:2 }} от {{ refund.payment.payment_date|date:'d.m.Y' }}<br><span class="text-muted">Действует: {{ refund.payment.effective_amount|floatformat:2 }}</span></td>
+                    <td class="cell-number">{% for allocation in refund.payment_allocations.all %}{{ allocation.payment.amount|floatformat:2 }} от {{ allocation.payment.payment_date|date:'d.m.Y' }} — {{ allocation.amount|floatformat:2 }}<br>{% empty %}{{ refund.payment.amount|floatformat:2 }} от {{ refund.payment.payment_date|date:'d.m.Y' }}{% endfor %}</td>
                     <td>{{ refund.get_payment_category_display }}</td>
                     <td class="cell-number"><strong>{{ refund.amount|floatformat:2 }}</strong></td>
                     <td class="cell-date">{{ refund.refund_date|date:'d.m.Y' }}</td>

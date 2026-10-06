@@ -41,9 +41,12 @@
       });
       if (body.querySelector('[name="mode"]')) A.initDistribution(body);
       if (body.querySelector('#writeoff-form')) A.initWriteoffs(body);
-      const field = body.querySelector('[aria-invalid="true"]:not([disabled])')
-        || body.querySelector('[autofocus], input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled])');
-      if (field) field.focus();
+      if (A.initRefundSelect) A.initRefundSelect(body);
+      if (!body.querySelector('[data-no-auto-focus]')) {
+        const field = body.querySelector('[aria-invalid="true"]:not([disabled]):not([hidden])')
+          || body.querySelector('[autofocus]:not([hidden]), input:not([type="hidden"]):not([disabled]):not([hidden]), select:not([disabled]):not([hidden]), textarea:not([disabled]):not([hidden])');
+        if (field) field.focus();
+      }
     }
 
     function render(html, url) {

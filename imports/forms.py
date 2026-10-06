@@ -305,9 +305,10 @@ class ImportUploadForm(forms.Form):
 class CollectionAgencyForm(forms.ModelForm):
     class Meta:
         model = CollectionAgency
-        fields = ('name',)
+        fields = ('name', 'shortname')
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'shortname': forms.TextInput(attrs={'class': 'form-control'}),
         }
 
 
@@ -320,17 +321,45 @@ class CounterpartyForm(forms.ModelForm):
         }
 
 
+class PaymentMultipleChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, payment):
+        return PaymentChoiceField.label_from_instance(self, payment)
+
+
+class RefundPaymentSelectMultiple(forms.SelectMultiple):
+    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
+        option = super().create_option(name, value, label, selected, index, subindex, attrs)
+        payment_id = str(value.value if hasattr(value, 'value') else value)
+        debt_id = getattr(self, 'payment_debt_ids', {}).get(payment_id)
+        if debt_id:
+            option['attrs']['data-debt-id'] = str(debt_id)
+        return option
+
+
 class PaymentRefundForm(forms.ModelForm):
+    debt = forms.ModelChoiceField(
+        label='ДБЗ',
+        queryset=Debt.objects.all(),
+        empty_label='Выберите ДБЗ',
+        widget=forms.Select(attrs={'class': 'form-control', 'data-searchable-select': ''}),
+    )
+    payments = PaymentMultipleChoiceField(
+        label='Платежи для возврата',
+        queryset=Payment.objects.none(),
+        required=False,
+        widget=RefundPaymentSelectMultiple(attrs={'class': 'form-control', 'data-multi-select': '', 'data-payment-select': ''}),
+    )
     payment = PaymentChoiceField(
         label='Исходный платёж',
         queryset=Payment.objects.none(),
         empty_label='Выберите платёж',
-        widget=forms.Select(attrs={'class': 'form-control', 'autofocus': True}),
+        required=False,
+        widget=forms.HiddenInput(),
     )
 
     class Meta:
         model = PaymentRefund
-        fields = ('payment', 'amount', 'refund_date', 'reason')
+        fields = ('debt', 'payment', 'payments', 'amount', 'refund_date', 'reason')
         widgets = {
             'amount': forms.NumberInput(attrs={
                 'class': 'form-control',
@@ -340,7 +369,7 @@ class PaymentRefundForm(forms.ModelForm):
             'refund_date': forms.DateInput(attrs={
                 'class': 'form-control',
                 'type': 'date',
-            }),
+            }, format='%Y-%m-%d'),
             'reason': forms.Textarea(attrs={
                 'class': 'form-control',
                 'rows': 3,
@@ -350,28 +379,67 @@ class PaymentRefundForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['payment'].queryset = Payment.objects.select_related(
+        available = Payment.objects.select_related(
             'debt',
         ).filter(
             amount__gt=F('refunded_amount'),
             operation_status__in=('active', 'corrected'),
         ).order_by('-payment_date', '-id')
+        self.fields['payment'].queryset = available
+        self.fields['payments'].queryset = available
+        self.fields['payments'].widget.payment_debt_ids = {
+            str(item.pk): item.debt_id for item in available
+        }
+        if self.initial.get('debt'):
+            self.fields['payments'].queryset = available.filter(debt_id=self.initial['debt'])
+        if self.initial.get('payment') and not self.initial.get('payments'):
+            self.initial['payments'] = [self.initial['payment']]
 
     def clean(self):
         cleaned_data = super().clean()
-        payment = cleaned_data.get('payment')
+        debt = cleaned_data.get('debt')
+        payments = list(cleaned_data.get('payments') or [])
+        payment = payments[0] if payments else cleaned_data.get('payment')
         amount = cleaned_data.get('amount')
+        if not payments and payment:
+            payments = [payment]
+        cleaned_data['payment'] = payment
+        if not payments:
+            self.add_error('payments', 'Выберите хотя бы один платёж.')
+            return cleaned_data
+        if debt is None:
+            self.add_error('debt', 'Выберите ДБЗ.')
+            return cleaned_data
         if payment is None or amount is None or amount <= 0:
             return cleaned_data
 
-        refunded_amount = payment.refunds.filter(
-            status=PaymentRefund.Status.ACTIVE,
-        ).aggregate(total=Sum('amount'))['total'] or 0
-        refundable_amount = payment.amount - refunded_amount
-        if amount > refundable_amount:
+        if any(item.debt_id != debt.pk for item in payments):
+            self.add_error('payments', 'Выберите платежи только выбранного ДБЗ.')
+            return cleaned_data
+        available_by_payment = {}
+        for item in payments:
+            refunded_amount = item.refund_allocations.filter(
+                refund__status=PaymentRefund.Status.ACTIVE,
+            ).aggregate(total=Sum('amount'))['total'] or 0
+            if not refunded_amount:
+                refunded_amount = item.refunds.filter(
+                    status=PaymentRefund.Status.ACTIVE,
+                ).aggregate(total=Sum('amount'))['total'] or 0
+            available_by_payment[item.pk] = item.amount - refunded_amount
+        total_available = sum(available_by_payment.values(), Decimal('0'))
+        if amount > total_available:
             self.add_error(
                 'amount',
-                'Сумма возврата не может превышать доступный остаток '
-                f'{refundable_amount:.2f}.',
+                'Сумма возврата не может превышать общий доступный остаток '
+                f'{total_available:.2f}.',
             )
+        else:
+            remaining = amount
+            allocations = []
+            for item in payments:
+                allocation = min(remaining, available_by_payment[item.pk])
+                if allocation:
+                    allocations.append((item, allocation))
+                    remaining -= allocation
+            cleaned_data['payment_allocations'] = allocations
         return cleaned_data

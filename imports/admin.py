@@ -32,8 +32,8 @@ class ImportAdmin(admin.ModelAdmin):
 
 @admin.register(CollectionAgency)
 class CollectionAgencyAdmin(admin.ModelAdmin):
-    list_display = ('name',)
-    search_fields = ('name',)
+    list_display = ('name', 'shortname')
+    search_fields = ('name', 'shortname')
 
 
 @admin.register(Counterparty)

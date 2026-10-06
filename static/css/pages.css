@@ -179,6 +179,37 @@ dialog.import-preview-modal { width: min(800px, calc(var(--viewport-width) - 28p
 .import-preview__actions .panel-footer { flex-wrap: wrap; background: var(--bg-panel); border-top: 0; }
 .import-preview__actions .panel-footer > span { margin-right: auto; align-self: center; }
 .import-preview__actions [data-confirm-delay]:disabled { background: var(--border-color); border-color: var(--border-color); color: var(--text-muted); opacity: 1; }
+
+/* Write-off creation is a focused workflow: keep the modal compact and make the three decisions easy to scan. */
+.writeoff-create-content dialog.modal-form { width: min(760px, calc(var(--viewport-width) - 28px)); }
+.writeoff-form-panel { background: transparent; }
+.writeoff-form-heading { padding-bottom: var(--space-4); }
+.writeoff-form-heading h2 { font-size: var(--text-body); font-weight: 600; }
+.writeoff-form-panel .panel-subtitle { margin-top: 3px; color: var(--text-muted); font-size: var(--text-caption); }
+.writeoff-intro { display: flex; gap: 10px; align-items: flex-start; padding: 0 0 var(--space-5); margin-bottom: var(--space-5); border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-size: var(--text-caption); line-height: 1.5; }
+.writeoff-intro p { margin: 0; }
+.writeoff-intro strong { color: var(--text-primary); font-weight: 600; }
+.writeoff-intro-icon { display: grid; place-items: center; width: 18px; height: 18px; flex: 0 0 auto; border: 1px solid currentColor; border-radius: 50%; color: var(--info); font-size: 11px; font-weight: 700; }
+.writeoff-section { padding: 0 0 var(--space-5); margin-bottom: var(--space-5); border-bottom: 1px solid var(--border-color); }
+.writeoff-section-heading { display: flex; gap: 10px; align-items: flex-start; margin-bottom: var(--space-4); }
+.writeoff-section-heading h3 { font-size: var(--text-small); font-weight: 600; }
+.writeoff-section-heading p { margin-top: 2px; color: var(--text-muted); font-size: var(--text-caption); }
+.writeoff-step { display: grid; place-items: center; width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-size: var(--text-caption); font-weight: 600; }
+.writeoff-main-grid { gap: var(--space-4) var(--space-5); }
+.writeoff-partial-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
+.writeoff-partial-section[hidden] { display: none !important; }
+.writeoff-reason-section { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
+.writeoff-reason-section textarea.form-control { min-height: 76px; }
+.writeoff-actions { margin-top: var(--space-5); padding: var(--space-4) 0 0; }
+.writeoff-required-note { margin-right: auto; color: var(--text-muted); font-size: var(--text-caption); }
+.writeoff-required-note .required { color: var(--danger); }
+.refund-form-panel { background: transparent; }
+.refund-form-heading { padding-bottom: var(--space-4); }
+.refund-form-heading h2 { font-size: var(--text-body); font-weight: 600; }
+@media (max-width: 600px) {
+  .writeoff-partial-grid { grid-template-columns: 1fr; }
+  .writeoff-required-note { flex-basis: 100%; order: -1; }
+}
 @media (max-width: 600px) {
   .import-preview-modal .modal-body { padding: 12px; }
   .import-preview__actions { bottom: -12px; }
