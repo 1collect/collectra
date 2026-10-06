@@ -11,9 +11,9 @@ user = get_user_model().objects.filter(is_superuser=True, is_active=True).first(
 if user is None: raise RuntimeError('No active administrator for read-only smoke verification.')
 client = Client(HTTP_HOST='localhost')
 client.force_login(user)
-routes = ['/imports/contracts/new/', '/imports/templates/contracts/']
+routes = ['/contracts/new/', '/imports/templates/contracts/']
 debt = Debt.objects.first()
-if debt: routes.append(f'/imports/contracts/{debt.pk}/')
+if debt: routes.append(f'/contracts/{debt.pk}/')
 for route in routes:
     response = client.get(route)
     if response.status_code != 200: raise RuntimeError(f'{route}: {response.status_code}')

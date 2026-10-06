@@ -13,7 +13,7 @@ class AccessControlTests(TestCase):
 
     def test_contracts_redirect_anonymous_user_to_existing_login_page(self):
         response = self.client.get(reverse('imports:debts'))
-        self.assertRedirects(response, '/login/?next=/imports/contracts/')
+        self.assertRedirects(response, '/login/?next=/contracts/')
 
     def test_login_page_uses_russian_test_app_interface(self):
         response = self.client.get(reverse('login'))

@@ -28,5 +28,5 @@ urlpatterns = [
     path('dashboard/', user_views.dashboard, name='dashboard'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('users/', include('users.urls')),
-    path('imports/', include('imports.urls')),
+    path('', include('imports.urls')),
 ]
