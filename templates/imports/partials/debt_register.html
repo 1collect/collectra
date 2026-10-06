@@ -1,9 +1,10 @@
+{% load table_rows %}
     <div class="p-0 table-container" tabindex="0" role="region" aria-label="Реестр договоров">
         <table class="table table-bordered table-compact debt-register">
-            <thead><tr><th scope="col" class="record-key">ДБЗ</th><th scope="col">ФИО</th><th scope="col">ИИН</th><th scope="col" class="cell-number">Основной долг</th><th scope="col" class="cell-number">Вознаграждение</th><th scope="col" class="cell-number">Пеня/Штрафы</th><th scope="col" class="cell-number">Дебиторская задолженность</th><th scope="col" class="cell-number">Гос.пошлина</th><th scope="col" class="cell-number">Представительские расходы</th><th scope="col" class="cell-number">Нотариальные расходы</th><th scope="col" class="cell-number">Почтовые расходы</th><th scope="col" class="cell-number">Обеспечение иска</th><th scope="col" class="cell-number">Дополнительные расходы</th><th scope="col" class="cell-number">Общая сумма задолженности</th><th scope="col" class="cell-number">Оплачено</th><th scope="col" class="cell-number">Списано</th><th scope="col" class="cell-number">Остаток</th><th scope="col" class="cell-number">Переплата</th><th scope="col">Дата закрытия</th></tr></thead>
+            <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col" class="record-key">ДБЗ</th><th scope="col">ФИО</th><th scope="col">ИИН</th><th scope="col" class="cell-number">Основной долг</th><th scope="col" class="cell-number">Вознаграждение</th><th scope="col" class="cell-number">Пеня/Штрафы</th><th scope="col" class="cell-number">Дебиторская задолженность</th><th scope="col" class="cell-number">Гос.пошлина</th><th scope="col" class="cell-number">Представительские расходы</th><th scope="col" class="cell-number">Нотариальные расходы</th><th scope="col" class="cell-number">Почтовые расходы</th><th scope="col" class="cell-number">Обеспечение иска</th><th scope="col" class="cell-number">Дополнительные расходы</th><th scope="col" class="cell-number">Общая сумма задолженности</th><th scope="col" class="cell-number">Оплачено</th><th scope="col" class="cell-number">Списано</th><th scope="col" class="cell-number">Остаток</th><th scope="col" class="cell-number">Переплата</th><th scope="col">Дата закрытия</th></tr></thead>
             <tbody>
             {% for debt in page_obj %}
-                <tr>
+                <tr><td class="font-mono row-number-column">{{ forloop.counter|row_number:page_obj }}</td>
                     <td class="record-key"><a class="font-mono" href="{% url 'imports:debt_detail' debt.pk %}">{{ debt.contract_number }}</a>{% include 'imports/partials/import_source.html' with record=debt %}</td>
                     <td class="cell-text">{{ debt.debtor.full_name }}</td>
                     <td class="font-mono">{{ debt.debtor.iin }}</td>
@@ -24,7 +25,7 @@
                     <td class="cell-number">{{ debt.overpayment_amount|floatformat:2 }}</td>
                     <td class="cell-date">{{ debt.closed_at|date:'d.m.Y'|default:'—' }}</td>
                 </tr>
-            {% empty %}<tr><td colspan="19"><div class="empty-state"><h3>Ничего не найдено</h3></div></td></tr>{% endfor %}
+            {% empty %}<tr><td colspan="20"><div class="empty-state"><h3>Ничего не найдено</h3></div></td></tr>{% endfor %}
             </tbody>
         </table>
     </div>

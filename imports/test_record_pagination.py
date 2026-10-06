@@ -68,6 +68,9 @@ class RecordPaginationTests(TestCase):
                 self.assertFalse({item.pk for item in first.context['page_obj']} &
                                  {item.pk for item in second.context['page_obj']})
                 self.assertEqual(len(second.context['page_obj']), 3)
+                self.assertContains(first, 'class="font-mono row-number-column">1</td>')
+                self.assertContains(second, 'class="font-mono row-number-column">41</td>')
+                self.assertContains(second, 'class="font-mono row-number-column">43</td>')
                 self.assertEqual(self.client.get(url, {'page': 'bad'}).context['page_obj'].number, 1)
                 self.assertEqual(self.client.get(url, {'page': 999}).context['page_obj'].number, 3)
 
@@ -78,6 +81,7 @@ class RecordPaginationTests(TestCase):
         self.assertContains(response, '?per_page=10&amp;page=4')
         self.assertNotContains(response, '<!DOCTYPE html>')
         self.assertEqual(len(response.context['page_obj']), 3)
+        self.assertContains(response, 'class="font-mono row-number-column">41</td>')
         self.assertEqual(response.context['page_obj'][0].outstanding_amount, 995)
 
     def test_single_page_and_empty_lists_show_totals(self):

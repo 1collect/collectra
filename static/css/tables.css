@@ -18,6 +18,10 @@
 .table .cell-actions { text-align: right; }
 .cell-actions > .flex { justify-content: flex-end; align-items: center; }
 .table .record-key { position: sticky; left: 0; z-index: 2; background: var(--bg-panel); border-right: 1px solid var(--border-strong); }
+.table .row-number-column { position: sticky; left: 0; z-index: 2; width: 48px; min-width: 48px; max-width: 48px; text-align: left; background: var(--bg-panel); }
+.table thead .row-number-column { z-index: 4; background: var(--bg-subtle); }
+.table tbody tr:hover .row-number-column { background: var(--bg-subtle); }
+.debt-register .record-key { left: 48px; }
 .table thead .record-key { z-index: 3; background: var(--bg-subtle); }
 .table tbody tr:hover .record-key { background: var(--bg-subtle); }
 .table td[colspan] { white-space: normal; }
