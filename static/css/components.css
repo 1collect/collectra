@@ -144,7 +144,7 @@ dialog.modal-form.modal-form-compact { width: min(460px, calc(var(--viewport-wid
 dialog.modal-form-compact .modal-body > form > .panel { border: 0; border-radius: 0; background: transparent; }
 dialog.modal-form-compact .modal-body > form > .panel > .panel-header { display: none; }
 dialog.modal-form-compact .modal-body > form > .panel > .panel-body { padding: 0; }
-dialog.modal-form-compact .modal-body > form > .panel > .panel-footer { margin: var(--space-5) calc(var(--space-5) * -1) calc(var(--space-5) * -1); }
+dialog.modal-form-compact .modal-body > form > .panel > .panel-footer { justify-content: flex-end; margin: var(--space-5) calc(var(--space-5) * -1) calc(var(--space-5) * -1); }
 .modal-form > .modal-header { position: sticky; top: 0; z-index: 1; background: var(--bg-panel); }
 .modal-form .modal-body > .panel:last-child { margin-bottom: 0; }
 .modal-form .form-grid { grid-template-columns: repeat(auto-fit, minmax(min(240px, 100%), 1fr)); }
