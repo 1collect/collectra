@@ -5,8 +5,8 @@
 .table td { height: var(--row-height); padding: var(--space-2) var(--space-3); border-bottom: 1px solid var(--border-color); vertical-align: middle; }
 .table strong { font-weight: 600; }
 .table tbody tr { --table-row-background: var(--bg-panel); }
-.table tbody tr:nth-child(even) { --table-row-background: var(--bg-subtle); }
-.table tbody tr:hover { --table-row-background: var(--bg-hover); }
+.table tbody tr:nth-child(even) { --table-row-background: color-mix(in srgb, var(--bg-panel) 80%, var(--bg-subtle)); }
+.table tbody tr:hover { --table-row-background: color-mix(in srgb, var(--bg-panel) 60%, var(--bg-subtle)); }
 .table tbody tr.is-selected, .table tbody tr:target { --table-row-background: var(--primary-soft); }
 /* Opaque cell backgrounds keep pinned columns in step with the whole row. */
 .table tbody tr > :is(td, th) { background: var(--table-row-background); }
