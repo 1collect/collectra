@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% load table_rows %}
 {% block title %}{{ title }}{% endblock %}
 {% block heading %}{{ title }}{% endblock %}
 {% block content %}
@@ -10,7 +9,7 @@
     <div class="p-0 table-container"><table class="table table-bordered table-compact">
         <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col">Дата</th><th scope="col">Автор</th><th scope="col">Событие</th><th scope="col">Поле</th><th scope="col">Было</th><th scope="col">Стало</th><th scope="col">Основание</th></tr></thead>
         <tbody>{% for event in history_page %}{% for row in event.changed_rows %}<tr>
-            {% if forloop.first %}<td rowspan="{{ event.changed_rows|length }}" class="font-mono row-number-column">{{ forloop.parentloop.counter|row_number:history_page }}</td><td rowspan="{{ event.changed_rows|length }}" class="cell-date">{{ event.created_at|date:'d.m.Y H:i:s' }}</td><td rowspan="{{ event.changed_rows|length }}">{% if event.actor %}{{ event.actor.get_full_name|default:event.actor.username }}{% else %}Не указан{% endif %}</td><td rowspan="{{ event.changed_rows|length }}">{{ event.get_action_display }}</td>{% endif %}
+            {% if forloop.first %}<td rowspan="{{ event.changed_rows|length }}" class="font-mono row-number-column">{{ history_page.start_index|add:forloop.parentloop.counter|add:"-1" }}</td><td rowspan="{{ event.changed_rows|length }}" class="cell-date">{{ event.created_at|date:'d.m.Y H:i:s' }}</td><td rowspan="{{ event.changed_rows|length }}">{% if event.actor %}{{ event.actor.get_full_name|default:event.actor.username }}{% else %}Не указан{% endif %}</td><td rowspan="{{ event.changed_rows|length }}">{{ event.get_action_display }}</td>{% endif %}
             <td>{{ row.label }}</td><td>{{ row.old }}</td><td>{{ row.new }}</td>
             {% if forloop.first %}<td rowspan="{{ event.changed_rows|length }}">{{ event.reason|default:'—' }}</td>{% endif %}
         </tr>{% endfor %}{% empty %}<tr><td colspan="8"><div class="empty-state"><h3>Ничего не найдено</h3></div></td></tr>{% endfor %}</tbody>

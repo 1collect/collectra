@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% load table_rows %}
 {% load static %}
 {% block content_class %}content--register{% endblock %}
 {% block title %}Возвраты платежей{% endblock %}
@@ -14,7 +13,7 @@
             <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col">Договор</th><th scope="col">Исходный платёж</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма возврата</th><th scope="col">Дата</th><th scope="col">Основание</th><th scope="col">Создал</th></tr></thead>
             <tbody>
             {% for refund in page_obj %}
-                <tr><td class="font-mono row-number-column">{{ forloop.counter|row_number:page_obj }}</td>
+                <tr><td class="font-mono row-number-column">{{ page_obj.start_index|add:forloop.counter|add:"-1" }}</td>
                     <td><strong class="font-mono">{{ refund.payment.debt.contract_number }}</strong>{% include 'imports/partials/import_source.html' with record=refund %}{% if not refund.import_item_id and refund.payment.import_item_id %}<div class="text-xs text-muted">Источник платежа:</div>{% include 'imports/partials/import_source.html' with record=refund.payment %}{% endif %}</td>
                     <td class="cell-number">{{ refund.payment.amount|floatformat:2 }} от {{ refund.payment.payment_date|date:'d.m.Y' }}<br><span class="text-muted">Действует: {{ refund.payment.effective_amount|floatformat:2 }}</span></td>
                     <td>{{ refund.get_payment_category_display }}</td>
