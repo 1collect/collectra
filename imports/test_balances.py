@@ -131,7 +131,8 @@ class DynamicBalanceTests(TestCase):
 
     def test_registry_refresh_keeps_search_and_plain_contract_number(self):
         response = self.client.get(reverse('imports:debts'), {'q': 'DYNAMIC'}, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
-        self.assertNotContains(response, reverse('imports:debt_detail', args=[self.debt.pk]))
+        self.assertContains(response, f'<a class="btn btn-sm" href="{reverse("imports:debt_detail", args=[self.debt.pk])}">Открыть</a>')
+        self.assertNotContains(response, '<a class="font-mono"')
         self.assertContains(response, f'<span class="font-mono">{self.debt.contract_number}</span>')
         self.assertNotContains(response, '<html')
 

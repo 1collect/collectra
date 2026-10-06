@@ -22,6 +22,9 @@
 .table thead .row-number-column { z-index: 4; background: var(--bg-subtle); }
 .table tbody tr:hover .row-number-column { background: var(--bg-subtle); }
 .debt-register .record-key { left: 48px; }
+.table .fixed-actions-column { position: sticky; right: 0; z-index: 2; width: 1%; white-space: nowrap; text-align: right; background: var(--bg-panel); border-left: 1px solid var(--border-strong); }
+.table thead .fixed-actions-column { z-index: 4; background: var(--bg-subtle); }
+.table tbody tr:hover .fixed-actions-column { background: var(--bg-subtle); }
 .table thead .record-key { z-index: 3; background: var(--bg-subtle); }
 .table tbody tr:hover .record-key { background: var(--bg-subtle); }
 .table td[colspan] { white-space: normal; }
