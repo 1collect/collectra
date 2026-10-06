@@ -32,14 +32,14 @@ urlpatterns = [
     path('expenses/<int:record_id>/history/', views.expense_history, name='expense_history'),
     path('refunds/', views.refund_list, name='refunds'),
     path('refunds/new/', views.refund_create, name='refund_new'),
-    path('imports/collection-agencies/', views.collection_agency_list, name='collection_agencies'),
-    path('imports/collection-agencies/new/', views.collection_agency_edit, name='collection_agency_new'),
-    path('imports/collection-agencies/<int:agency_id>/edit/', views.collection_agency_edit, name='collection_agency_edit'),
-    path('imports/collection-agencies/<int:agency_id>/delete/', views.collection_agency_delete, name='collection_agency_delete'),
-    path('imports/counterparties/', views.counterparty_list, name='counterparties'),
-    path('imports/counterparties/new/', views.counterparty_edit, name='counterparty_new'),
-    path('imports/counterparties/<int:counterparty_id>/edit/', views.counterparty_edit, name='counterparty_edit'),
-    path('imports/counterparties/<int:counterparty_id>/delete/', views.counterparty_delete, name='counterparty_delete'),
+    path('collection-agencies/', views.collection_agency_list, name='collection_agencies'),
+    path('collection-agencies/new/', views.collection_agency_edit, name='collection_agency_new'),
+    path('collection-agencies/<int:agency_id>/edit/', views.collection_agency_edit, name='collection_agency_edit'),
+    path('collection-agencies/<int:agency_id>/delete/', views.collection_agency_delete, name='collection_agency_delete'),
+    path('counterparties/', views.counterparty_list, name='counterparties'),
+    path('counterparties/new/', views.counterparty_edit, name='counterparty_new'),
+    path('counterparties/<int:counterparty_id>/edit/', views.counterparty_edit, name='counterparty_edit'),
+    path('counterparties/<int:counterparty_id>/delete/', views.counterparty_delete, name='counterparty_delete'),
 ]
 
 
