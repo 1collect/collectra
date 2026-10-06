@@ -129,9 +129,10 @@ class DynamicBalanceTests(TestCase):
         self.assertEqual(self.debt.purchase_principal, 600)
         self.assertEqual(self.debt.purchase_total_debt, 1000)
 
-    def test_registry_refresh_keeps_search_and_links_to_calculation(self):
+    def test_registry_refresh_keeps_search_and_plain_contract_number(self):
         response = self.client.get(reverse('imports:debts'), {'q': 'DYNAMIC'}, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
-        self.assertContains(response, reverse('imports:debt_detail', args=[self.debt.pk]))
+        self.assertNotContains(response, reverse('imports:debt_detail', args=[self.debt.pk]))
+        self.assertContains(response, f'<span class="font-mono">{self.debt.contract_number}</span>')
         self.assertNotContains(response, '<html')
 
     def test_allocation_total_matches_each_payment_and_overpayment(self):
