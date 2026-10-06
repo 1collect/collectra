@@ -28,4 +28,4 @@
             </tbody>
         </table>
     </div>
-    <div class="table-footer">{% include 'imports/partials/record_pagination.html' %}</div>
+    <div class="table-footer" data-record-total="{{ page_obj.paginator.count }}">{% include 'imports/partials/record_pagination.html' %}</div>

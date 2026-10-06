@@ -23,6 +23,9 @@ document.addEventListener('DOMContentLoaded', () => {
           if (position) { el.scrollLeft = position[0]; el.scrollTop = position[1]; }
         });
         lastContent = content;
+        const count = document.querySelector('[data-record-count]');
+        const total = container.querySelector('[data-record-total]');
+        if (count && total) count.textContent = total.dataset.recordTotal;
       }
       if (status) status.textContent = 'Обновлено: ' + new Date().toLocaleTimeString('ru-RU') + '. Автообновление включено.';
     } catch (_) {
