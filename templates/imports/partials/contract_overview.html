@@ -1,0 +1,28 @@
+        <dl class="contract-fields contract-overview">
+            <div><dt>Сумма кредита</dt><dd>{{ debt.issued_credit_amount|floatformat:'2g' }}</dd></div>
+            <div><dt>Дата начала</dt><dd>{{ debt.dbz_start_date|date:'d.m.Y'|default:'—' }}</dd></div>
+            <div><dt>Дата окончания</dt><dd>{{ debt.dbz_end_date|date:'d.m.Y'|default:'—' }}</dd></div>
+            <div><dt>Договор цессии</dt><dd>{{ debt.cession|default:'—' }}</dd></div>
+            <div><dt>Реестр</dt><dd>{{ debt.registry_number|default:'—' }}{% if debt.registry_date %} от {{ debt.registry_date|date:'d.m.Y' }}{% endif %}</dd></div>
+            <div><dt>Просрочка</dt><dd{% if debt.overdue_days > 0 %} class="text-danger"{% endif %}>{{ debt.overdue_days }} дней</dd></div>
+        </dl>
+        <details class="contract-disclosure" id="contract-extra"><summary>Дополнительные данные</summary>
+            {% if debt.opening_difference %}<div class="alert alert-warning">Исходный итог отличается от суммы компонентов на {{ debt.opening_difference|floatformat:'2g' }}. Проверьте исходные данные.</div>{% endif %}
+            <dl class="contract-fields">
+                <div><dt>Коллекторское агентство</dt><dd>{{ debt.collection_agency|default:'—' }}</dd></div>
+                <div><dt>Контрагент</dt><dd>{{ debt.counterparty|default:'—' }}</dd></div>
+                <div><dt>Дата закрытия</dt><dd>{{ debt.closed_at|date:'d.m.Y'|default:'—' }}</dd></div>
+                <div><dt>Общая сумма задолженности</dt><dd>{{ debt.total_amount|floatformat:'2g' }}</dd></div>
+                <div><dt>Выкуп и наши расходы</dt><dd>{{ debt.accrued_amount|floatformat:'2g' }}</dd></div>
+            </dl>
+        </details>
+        <details class="contract-disclosure" id="contract-calculation"><summary>Исходные суммы и текущие остатки</summary>
+            <div class="table-container"><table class="table table-bordered table-compact">
+                <thead><tr><th scope="col">Категория</th><th scope="col" class="cell-number">Исходная сумма</th><th scope="col" class="cell-number">Текущий остаток</th></tr></thead>
+                <tbody>{% for row in categories %}<tr><th scope="row">{{ row.label }}</th><td class="cell-number">{{ row.initial|floatformat:'2g' }}</td><td class="cell-number">{{ row.current|floatformat:'2g' }}</td></tr>{% endfor %}</tbody>
+                <tfoot><tr><th scope="row">Итого</th><td class="cell-number">{{ debt.accrued_amount|floatformat:'2g' }}</td><td class="cell-number">{{ debt.outstanding_amount|floatformat:'2g' }}</td></tr></tfoot>
+            </table></div>
+        </details>
+        <details class="contract-disclosure" id="contract-source"><summary>Состав исходного выкупа</summary>
+            <div class="table-container"><table class="table table-bordered table-compact"><thead><tr><th scope="col">Компонент</th><th scope="col" class="cell-number">Сумма при загрузке</th></tr></thead><tbody>{% for row in source_rows %}<tr><th scope="row">{{ row.label }}</th><td class="cell-number">{{ row.amount|floatformat:'2g' }}</td></tr>{% endfor %}</tbody></table></div>
+        </details>

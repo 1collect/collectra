@@ -311,17 +311,19 @@ def debt_detail(request, debt_id):
     )
     balance = calculate_balance(debt)
     apply_balance(debt, balance)
+    workspace = workspace_context(request, debt, balance)
+    selected_debt = workspace['selected_debt']
+    selected_balance = workspace['selected_balance']
     labels = dict(CATEGORY_LABELS)
-    if 'additional_expenses' in balance['current']: labels['additional_expenses'] = 'Дополнительные расходы (ранее внесённые)'
+    if selected_balance and 'additional_expenses' in selected_balance['current']: labels['additional_expenses'] = 'Дополнительные расходы (ранее внесённые)'
     categories = [{
         'label': label,
-        'initial': balance['opening'][field] + balance['own'].get(field, 0),
-        'current': balance['current'][field],
-    } for field, label in labels.items()]
-    source_rows = [{'label': Debt._meta.get_field(field).verbose_name, 'amount': getattr(debt, field)}
-                   for field in PURCHASE_FIELDS]
+        'initial': selected_balance['opening'][field] + selected_balance['own'].get(field, 0),
+        'current': selected_balance['current'][field],
+    } for field, label in labels.items()] if selected_balance else []
+    source_rows = [{'label': Debt._meta.get_field(field).verbose_name, 'amount': getattr(selected_debt, field)}
+                   for field in PURCHASE_FIELDS] if selected_debt else []
     template = 'imports/partials/debt_balance.html' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'imports/debt_detail.html'
-    workspace = workspace_context(request, debt, balance)
     context = record_page_context(request, workspace['operation_rows'], label='Страницы операций договора')
     context.update(workspace)
     context.update(debt=debt, categories=categories, source_rows=source_rows)

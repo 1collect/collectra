@@ -52,9 +52,48 @@ class DebtWorkspaceTests(TestCase):
         self.client.force_login(reader)
         response = self.client.get(self.url, {'tab': 'payments'})
         self.assertEqual(response.context['active_tab'], 'overview')
-        self.assertEqual(response.context['operation_actions'], [])
         self.assertNotContains(response, 'data-operation-row=')
         self.assertNotContains(response, 'Добавить операцию')
+
+    def test_layout_has_borrower_banner_and_contract_picker_without_statuses(self):
+        response = self.client.get(self.url)
+        for marker in ('borrower-banner', 'borrower-columns', 'data-contract-search',
+                       'data-contract-select-all', 'data-contract-clear'):
+            self.assertContains(response, marker)
+        self.assertNotContains(response, 'Добавить операцию')
+        self.assertNotContains(response, 'Статус')
+        self.assertNotContains(response, 'Активен')
+        self.assertEqual(response.context['selected_contracts'], [response.context['selected_debt']])
+
+    def test_multi_selection_combines_only_selected_contracts(self):
+        sibling_payment = Payment.objects.create(debt=self.sibling, amount=10, status='individual', payment_date=date(2026, 10, 1))
+        response = self.client.get(self.url, {'scope': '1', 'contract': [self.debt.pk, self.sibling.pk, self.other_debt.pk], 'tab': 'payments'})
+        self.assertEqual(response.context['page_obj'].paginator.count, 2)
+        self.assertContains(response, f'data-operation-row="payment-{self.payment.pk}"')
+        self.assertContains(response, f'data-operation-row="payment-{sibling_payment.pk}"')
+        self.assertNotContains(response, f'data-operation-row="payment-{self.other_payment.pk}"')
+        self.assertEqual(response.context['contract_totals']['outstanding_amount'], 1070)
+        self.assertEqual(response.context['contract_totals']['paid_amount'], 30)
+        self.assertContains(response, 'Выбрано договоров: 2')
+        self.assertContains(response, f'contract={self.sibling.pk}')
+
+    def test_empty_selection_clears_operations_and_totals(self):
+        response = self.client.get(self.url, {'scope': '1', 'tab': 'payments'})
+        self.assertEqual(response.context['selected_contracts'], [])
+        self.assertEqual(response.context['page_obj'].paginator.count, 0)
+        self.assertContains(response, 'Выберите договоры')
+        self.assertNotContains(response, 'data-operation-row=')
+        self.assertNotContains(response, 'contract-summary-primary')
+
+    def test_selecting_sibling_uses_its_overview_and_history(self):
+        ActionLog.objects.create(action='recalculated', object_type='debt', object_id=str(self.sibling.pk), reason='SIBLING-HISTORY')
+        ActionLog.objects.create(action='recalculated', object_type='debt', object_id=str(self.debt.pk), reason='CURRENT-HISTORY')
+        response = self.client.get(self.url, {'scope': '1', 'contract': self.sibling.pk})
+        self.assertEqual(response.context['selected_debt'].pk, self.sibling.pk)
+        self.assertEqual(response.context['contract_totals']['outstanding_amount'], 100)
+        response = self.client.get(self.url, {'scope': '1', 'contract': self.sibling.pk, 'tab': 'history'})
+        self.assertContains(response, 'SIBLING-HISTORY')
+        self.assertNotContains(response, 'CURRENT-HISTORY')
 
     def test_history_excludes_other_contracts(self):
         ActionLog.objects.create(action='recalculated', object_type='debt', object_id=str(self.debt.pk), reason='CURRENT')

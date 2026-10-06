@@ -5,8 +5,9 @@
 {% block heading %}Карточка заёмщика{% endblock %}
 {% block content_class %}borrower-workspace{% endblock %}
 {% block content %}
+<section class="panel borrower-banner">
 <div class="page-header borrower-header">
-    <div><h1>{{ debt.debtor.full_name }}</h1><p>ИИН <span class="font-mono">{{ debt.debtor.iin }}</span> <span class="borrower-header-separator">·</span> Телефон: не указан</p></div>
+    <div><h1>{{ debt.debtor.full_name }}</h1><p>ИИН <span class="font-mono">{{ debt.debtor.iin }}</span></p></div>
     <a class="btn" href="{% url 'imports:debts' %}">Все договоры</a>
 </div>
 <details class="borrower-personal-details">
@@ -22,9 +23,10 @@
         <div><dt>КАТО</dt><dd>{{ debt.debtor.kato|default:'—' }}</dd></div>
     </dl>
 </details>
+</section>
 <div data-live-balances>{% include 'imports/partials/debt_balance.html' %}</div>
 {% endblock %}
 {% block scripts %}
-<script defer src="{% static 'js/debt-workspace.js' %}?v=20261006-1"></script>
-<script defer src="{% static 'js/balances.js' %}?v=20261006-2"></script>
+<script defer src="{% static 'js/debt-workspace.js' %}?v=20261006-2"></script>
+<script defer src="{% static 'js/balances.js' %}?v=20261006-3"></script>
 {% endblock %}

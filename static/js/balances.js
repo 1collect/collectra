@@ -17,7 +17,9 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!response.ok || response.redirected) throw new Error('refresh failed');
       const content = (await response.text()).trim();
       if (content !== lastContent) {
-        const positions = [...container.querySelectorAll('.table-container')].map(el => [el.scrollLeft, el.scrollTop]);
+        const scrollSelector = '.table-container, .contract-picker-list';
+        const positions = [...container.querySelectorAll(scrollSelector)].map(el => [el.scrollLeft, el.scrollTop]);
+        const contractSearch = container.querySelector('[data-contract-search]')?.value;
         const disclosures = [...container.querySelectorAll('details[open][id]')].map(el => el.id);
         const expanded = [...container.querySelectorAll('[data-operation-details]:not([hidden])')].map(el => el.dataset.operationDetails);
         container.innerHTML = content;
@@ -28,10 +30,13 @@ document.addEventListener('DOMContentLoaded', () => {
           if (row) row.hidden = false;
           if (button) { button.setAttribute('aria-expanded', 'true'); button.textContent = 'Свернуть'; }
         });
-        container.querySelectorAll('.table-container').forEach((el, index) => {
+        container.querySelectorAll(scrollSelector).forEach((el, index) => {
           const position = positions[index];
           if (position) { el.scrollLeft = position[0]; el.scrollTop = position[1]; }
         });
+        const searchInput = container.querySelector('[data-contract-search]');
+        if (searchInput && contractSearch !== undefined) searchInput.value = contractSearch;
+        document.dispatchEvent(new Event('balances:updated'));
         lastContent = content;
         status = document.querySelector('[data-balance-status]');
         const count = document.querySelector('[data-record-count]');
