@@ -24,11 +24,11 @@ class ImportPaginationTests(TestCase):
 
     def test_default_size_and_total(self):
         response = self.client.get(reverse('imports:list'))
-        self.assertEqual(len(response.context['imports']), 10)
+        self.assertEqual(len(response.context['imports']), 15)
         self.assertEqual(response.context['page_obj'].paginator.count, 43)
-        self.assertContains(response, '<option value="10" selected>10 строк</option>')
-        self.assertContains(response, 'Записи с 1 до 10 из 43')
-        self.assertContains(response, '?per_page=10&amp;page=2')
+        self.assertContains(response, '<option value="15" selected>15 строк</option>')
+        self.assertContains(response, 'Записи с 1 до 15 из 43')
+        self.assertContains(response, '?per_page=15&amp;page=2')
 
     def test_filters_individually_and_together(self):
         record = Import.objects.first()
@@ -51,11 +51,11 @@ class ImportPaginationTests(TestCase):
                 self.assertEqual(status['html'].count('data-import-id='), 1)
 
     def test_filter_pagination_and_invalid_values(self):
-        params = {'status': Import.Status.COMPLETED, 'per_page': 10}
+        params = {'status': Import.Status.COMPLETED, 'per_page': 15}
         response = self.client.get(reverse('imports:list'), params)
-        self.assertContains(response, '?per_page=10&amp;status=completed&amp;page=2')
+        self.assertContains(response, '?per_page=15&amp;status=completed&amp;page=2')
         data = self.client.get(reverse('imports:status'), params).json()
-        self.assertIn('?per_page=10&amp;status=completed&amp;page=2', data['pagination_html'])
+        self.assertIn('?per_page=15&amp;status=completed&amp;page=2', data['pagination_html'])
         response = self.client.get(reverse('imports:list'), {
             'author': 'bad', 'import_type': 'bad', 'status': 'bad', 'date_from': 'bad',
         })
@@ -70,39 +70,39 @@ class ImportPaginationTests(TestCase):
         second = self.client.get(reverse('imports:list'), {'page': 2})
         self.assertFalse(set(record.pk for record in first.context['imports']) &
                          set(record.pk for record in second.context['imports']))
-        self.assertContains(second, 'class="font-mono import-id-column">11</td>')
-        self.assertContains(second, 'Записи с 11 до 20 из 43')
-        last = self.client.get(reverse('imports:list'), {'page': 5})
-        self.assertEqual(len(last.context['imports']), 3)
-        self.assertContains(last, 'Записи с 41 до 43 из 43')
+        self.assertContains(second, 'class="font-mono import-id-column">16</td>')
+        self.assertContains(second, 'Записи с 16 до 30 из 43')
+        last = self.client.get(reverse('imports:list'), {'page': 3})
+        self.assertEqual(len(last.context['imports']), 13)
+        self.assertContains(last, 'Записи с 31 до 43 из 43')
         self.assertContains(last, 'class="font-mono import-id-column">43</td>')
 
     def test_size_selection_and_invalid_parameters(self):
-        for size in (10, 20, 50, 100):
+        for size in (15, 30, 50, 100):
             with self.subTest(size=size):
                 response = self.client.get(reverse('imports:list'), {'per_page': size})
                 self.assertEqual(len(response.context['imports']), min(43, size))
                 self.assertEqual(response.context['page_size'], size)
-        for size in ('bad', '0', '-5', '1000000'):
+        for size in ('bad', '0', '-5', '10', '20', '1000000'):
             with self.subTest(size=size):
                 response = self.client.get(reverse('imports:list'), {'per_page': size, 'page': 'bad'})
-                self.assertEqual(response.context['page_size'], 10)
+                self.assertEqual(response.context['page_size'], 15)
                 self.assertEqual(response.context['page_obj'].number, 1)
         response = self.client.get(reverse('imports:list'), {'page': 999})
-        self.assertEqual(response.context['page_obj'].number, 5)
+        self.assertEqual(response.context['page_obj'].number, 3)
 
     def test_polling_uses_same_page_and_total(self):
-        params = {'per_page': 10, 'page': 2}
+        params = {'per_page': 15, 'page': 2}
         listing = self.client.get(reverse('imports:list'), params)
         status = self.client.get(reverse('imports:status'), params)
         data = status.json()
         self.assertEqual(data['count'], 43)
-        self.assertEqual(data['html'].count('data-import-id='), 10)
+        self.assertEqual(data['html'].count('data-import-id='), 15)
         for record in listing.context['imports']:
             self.assertIn(f'data-import-id="{record.pk}"', data['html'])
-        self.assertIn('import-id-column">11</td>', data['html'])
+        self.assertIn('import-id-column">16</td>', data['html'])
         self.assertIn('aria-current="page" aria-label="Страница 2"', data['pagination_html'])
-        self.assertIn('?per_page=10&amp;page=3', data['pagination_html'])
+        self.assertIn('?per_page=15&amp;page=3', data['pagination_html'])
         self.assertEqual(status.headers['Cache-Control'], 'no-store')
 
     def test_pending_outside_current_page_is_reported(self):

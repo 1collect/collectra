@@ -50,13 +50,13 @@ def list_query_string(request):
 
 
 def import_page_context(request):
-    page_sizes = (10, 20, 50, 100)
+    page_sizes = (15, 30, 50, 100)
     try:
-        page_size = int(request.GET.get('per_page', 10))
+        page_size = int(request.GET.get('per_page', 15))
     except (ValueError, TypeError):
-        page_size = 10
+        page_size = 15
     if page_size not in page_sizes:
-        page_size = 10
+        page_size = 15
     records = Import.objects.select_related('import_type', 'created_by').order_by('-created_at', '-pk')
     filters = ImportFilterForm(request.GET)
     filters.is_valid()

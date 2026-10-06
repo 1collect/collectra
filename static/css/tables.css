@@ -56,6 +56,11 @@
 .table td[colspan] .empty-state { position: sticky; left: 0; width: calc(100cqw - var(--space-5)); max-width: 100%; }
 
 /* Import history: keep the record key visible while the wide table scrolls. */
+body[data-page="imports"] .content { height: calc(var(--viewport-dynamic-height) - var(--topbar-height)); min-height: 0; display: flex; flex-direction: column; }
+.import-history { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+.import-history > .panel-header, .import-history > .table-footer { flex-shrink: 0; }
+.import-history > .import-filter-panel { flex-shrink: 0; max-height: 50%; overflow-y: auto; }
+.import-history > .import-table-container { flex: 1; min-height: 0; overscroll-behavior: contain; }
 .import-header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-left: auto; }
 .import-table-settings { display: flex; align-items: center; gap: 8px; }
 .import-table-settings-separated { border-right: 1px solid var(--border-color); padding-right: 16px; }
