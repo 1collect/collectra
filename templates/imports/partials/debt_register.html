@@ -1,4 +1,4 @@
-    <div class="p-0 table-container">
+    <div class="p-0 table-container" tabindex="0" role="region" aria-label="Реестр договоров">
         <table class="table table-bordered table-compact debt-register">
             <thead><tr><th scope="col" class="record-key">ДБЗ</th><th scope="col">ФИО</th><th scope="col">ИИН</th><th scope="col" class="cell-number">Основной долг</th><th scope="col" class="cell-number">Вознаграждение</th><th scope="col" class="cell-number">Пеня/Штрафы</th><th scope="col" class="cell-number">Дебиторская задолженность</th><th scope="col" class="cell-number">Гос.пошлина</th><th scope="col" class="cell-number">Представительские расходы</th><th scope="col" class="cell-number">Нотариальные расходы</th><th scope="col" class="cell-number">Почтовые расходы</th><th scope="col" class="cell-number">Обеспечение иска</th><th scope="col" class="cell-number">Дополнительные расходы</th><th scope="col" class="cell-number">Общая сумма задолженности</th><th scope="col" class="cell-number">Оплачено</th><th scope="col" class="cell-number">Списано</th><th scope="col" class="cell-number">Остаток</th><th scope="col" class="cell-number">Переплата</th><th scope="col">Дата закрытия</th></tr></thead>
             <tbody>
@@ -28,13 +28,4 @@
             </tbody>
         </table>
     </div>
-    {% if page_obj.paginator.num_pages > 1 %}
-    <div class="table-footer">
-        <span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span>
-        <nav aria-label="Страницы договоров" class="pagination">
-            {% if page_obj.has_previous %}<a class="page-btn" href="?page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}
-            <span aria-current="page" class="page-btn">{{ page_obj.number }}</span>
-            {% if page_obj.has_next %}<a class="page-btn" href="?page={{ page_obj.next_page_number }}">Далее</a>{% endif %}
-        </nav>
-    </div>
-    {% endif %}
+    <div class="table-footer">{% include 'imports/partials/record_pagination.html' %}</div>

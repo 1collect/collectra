@@ -1,10 +1,1 @@
-<span class="table-result-info" role="status">{% if page_obj.paginator.count %}Записи с {{ page_obj.start_index }} до {{ page_obj.end_index }} из {{ page_obj.paginator.count }}{% else %}Записей: 0{% endif %}</span>
-{% if page_obj.has_other_pages %}
-<nav class="pagination" aria-label="Страницы импортов">
-    {% if page_obj.has_previous %}<a class="page-btn" href="?{{ import_query_string }}&amp;page={{ page_obj.previous_page_number }}" aria-label="Предыдущая страница"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"></path></svg></a>{% else %}<button class="page-btn" type="button" disabled aria-label="Предыдущая страница"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m15 6-6 6 6 6"></path></svg></button>{% endif %}
-    {% for number in page_numbers %}
-        {% if number == page_obj.paginator.ELLIPSIS %}<span class="page-ellipsis">{{ number }}</span>{% elif number == page_obj.number %}<span class="page-btn" aria-current="page" aria-label="Страница {{ number }}">{{ number }}</span>{% else %}<a class="page-btn" href="?{{ import_query_string }}&amp;page={{ number }}" aria-label="Страница {{ number }}">{{ number }}</a>{% endif %}
-    {% endfor %}
-    {% if page_obj.has_next %}<a class="page-btn" href="?{{ import_query_string }}&amp;page={{ page_obj.next_page_number }}" aria-label="Следующая страница"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></a>{% else %}<button class="page-btn" type="button" disabled aria-label="Следующая страница"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m9 6 6 6-6 6"></path></svg></button>{% endif %}
-</nav>
-{% endif %}
+{% include 'imports/partials/record_pagination.html' with pagination_query_string=import_query_string pagination_label='Страницы импортов' %}

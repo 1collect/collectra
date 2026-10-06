@@ -49,7 +49,7 @@ def list_query_string(request):
     return query.urlencode()
 
 
-def import_page_context(request):
+def selected_page_size(request):
     page_sizes = (15, 30, 50, 100)
     try:
         page_size = int(request.GET.get('per_page', 15))
@@ -57,6 +57,27 @@ def import_page_context(request):
         page_size = 15
     if page_size not in page_sizes:
         page_size = 15
+    return page_size, page_sizes
+
+
+def record_page_context(request, records, *, label):
+    page_size, page_sizes = selected_page_size(request)
+    page = Paginator(records, page_size).get_page(request.GET.get('page'))
+    query = request.GET.copy()
+    query.pop('page', None)
+    query.pop('per_page', None)
+    params = [(key, value) for key, values in query.lists() for value in values]
+    query['per_page'] = page_size
+    return {
+        'page_obj': page, 'page_size': page_size, 'page_sizes': page_sizes,
+        'pagination_query_string': query.urlencode(), 'pagination_params': params,
+        'pagination_label': label,
+        'page_numbers': list(page.paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+    }
+
+
+def import_page_context(request):
+    page_size, page_sizes = selected_page_size(request)
     records = Import.objects.select_related('import_type', 'created_by').order_by('-created_at', '-pk')
     filters = ImportFilterForm(request.GET)
     filters.is_valid()
@@ -261,15 +282,14 @@ def debt_list(request):
         'counterparty',
         'import_item__import_record',
     ).order_by('contract_number')
-    page_obj = Paginator(debts, 25).get_page(request.GET.get('page'))
+    context = record_page_context(request, debts, label='Страницы договоров')
+    page_obj = context['page_obj']
     page_obj.object_list = list(page_obj.object_list.prefetch_related('payments__refunds', 'expenses', 'writeoffs'))
     for debt in page_obj.object_list:
         apply_balance(debt, calculate_balance(debt))
 
     template = 'imports/partials/debt_register.html' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'imports/debt_list.html'
-    response = render(request, template, {
-        'page_obj': page_obj,
-    })
+    response = render(request, template, context)
     response['Cache-Control'] = 'no-store'
     return response
 
@@ -311,9 +331,9 @@ def _financial_list(request, *, model, title, kind):
     if not request.user.has_perm(permission):
         raise PermissionDenied
     records = model.objects.select_related('debt', 'debt__debtor', 'import_item__import_record')
-    page_obj = Paginator(records, 25).get_page(request.GET.get('page'))
-    return render(request, 'imports/financial_list.html', {
-        'page_obj': page_obj, 'title': title, 'kind': kind,
+    context = record_page_context(request, records, label=f'Страницы: {title.lower()}')
+    return render(request, 'imports/financial_list.html', context | {
+        'title': title, 'kind': kind,
     })
 
 
@@ -350,9 +370,8 @@ def expense_list(request):
 @permission_required('imports.view_writeoff')
 def writeoff_list(request):
     records = WriteOff.objects.select_related('debt', 'debt__debtor', 'created_by', 'import_item__import_record')
-    return render(request, 'imports/writeoff_list.html', {
-        'page_obj': Paginator(records, 25).get_page(request.GET.get('page')),
-    })
+    return render(request, 'imports/writeoff_list.html',
+                  record_page_context(request, records, label='Страницы списаний'))
 
 
 @permission_required('imports.add_writeoff')
@@ -525,10 +544,8 @@ def refund_list(request):
         'created_by',
         'import_item__import_record', 'payment__import_item__import_record',
     )
-    page_obj = Paginator(refunds, 25).get_page(request.GET.get('page'))
-    return render(request, 'imports/refund_list.html', {
-        'page_obj': page_obj,
-    })
+    return render(request, 'imports/refund_list.html',
+                  record_page_context(request, refunds, label='Страницы возвратов'))
 
 
 @permission_required('imports.add_paymentrefund')

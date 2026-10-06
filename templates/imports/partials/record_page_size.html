@@ -1,0 +1,7 @@
+<form class="rows-control" method="get" aria-label="Настройки таблицы">
+    {% for key, value in pagination_params %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+    <select class="form-control" name="per_page" aria-label="Количество строк на странице" title="Количество строк на странице" data-record-page-size>
+        {% for size in page_sizes %}<option value="{{ size }}"{% if size == page_size %} selected{% endif %}>{{ size }} строк</option>{% endfor %}
+    </select>
+    <noscript><button class="btn" type="submit">Применить</button></noscript>
+</form>

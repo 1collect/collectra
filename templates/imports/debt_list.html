@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% block content_class %}content--register{% endblock %}
 {% block title %}Договоры{% endblock %}
 {% block page_name %}debts{% endblock %}
 {% block heading %}Договоры{% endblock %}
@@ -7,12 +8,10 @@
 <div class="page-header">
     <div><div class="page-eyebrow">Данные / Задолженности</div><h1>Договоры</h1></div>
 </div>
-<section class="panel">
-    <div class="panel-header"><h2>Реестр договоров <span class="badge">{{ page_obj.paginator.count }}</span></h2><span class="badge badge-neutral">По 25 записей</span></div>
-    <div class="panel-body">
-    </div>
+<section class="panel data-register">
+    <div class="panel-header"><h2>Реестр договоров <span class="badge">{{ page_obj.paginator.count }}</span></h2>{% include 'imports/partials/record_page_size.html' %}</div>
     <div data-live-balances>{% include 'imports/partials/debt_register.html' %}</div>
 </section>
 {% endblock %}
 
-{% block scripts %}<script defer src="{% static 'js/balances.js' %}"></script>{% endblock %}
+{% block scripts %}<script defer src="{% static 'js/balances.js' %}"></script><script defer src="{% static 'js/table-pagination.js' %}?v=20261006-1"></script>{% endblock %}

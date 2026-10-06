@@ -7,7 +7,7 @@
     <meta name="description" content="Панель управления платежами">
     <title>{% block title %}Панель управления{% endblock %} — Collectra</title>
     <link href="{% static 'assets/icons/favicon.svg' %}" rel="icon" type="image/svg+xml">
-    <link href="{% static 'css/main.css' %}?v=20261006-1" rel="stylesheet">
+    <link href="{% static 'css/main.css' %}?v=20261006-2" rel="stylesheet">
 </head>
 <body data-page="{% block page_name %}dashboard{% endblock %}">
     <a class="skip-link" href="#main-content">Перейти к содержимому</a>
@@ -117,7 +117,7 @@
                 </div>
             </div>
         </header>
-        <main class="content" id="main-content" tabindex="-1">
+        <main class="content {% block content_class %}{% endblock %}" id="main-content" tabindex="-1">
             {% block notifications %}{% if messages %}{% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} mb-3">{{ message }}</div>{% endfor %}{% endif %}{% endblock %}
             {% if form_modal_page %}
             <dialog class="modal modal-form{% if form_modal_compact %} modal-form-compact{% endif %}" id="record-form-modal" data-form-auto-open data-return-url="{{ form_modal_return_url }}" aria-labelledby="record-form-title">

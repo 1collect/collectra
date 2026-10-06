@@ -1,4 +1,6 @@
 {% extends 'base.html' %}
+{% load static %}
+{% block content_class %}content--register{% endblock %}
 {% block title %}Возвраты платежей{% endblock %}
 {% block page_name %}refunds{% endblock %}
 {% block heading %}Возвраты платежей{% endblock %}
@@ -7,9 +9,9 @@
     <div><div class="page-eyebrow">Данные / Платежи</div><h1>Возвраты платежей</h1></div>
     <a data-form-modal aria-haspopup="dialog" class="btn btn-primary" href="{% url 'imports:refund_new' %}">Создать возврат</a>
 </div>
-<section class="panel">
-    <div class="panel-header"><h2>История возвратов <span class="badge">{{ page_obj.paginator.count }}</span></h2></div>
-    <div class="p-0 table-container">
+<section class="panel data-register">
+    <div class="panel-header"><h2>История возвратов <span class="badge">{{ page_obj.paginator.count }}</span></h2>{% include 'imports/partials/record_page_size.html' %}</div>
+    <div class="p-0 table-container" tabindex="0" role="region" aria-label="{{ title|default:pagination_label }}">
         <table class="table table-bordered table-compact">
             <thead><tr><th scope="col">Договор</th><th scope="col">Исходный платёж</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма возврата</th><th scope="col">Дата</th><th scope="col">Основание</th><th scope="col">Создал</th></tr></thead>
             <tbody>
@@ -27,6 +29,8 @@
             </tbody>
         </table>
     </div>
-    {% if page_obj.paginator.num_pages > 1 %}<div class="table-footer"><span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span><nav class="pagination" aria-label="Страницы возвратов">{% if page_obj.has_previous %}<a class="page-btn" href="?page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}<span class="page-btn" aria-current="page">{{ page_obj.number }}</span>{% if page_obj.has_next %}<a class="page-btn" href="?page={{ page_obj.next_page_number }}">Далее</a>{% endif %}</nav></div>{% endif %}
+    <div class="table-footer">{% include 'imports/partials/record_pagination.html' %}</div>
 </section>
 {% endblock %}
+
+{% block scripts %}<script defer src="{% static 'js/table-pagination.js' %}?v=20261006-1"></script>{% endblock %}
