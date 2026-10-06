@@ -7,8 +7,8 @@ from openpyxl import load_workbook
 from openpyxl.utils import get_column_letter
 from django.core.files.uploadedfile import SimpleUploadedFile
 
-from .models import Import, ImportItem, ImportType
-from .services import process_xlsx_import
+from imports.models import Import, ImportItem, ImportType
+from imports.services import process_xlsx_import
 from .tests import xlsx_file
 
 
@@ -34,7 +34,7 @@ class ImportDownloadTests(TestCase):
         response = self.client.get(reverse('imports:download', args=[self.record.pk]), params)
         self.assertEqual(response.status_code, 200)
         content = b''.join(response.streaming_content)
-        response.close()
+        # The test client's streaming iterator already closes the response.
         return response, load_workbook(BytesIO(content))
 
     def test_error_report_appends_only_error_and_preserves_source_rows(self):
@@ -134,7 +134,6 @@ class ImportDownloadTests(TestCase):
         self.assertEqual(self.record.successful_items, 1)
         response = self.client.get(reverse('imports:download', args=[self.record.pk]))
         content = b''.join(response.streaming_content)
-        response.close()
         regenerated = Import.objects.create(import_type=self.record.import_type)
         process_xlsx_import(regenerated, SimpleUploadedFile('regenerated.xlsx', content), preview_only=True)
         self.assertEqual(regenerated.successful_items, 1)

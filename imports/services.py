@@ -1,23 +1,39 @@
 from copy import copy
+from contextlib import contextmanager
+from contextvars import ContextVar
+from itertools import islice
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from zipfile import BadZipFile
 import json
+import logging
 
 from django.db import transaction
+from django.conf import settings
 from django.db.models import Count, Max, Q, Sum
 from django.core.serializers.json import DjangoJSONEncoder
 from django.utils import timezone
 from openpyxl import load_workbook
 from openpyxl.utils.exceptions import InvalidFileException
 from contract_generator.schema import CONTRACT_BASE_COLUMNS
+from finance.services import (
+    recalculate_debt, recalculate_payment, FinancialChangeError,
+    create_financial_change_request, review_financial_change, financial_record_snapshot,
+    PAYMENT_CHANGE_FIELDS, EXPENSE_CHANGE_FIELDS, _active_refund_total,
+)
+from refunds.services import RefundValidationError, create_payment_refund, cancel_payment_refund
+from writeoffs.services import WriteOffValidationError, create_writeoff
 
 from .balances import apply_balance, calculate_balance, WRITEOFF_CATEGORIES
 from .audit import audit_user, log_action
-from .models import (
-    Debt, Debtor, Expense, FinancialChangeRequest, Import, ImportItem,
-    Payment, PaymentRefund, WriteOff,
-)
+from .writeoff_import import WRITEOFF_COLUMN_FIELDS, WRITEOFF_TEMPLATE_COLUMNS, WRITEOFF_HEADER_ALIASES
+from debts.models import Debt, Debtor
+from expenses.models import Expense
+from finance.models import FinancialChangeRequest
+from imports.models import Import, ImportItem
+from payments.models import Payment
+from refunds.models import PaymentRefund
+from writeoffs.models import WriteOff
 
 
 CONTRACT_IMPORT_COLUMNS = CONTRACT_BASE_COLUMNS
@@ -43,7 +59,7 @@ PAYMENT_REQUIRED_COLUMNS = ('ДБЗ', 'Платеж', 'Статус платеж
 FINANCIAL_HEADER_ALIASES = {
     'payments': {'Сумма платежа': 'Платеж', 'От кого': 'Статус платежа'},
     'expenses': {'Обесечение иска': 'Обеспечение иска'},
-    'writeoffs': {'Сумма': 'Сумма списания', 'Тип': 'Тип списания'},
+    'writeoffs': {'Сумма': 'Сумма списания', 'Тип': 'Тип списания', **WRITEOFF_HEADER_ALIASES},
 }
 
 DEBT_COLUMN_FIELDS = {
@@ -69,6 +85,68 @@ EXPENSE_COLUMN_FIELDS = {
 
 class ImportValidationError(Exception):
     pass
+
+
+_import_debts = ContextVar('import_debt_lookup', default=None)
+_import_references = ContextVar('import_reference_lookup', default=None)
+_import_recalculations = ContextVar('import_recalculations', default=None)
+
+
+@contextmanager
+def cache_import_debts():
+    token = _import_debts.set({})
+    references_token = _import_references.set({})
+    try:
+        yield
+    finally:
+        _import_debts.reset(token)
+        _import_references.reset(references_token)
+
+
+def import_reference(model, filters, message):
+    cache = _import_references.get()
+    key = (model, tuple(sorted(filters.items())))
+    if cache is None or key not in cache:
+        query = model.objects.filter(**filters)
+        if model._meta.model_name == 'cession':
+            query = query.select_related('creditor')
+        records = list(query[:2])
+        result = records[0] if len(records) == 1 else None
+        if cache is not None:
+            cache[key] = result
+    else:
+        result = cache[key]
+    if result is None:
+        raise ImportValidationError(message)
+    return result
+
+
+@contextmanager
+def defer_import_recalculations(code, records):
+    # Writeoffs must still validate each operation against the dated ledger.
+    if code not in ('payments', 'expenses'):
+        yield
+        return
+    debt_ids = {values['debt'].pk for values in records}
+    # Serialise financial changes before writing, in a deterministic lock order.
+    list(Debt.objects.select_for_update().filter(pk__in=debt_ids).order_by('pk').values_list('pk', flat=True))
+    affected = set()
+    token = _import_recalculations.set(affected)
+    try:
+        yield
+    finally:
+        _import_recalculations.reset(token)
+    # Only successful writes reach here; everything remains in the import transaction.
+    for debt_id in sorted(affected):
+        recalculate_debt(debt_id)
+
+
+def recalculate_import_debt(debt_id):
+    pending = _import_recalculations.get()
+    if pending is None:
+        recalculate_debt(debt_id)
+    else:
+        pending.add(debt_id)
 
 
 def normalize_header(value):
@@ -116,6 +194,14 @@ def decimal_values(data, column_fields):
 
 
 def debt_for_contract(contract_number):
+    cache = _import_debts.get()
+    if cache is not None:
+        if contract_number not in cache:
+            cache[contract_number] = Debt.objects.select_related('debtor').filter(contract_number=contract_number).first()
+        debt = cache[contract_number]
+        if debt is None:
+            raise ImportValidationError(f'Договор с ДБЗ «{contract_number}» не найден.')
+        return debt
     try:
         return Debt.objects.get(contract_number=contract_number)
     except Debt.DoesNotExist as error:
@@ -211,302 +297,58 @@ def save_contract(contract_number, iin, full_name, debt_values, *, import_item=N
 
 def save_expense(values, *, import_item=None):
     expense = Expense.objects.create(**values, import_item=import_item)
-    recalculate_debt(expense.debt_id)
+    recalculate_import_debt(expense.debt_id)
     return expense
 
 
 def save_payment(values, *, import_item=None):
     payment = Payment.objects.create(**values, import_item=import_item)
-    recalculate_debt(payment.debt_id)
+    recalculate_import_debt(payment.debt_id)
     return payment
 
 
-class RefundValidationError(Exception):
-    pass
-
-
-def _active_refund_total(payment_id):
-    return PaymentRefund.objects.filter(
-        payment_id=payment_id,
-        status=PaymentRefund.Status.ACTIVE,
-    ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-
-
-def recalculate_payment(payment, *, actor=None, reason=''):
-    """Synchronize cached refund data from the immutable refund history."""
-    refunded_amount = _active_refund_total(payment.pk)
-    if refunded_amount <= 0:
-        refund_status = Payment.RefundStatus.ACTIVE
-    elif refunded_amount >= payment.amount:
-        refund_status = Payment.RefundStatus.REFUNDED
-    else:
-        refund_status = Payment.RefundStatus.PARTIALLY_REFUNDED
-
-    payment.refunded_amount = refunded_amount
-    payment.refund_status = refund_status
-    payment.save(update_fields=('refunded_amount', 'refund_status'), audit_actor=actor, audit_reason=reason)
-    return payment
-
-
-@transaction.atomic
-def recalculate_debt(debt_or_id, *, source='recalculation', actor=None):
-    """Recalculate contract figures using every payment exactly once."""
-    debt = Debt.objects.select_for_update().get(pk=debt_or_id.pk if isinstance(debt_or_id, Debt) else debt_or_id)
-    balance = calculate_balance(debt)
-    fields = ('paid_amount', 'written_off_amount', 'outstanding_amount',
-              'overpayment_amount', 'status', 'closed_at', 'needs_manual_review',
-              'recalculation_error_message', 'has_overpayment')
-    Debt.objects.filter(pk=debt.pk).update(**{field: balance[field] for field in fields})
-    apply_balance(debt, balance)
-    from .models import BalanceSnapshot, PaymentDistribution
-    debt.balance_snapshots.all().delete()
-    dates = {operation['date'] for operation in balance['operations']}
-    if debt.registry_date: dates.add(debt.registry_date)
-    dates.add(timezone.localdate())
-    for day in sorted(dates):
-        snapshot = calculate_balance(debt, as_of=day)
-        if not snapshot['needs_manual_review']:
-            BalanceSnapshot.objects.create(debt=debt, snapshot_date=day,
-                balances={f: str(v) for f, v in snapshot['current'].items()},
-                outstanding_amount=snapshot['outstanding_amount'], overpayment_amount=snapshot['overpayment_amount'],
-                status=snapshot['status'], closed_at=snapshot['closed_at'],
-                paid_amount=snapshot['paid_amount'], written_off_amount=snapshot['written_off_amount'], calculation_source=source)
-    # Remove cancelled operations and allocations omitted by a failed replay.
-    PaymentDistribution.objects.filter(payment__debt=debt).exclude(
-        payment_id__in=balance['payment_allocations'],
-    ).delete()
-    for payment_id, allocation in balance['payment_allocations'].items():
-        payment = Payment.objects.get(pk=payment_id)
-        PaymentDistribution.objects.update_or_create(payment=payment, defaults={
-            'amounts': {f: str(v) for f, v in allocation['allocation'].items()},
-            'overpayment_amount': allocation['surplus'], 'mode': payment.distribution_mode})
-    log_action('recalculation_error' if balance['needs_manual_review'] else 'recalculated', debt,
-               actor=actor, details={'source': source, 'error': balance['recalculation_error_message']})
-    return debt
-
-
-class WriteOffValidationError(Exception):
-    pass
-
-
-@transaction.atomic
-def create_writeoff(*, debt_id, kind, category='', writeoff_date, created_by, amount=None, distribution=None, reason='', import_item=None):
-    debt = Debt.objects.select_for_update().get(pk=debt_id)
-    if kind not in WriteOff.Kind.values:
-        raise WriteOffValidationError('Выберите тип списания.')
-    if kind == WriteOff.Kind.PARTIAL and not distribution and category not in WriteOff.Category.values:
-        raise WriteOffValidationError('Выберите категорию частичного списания.')
-    balance = calculate_balance(debt, as_of=writeoff_date)
-    if balance['needs_manual_review']:
-        raise WriteOffValidationError(balance['recalculation_error_message'])
-    current = balance['current']
-    if kind == WriteOff.Kind.FULL:
-        category = ''
-        amount = balance['outstanding_amount']
-        distribution = {field: str(value) for field, value in current.items()}
-    elif distribution:
-        from .ledger import allocation_values
-        try:
-            values = allocation_values(distribution)
-            amount = Decimal(str(amount)) if amount is not None else sum(values.values(), Decimal('0'))
-        except (ValueError, InvalidOperation):
-            raise WriteOffValidationError('Некорректное распределение списания.')
-        if amount <= 0 or sum(values.values(), Decimal('0')) != amount or any(v > current[f] for f, v in values.items()):
-            raise WriteOffValidationError('Суммы по категориям должны равняться сумме списания и не превышать остатки.')
-        distribution = {f: str(v) for f, v in values.items() if v}
-        category = ''
-    else:
-        current_category = WRITEOFF_CATEGORIES[category]
-        available = current[current_category]
-        try:
-            amount = Decimal(str(amount))
-        except (InvalidOperation, ValueError):
-            raise WriteOffValidationError('Укажите сумму частичного списания.')
-        if not amount.is_finite() or amount <= 0:
-            raise WriteOffValidationError('Сумма списания должна быть больше нуля.')
-        if amount > available:
-            raise WriteOffValidationError(f'Сумма списания не может превышать доступный остаток {available:.2f}.')
-        distribution = {current_category: str(amount)}
-    if amount <= 0:
-        raise WriteOffValidationError('Нет доступной суммы для списания.')
-    writeoff = WriteOff(
-        import_item=import_item,
-        debt=debt, kind=kind, category=category, amount=amount,
-        writeoff_date=writeoff_date, created_by=created_by, distribution=distribution, reason=reason,
-    )
-    writeoff.full_clean()
-    writeoff.save()
-    recalculate_debt(debt)
-    return writeoff
-
-
-PAYMENT_CHANGE_FIELDS = ('debt', 'amount', 'status', 'payment_date', 'account', 'transfer_date')
-EXPENSE_CHANGE_FIELDS = (
-    'debt', 'state_duty', 'representative_expenses', 'notary_expenses',
-    'postal_expenses', 'claim_security', 'additional_expenses', 'expense_date',
-)
-
-
-class FinancialChangeError(Exception):
-    pass
-
-
-def _json_value(value):
-    if hasattr(value, 'pk'):
-        return value.pk
-    if isinstance(value, Decimal):
-        return str(value)
-    if isinstance(value, (date, datetime)):
-        return value.isoformat()
-    return value
-
-
-def financial_record_snapshot(record):
-    fields = PAYMENT_CHANGE_FIELDS if isinstance(record, Payment) else EXPENSE_CHANGE_FIELDS
-    return {
-        field: _json_value(record.debt_id if field == 'debt' else getattr(record, field))
-        for field in fields
-    }
-
-
-def create_financial_change_request(*, record, cleaned_data, reason, requested_by):
-    record = record.__class__.objects.get(pk=record.pk)
-    if record.operation_status == 'cancelled':
-        raise FinancialChangeError('Нельзя изменить отменённую операцию.')
-    pending = record.change_requests.filter(status=FinancialChangeRequest.Status.PENDING)
-    if pending.exists():
-        raise FinancialChangeError('Для этой записи уже есть заявка на подтверждении.')
-    fields = PAYMENT_CHANGE_FIELDS if isinstance(record, Payment) else EXPENSE_CHANGE_FIELDS
-    new_data = {field: _json_value(cleaned_data.get(field, getattr(record, field))) for field in fields}
-    old_data = financial_record_snapshot(record)
-    if new_data == old_data:
-        raise FinancialChangeError('Измените хотя бы одно поле.')
-    kwargs = {'payment': record} if isinstance(record, Payment) else {'expense': record}
-    return FinancialChangeRequest.objects.create(
-        **kwargs,
-        old_data=old_data,
-        new_data=new_data,
-        reason=reason.strip(),
-        requested_by=requested_by,
-    )
-
-
-def _restore_value(record, field, value):
-    model_field = record._meta.get_field(field)
-    if value is None: return None
-    if model_field.is_relation:
-        return model_field.remote_field.model.objects.get(pk=value)
-    if model_field.get_internal_type() == 'DecimalField':
-        return Decimal(value)
-    if model_field.get_internal_type() == 'DateField':
-        return date.fromisoformat(value)
-    return value
-
-
-@transaction.atomic
-def review_financial_change(*, change_id, reviewer, approve, comment=''):
-    change = FinancialChangeRequest.objects.select_for_update().select_related(
-        'payment', 'expense', 'requested_by',
-    ).get(pk=change_id)
-    if change.status != FinancialChangeRequest.Status.PENDING:
-        raise FinancialChangeError('Эта заявка уже рассмотрена.')
-    if change.requested_by_id == reviewer.pk:
-        raise FinancialChangeError('Автор заявки не может подтвердить собственное изменение.')
-
-    if approve:
-        record = change.record
-        record = record.__class__.objects.select_for_update().get(pk=record.pk)
-        if record.operation_status == 'cancelled':
-            raise FinancialChangeError('Нельзя подтвердить изменение отменённой операции.')
-        if financial_record_snapshot(record) != change.old_data:
-            raise FinancialChangeError(
-                'Запись изменилась после создания заявки. Отклоните заявку и создайте новую.'
-            )
-        old_debt_id = record.debt_id
-        for field, value in change.new_data.items():
-            setattr(record, field, _restore_value(record, field, value))
-        if isinstance(record, Payment):
-            if record.refunds.filter(refund_date__lt=record.payment_date).exists():
-                raise FinancialChangeError('Дата платежа не может быть позже уже оформленного возврата.')
-            active_refunds = _active_refund_total(record.pk)
-            if record.amount < active_refunds:
-                raise FinancialChangeError(
-                    f'Сумма платежа меньше уже возвращённой суммы {active_refunds:.2f}.'
-                )
-        record.full_clean(exclude=('refunded_amount', 'refund_status'))
-        record.operation_status = 'corrected'
-        record.save(update_fields=(*change.new_data, 'operation_status'), audit_actor=reviewer, audit_reason=change.reason)
-        if isinstance(record, Payment):
-            recalculate_payment(record, actor=reviewer, reason=change.reason)
-            recalculate_debt(old_debt_id)
-            if record.debt_id != old_debt_id:
-                recalculate_debt(record.debt_id)
-        elif isinstance(record, Expense):
-            recalculate_debt(old_debt_id)
-            if record.debt_id != old_debt_id:
-                recalculate_debt(record.debt_id)
-        change.status = FinancialChangeRequest.Status.APPROVED
-    else:
-        change.status = FinancialChangeRequest.Status.REJECTED
-
-    change.reviewed_by = reviewer
-    change.review_comment = comment.strip()
-    change.reviewed_at = timezone.now()
-    change.save(update_fields=('status', 'reviewed_by', 'review_comment', 'reviewed_at'))
-    return change
-
-
-@transaction.atomic
-def create_payment_refund(*, payment_id, amount, refund_date, reason, created_by):
-    """Create a refund while serializing changes for the source payment."""
-    payment = Payment.objects.select_for_update().select_related('debt').get(
-        pk=payment_id,
-    )
-    Debt.objects.select_for_update().get(pk=payment.debt_id)
-    amount = Decimal(amount)
-    reason = reason.strip()
-    if amount <= 0:
-        raise RefundValidationError('Сумма возврата должна быть больше нуля.')
-    if not reason:
-        raise RefundValidationError('Укажите основание возврата.')
-    if payment.operation_status == 'cancelled': raise RefundValidationError('Нельзя вернуть отменённый платёж.')
-    if refund_date < payment.payment_date: raise RefundValidationError('Дата возврата не может быть раньше платежа.')
-
-    active_refunds = _active_refund_total(payment.pk)
-    refundable_amount = payment.amount - active_refunds
-    if amount > refundable_amount:
-        raise RefundValidationError(
-            'Сумма возврата не может превышать доступный остаток '
-            f'{refundable_amount:.2f}.'
-        )
-
-    refund = PaymentRefund.objects.create(
-        payment=payment,
-        amount=amount,
-        refund_date=refund_date,
-        reason=reason,
-        payment_category=payment.status,
-        created_by=created_by,
-    )
-    recalculate_payment(payment, actor=created_by, reason=f'Возврат #{refund.pk}: {reason}')
-    recalculate_debt(payment.debt_id)
-    return refund
-
-
-@transaction.atomic
-def cancel_payment_refund(refund_id, *, cancelled_by=None):
-    refund = PaymentRefund.objects.select_for_update().select_related(
-        'payment',
-    ).get(pk=refund_id)
-    Payment.objects.select_for_update().get(pk=refund.payment_id)
-    Debt.objects.select_for_update().get(pk=refund.payment.debt_id)
-    if refund.status == PaymentRefund.Status.ACTIVE:
-        refund.status = PaymentRefund.Status.CANCELLED
-        refund.cancelled_at = timezone.now()
-        refund.save(update_fields=('status', 'cancelled_at'))
-        recalculate_payment(refund.payment, actor=cancelled_by, reason=f'Отмена возврата #{refund.pk}')
-        recalculate_debt(refund.payment.debt_id)
-    return refund
+def save_import_rows(code, items, records, save_func, *, progress=None):
+    """Batch financial inserts while retaining source links and both audit trails."""
+    total = len(items)
+    if code == 'contracts' and save_func is save_contract_record:
+        from .import_batches import save_contract_batches
+        save_contract_batches(items, records, progress=progress)
+        return
+    model = Payment if code == 'payments' and save_func is save_payment else (
+        Expense if code == 'expenses' and save_func is save_expense else None)
+    with defer_import_recalculations(code, records):
+        if model is None:
+            step = max(10, min(1000, total // 100))
+            for index, (item, values) in enumerate(zip(items, records, strict=True), start=1):
+                save_func(values, import_item=item)
+                if progress and (index == 1 or index % step == 0 or index == total):
+                    progress(index, total)
+            return
+        from .audit import record_snapshot
+        from finance.models import ActionLog, FinancialRecordHistory
+        actor = audit_user.get()
+        for start in range(0, total, 500):
+            batch = []
+            for item, values in zip(items[start:start + 500], records[start:start + 500], strict=True):
+                fields = {**values, 'import_item': item}
+                if model is Payment:
+                    fields['created_by'] = actor or item.import_record.created_by
+                batch.append(model(**fields))
+            model.objects.bulk_create(batch, batch_size=500)
+            # Audit persisted values, including the database's Decimal rounding.
+            persisted = list(model.objects.filter(pk__in=[record.pk for record in batch]).order_by('pk'))
+            histories, actions = [], []
+            for record in persisted:
+                snapshot = record_snapshot(record)
+                histories.append(FinancialRecordHistory(**{model._meta.model_name: record},
+                    action='created', old_data={}, new_data=snapshot, actor=actor))
+                actions.append(ActionLog(actor=actor, action='created', object_type=model._meta.model_name,
+                    object_id=str(record.pk), details={'old': {}, 'new': snapshot}))
+                recalculate_import_debt(record.debt_id)
+            FinancialRecordHistory.objects.bulk_create(histories, batch_size=500)
+            ActionLog.objects.bulk_create(actions, batch_size=500)
+            if progress:
+                progress(min(start + 500, total), total)
 
 
 def save_contract_record(values, *, import_item=None):
@@ -608,6 +450,7 @@ IMPORT_HANDLERS = {
 }
 
 
+@cache_import_debts()
 def process_xlsx_import(import_record, uploaded_file, *, preview_only=False, progress=None, check_token=None):
     started_at = timezone.now()
     import_record.status = Import.Status.PROCESSING
@@ -638,15 +481,22 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False, pro
             raise ImportValidationError('Файл не содержит строк.')
 
         aliases = FINANCIAL_HEADER_ALIASES.get(import_record.import_type.code, {})
+        writeoff_headers = {normalize_header(name).casefold(): target for name, target in aliases.items()}
+        if import_record.import_type.code == 'writeoffs':
+            writeoff_headers.update({normalize_header(name).casefold(): name for name in columns})
         header_positions = {}
         for index, value in enumerate(header_row):
             header = normalize_header(value)
-            header = aliases.get(header, header)
+            header = writeoff_headers.get(header.casefold(), header) if import_record.import_type.code == 'writeoffs' else aliases.get(header, header)
             if not header:
                 continue
             if import_record.import_type.code in FINANCIAL_HEADER_ALIASES and header in columns and header in header_positions:
                 raise ImportValidationError(f'Колонка «{header}» указана несколько раз.')
             header_positions[header] = index
+        if import_record.import_type.code == 'writeoffs' and 'Тип списания' not in header_positions:
+            required_columns = ('ДБЗ', 'Дата списания')
+            if not any(column in header_positions for column in WRITEOFF_COLUMN_FIELDS):
+                raise ImportValidationError('В файле нет колонок сумм списания по категориям.')
         # Contract imports retain their existing full-column format. Financial
         # imports need only their required columns; optional amounts default to 0.
         header_columns = required_columns
@@ -669,8 +519,21 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False, pro
         processed_at = timezone.now()
         writeoff_balances = {}
         seen_contracts = set()
-        for row_number, row in enumerate(rows, start=2):
-            if progress and (row_number == 2 or row_number % 25 == 0):
+        progress_step = max(25, min(1000, ((worksheet.max_row or 1) - 1) // 100))
+
+        def checked_rows():
+            # One existence query per chunk, not one round trip per Excel row.
+            for batch in iter(lambda: list(islice(rows, 500)), []):
+                existing = set()
+                if import_record.import_type.code == 'contracts':
+                    index = header_positions['ДБЗ']
+                    numbers = [serialize_value('ДБЗ', row[index]) for row in batch if index < len(row)]
+                    existing = set(Debt.objects.filter(contract_number__in=numbers).values_list('contract_number', flat=True))
+                for row in batch:
+                    yield row, existing
+
+        for row_number, (row, existing_contracts) in enumerate(checked_rows(), start=2):
+            if progress and (row_number == 2 or row_number % progress_step == 0):
                 progress(row_number - 2, max((worksheet.max_row or row_number) - 1, 1))
             data = {
                 column: serialize_value(
@@ -694,7 +557,7 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False, pro
                 try:
                     values = values_func(data)
                     if import_record.import_type.code == 'contracts':
-                        if values[0] in seen_contracts or Debt.objects.filter(contract_number=values[0]).exists():
+                        if values[0] in seen_contracts or values[0] in existing_contracts:
                             raise ImportValidationError('ДБЗ уже существует или повторяется в файле.')
                         seen_contracts.add(values[0])
                         data['Общая сумма задолженности (выкуп)'] = format(values[3]['purchase_total_debt'], '.2f')
@@ -740,8 +603,7 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False, pro
             try:
                 if not preview_only and not blocked:
                     accepted_items = [item for item in items if item.status == ImportItem.Status.PROCESSED]
-                    for item, record in zip(accepted_items, records, strict=True):
-                        save_func(record, import_item=item)
+                    save_import_rows(import_record.import_type.code, accepted_items, records, save_func)
             finally:
                 audit_user.reset(audit_token)
             import_record.status = Import.Status.REVIEW if preview_only else (
@@ -754,7 +616,7 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False, pro
             import_record.completed_at = None if preview_only else timezone.now()
             import_record.metadata = {
                 'sheet': worksheet.title,
-                'columns': list(columns) if import_record.import_type.code == 'writeoffs' else [column for column in columns if column in header_positions],
+                'columns': (list(WRITEOFF_TEMPLATE_COLUMNS) if 'Тип списания' not in header_positions else list(columns)) if import_record.import_type.code == 'writeoffs' else [column for column in columns if column in header_positions],
             }
             summary = _build_import_preview_summary(import_record, items)
             signature = [len(items), failed_items, max(item.pk for item in items)]
@@ -786,6 +648,14 @@ def process_xlsx_import(import_record, uploaded_file, *, preview_only=False, pro
         if workbook is not None:
             workbook.close()
 
+    if preview_only and settings.IMPORT_PREBUILD_ERROR_REPORTS and import_record.total_items and import_record.status in (Import.Status.REVIEW, Import.Status.FAILED):
+        from .export_jobs import prepare_error_report
+        try:
+            prepare_error_report(import_record.pk)
+        except Exception:
+            # Report preparation must not discard the completed validation.
+            logging.getLogger(__name__).exception('Failed to prepare error report for import %s', import_record.pk)
+
     return import_record
 
 
@@ -797,10 +667,14 @@ def contract_values(data):
 def payment_values(data):
     return extend_payment(data, _payment_reader)
 def writeoff_values(data):
+    if any(data.get(column) not in (None, '') for column in WRITEOFF_COLUMN_FIELDS) or not data.get('Тип списания'):
+        from .writeoff_import import column_writeoff_values
+        return column_writeoff_values(data)
     return extend_writeoff(data, _writeoff_reader)
 CONTRACT_IMPORT_COLUMNS += CONTRACT_EXTRAS
 PAYMENT_IMPORT_COLUMNS += PAYMENT_EXTRAS
 WRITEOFF_IMPORT_COLUMNS += WRITEOFF_EXTRAS
+WRITEOFF_IMPORT_COLUMNS += tuple(column for column in WRITEOFF_COLUMN_FIELDS if column not in WRITEOFF_IMPORT_COLUMNS)
 TEXT_COLUMNS.update({'ИИН', 'Номер счета', 'КАТО', 'Номер реестра', 'Номер договора цессии'})
 IMPORT_HANDLERS.update({
     'contracts': (CONTRACT_IMPORT_COLUMNS, CONTRACT_REQUIRED_COLUMNS, contract_values, save_contract_record),
@@ -910,13 +784,17 @@ def _build_import_preview_summary(import_record, items=None):
 
 
 @transaction.atomic
-def confirm_import(import_id, *, user, cancel=False):
+@cache_import_debts()
+def confirm_import(import_id, *, user, cancel=False, application_token=None, progress=None):
     """Lock the staged import so repeated submissions cannot create duplicates."""
     import_record = Import.objects.select_for_update().select_related('import_type').get(pk=import_id)
     if import_record.created_by_id != user.pk:
         raise ImportValidationError('Подтвердить или отменить импорт может только его автор.')
-    if import_record.status != Import.Status.REVIEW:
+    expected_status = Import.Status.IMPORTING if application_token else Import.Status.REVIEW
+    if import_record.status != expected_status:
         raise ImportValidationError('Этот импорт уже завершён или отменён.')
+    if application_token and not import_record.application_progress.token == application_token:
+        raise ImportValidationError('Задание импорта передано другому обработчику.')
     if cancel:
         import_record.status = Import.Status.CANCELLED
         import_record.completed_at = timezone.now()
@@ -924,8 +802,8 @@ def confirm_import(import_id, *, user, cancel=False):
         return import_record
     if import_record.failed_items or import_record.items.filter(status=ImportItem.Status.FAILED).exists():
         raise ImportValidationError('В файле есть ошибки. Импорт всего файла заблокирован. Исправьте файл и загрузите его заново.')
-    if import_record.import_type.code == 'writeoffs' and not user.has_perm('imports.add_writeoff'):
-        raise ImportValidationError('Нет права на добавление списаний.')
+    if import_record.import_type.code == 'writeoffs' and not user.has_perm('writeoffs.import_writeoff'):
+        raise ImportValidationError('Нет права на импорт списаний.')
     _, _, values_func, save_func = IMPORT_HANDLERS[import_record.import_type.code]
     items = list(import_record.items.filter(status=ImportItem.Status.NEW))
     if not items:
@@ -943,8 +821,9 @@ def confirm_import(import_id, *, user, cancel=False):
                 raise ImportValidationError('Остаток для списания изменился после проверки. Загрузите файл заново.')
     audit_token = audit_user.set(user)
     try:
-        for item, record in zip(items, records, strict=True):
-            save_func(record, import_item=item)
+        if progress:
+            progress(0, len(items))
+        save_import_rows(import_record.import_type.code, items, records, save_func, progress=progress)
     finally:
         audit_user.reset(audit_token)
     now = timezone.now()

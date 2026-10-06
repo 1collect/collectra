@@ -1,4 +1,5 @@
 /* Page compositions, not alternative component styles. */
+.btn.contract-open-disabled { background: var(--bg-table-stripe); color: var(--text-secondary); border-color: var(--border-color); cursor: not-allowed; }
 .borrower-banner { min-height: 168px; margin-bottom: var(--space-5); padding: var(--space-5); }
 .borrower-workspace .borrower-header { margin: 0 0 var(--space-4); align-items: flex-start; }
 .borrower-header h1 { overflow-wrap: anywhere; }
@@ -167,42 +168,25 @@
 .import-preview__summary td { text-align: right; vertical-align: middle; font-size: 1rem; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .import-preview__summary tr:first-child td { font-size: var(--text-heading); }
 .import-preview__summary tr:last-child > * { border-bottom: 0; }
+.import-preview .table tfoot tr > :is(th, td) { position: static; background: var(--bg-subtle); color: var(--text-primary); padding: var(--space-3); height: var(--row-height); font-weight: 600; border-bottom: 1px solid var(--border-color); vertical-align: middle; }
+.import-preview .table-bordered tfoot tr > * + * { border-left: 1px solid var(--border-color); }
 .import-preview__check { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
 .import-preview__check input { margin-top: 3px; flex-shrink: 0; }
 .import-preview .panel-header { flex-wrap: wrap; overflow-wrap: anywhere; }
-dialog.import-preview-modal { width: min(800px, calc(var(--viewport-width) - 28px)); }
-.import-preview-modal .modal-header { position: sticky; top: 0; z-index: 2; background: var(--bg-panel); }
+dialog.import-preview-modal { width: min(800px, calc(var(--viewport-width) - 28px)); overflow: hidden; }
+dialog.import-preview-modal[open] { display: flex; flex-direction: column; }
+.import-preview-modal .modal-header { flex-shrink: 0; background: var(--bg-panel); }
+.import-preview-modal .modal-body { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .import-preview-modal .stat-value { font-size: clamp(20px, calc(var(--viewport-width) * .03), 28px); overflow-wrap: anywhere; }
 .import-preview__errors { margin: 0; padding-left: 20px; }
 .import-preview__errors li + li { margin-top: 8px; }
-.import-preview__actions { position: sticky; bottom: -20px; z-index: 1; box-shadow: none; }
+.import-preview__actions { flex-shrink: 0; margin: 0; border-top: 1px solid var(--border-color); background: var(--bg-panel); box-shadow: none; }
 .import-preview__actions .panel-footer { flex-wrap: wrap; background: var(--bg-panel); border-top: 0; }
+.import-preview__actions.modal-footer { flex-wrap: wrap; }
 .import-preview__actions .panel-footer > span { margin-right: auto; align-self: center; }
 .import-preview__actions [data-confirm-delay]:disabled { background: var(--border-color); border-color: var(--border-color); color: var(--text-muted); opacity: 1; }
 
 /* Write-off creation is a focused workflow: keep the modal compact and make the three decisions easy to scan. */
-.writeoff-create-content dialog.modal-form { width: min(760px, calc(var(--viewport-width) - 28px)); }
-.writeoff-form-panel { background: transparent; }
-.writeoff-form-heading { padding-bottom: var(--space-4); }
-.writeoff-form-heading h2 { font-size: var(--text-body); font-weight: 600; }
-.writeoff-form-panel .panel-subtitle { margin-top: 3px; color: var(--text-muted); font-size: var(--text-caption); }
-.writeoff-intro { display: flex; gap: 10px; align-items: flex-start; padding: 0 0 var(--space-5); margin-bottom: var(--space-5); border-bottom: 1px solid var(--border-color); color: var(--text-secondary); font-size: var(--text-caption); line-height: 1.5; }
-.writeoff-intro p { margin: 0; }
-.writeoff-intro strong { color: var(--text-primary); font-weight: 600; }
-.writeoff-intro-icon { display: grid; place-items: center; width: 18px; height: 18px; flex: 0 0 auto; border: 1px solid currentColor; border-radius: 50%; color: var(--info); font-size: 11px; font-weight: 700; }
-.writeoff-section { padding: 0 0 var(--space-5); margin-bottom: var(--space-5); border-bottom: 1px solid var(--border-color); }
-.writeoff-section-heading { display: flex; gap: 10px; align-items: flex-start; margin-bottom: var(--space-4); }
-.writeoff-section-heading h3 { font-size: var(--text-small); font-weight: 600; }
-.writeoff-section-heading p { margin-top: 2px; color: var(--text-muted); font-size: var(--text-caption); }
-.writeoff-step { display: grid; place-items: center; width: 22px; height: 22px; flex: 0 0 auto; border-radius: 50%; background: var(--primary-soft); color: var(--primary); font-size: var(--text-caption); font-weight: 600; }
-.writeoff-main-grid { gap: var(--space-4) var(--space-5); }
-.writeoff-partial-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); }
-.writeoff-partial-section[hidden] { display: none !important; }
-.writeoff-reason-section { margin-bottom: 0; padding-bottom: 0; border-bottom: 0; }
-.writeoff-reason-section textarea.form-control { min-height: 76px; }
-.writeoff-actions { margin-top: var(--space-5); padding: var(--space-4) 0 0; }
-.writeoff-required-note { margin-right: auto; color: var(--text-muted); font-size: var(--text-caption); }
-.writeoff-required-note .required { color: var(--danger); }
 .refund-form-panel { background: transparent; }
 .refund-register-table tbody td { padding-block: 14px; vertical-align: middle; }
 .refund-register-table .refund-source-cell { min-width: 260px; white-space: normal; }
@@ -214,6 +198,26 @@ dialog.import-preview-modal { width: min(800px, calc(var(--viewport-width) - 28p
 .refund-register-table .refund-amount { font-variant-numeric: tabular-nums; }
 .refund-row-actions { display: flex; justify-content: flex-end; align-items: center; gap: 4px; }
 dialog.modal-form:has(.refund-form-panel) { width: min(680px, calc(var(--viewport-width) - 28px)); }
+dialog.modal-form:has(.payment-form-panel) { width: min(900px, calc(var(--viewport-width) - 28px)); }
+dialog.modal-form:has(.payment-form-panel)[open] { display: flex; flex-direction: column; height: min(860px, calc(var(--viewport-dynamic-height) - 40px)); overflow: hidden; }
+.modal-form:has(.payment-form-panel) > .modal-header { flex-shrink: 0; }
+.modal-form:has(.payment-form-panel) > .modal-body { display: flex; flex: 1; min-height: 0; padding: 0; overflow: hidden; }
+.payment-form-panel, .payment-form-panel > form { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; }
+.payment-form-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: var(--space-5); }
+.payment-form-section { min-width: 0; margin: 0; padding: 0 0 20px; border: 0; }
+.payment-form-section + .payment-form-section { padding-top: 20px; border-top: 1px solid var(--border-color); }
+.payment-form-section legend { float: left; width: 100%; margin-bottom: 16px; padding: 0; font-size: var(--text-body); font-weight: 600; }
+.modal-form .payment-form-grid { clear: both; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 24px; }
+.payment-form-grid > .span-2 { grid-column: 1 / -1; }
+.payment-form-footer { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 12px 24px; flex-shrink: 0; padding: 16px var(--space-5); border-top: 1px solid var(--border-color); background: var(--bg-panel); }
+.payment-form-summary { display: flex; align-items: baseline; justify-content: flex-end; flex-wrap: wrap; gap: 8px 16px; text-align: right; }
+.payment-form-summary span { color: var(--text-secondary); font-size: var(--text-small); }
+.payment-form-summary output { font-size: 20px; font-weight: 600; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; min-width: 0; }
+.payment-form-panel .form-actions { margin: 0; padding: 0; border: 0; }
+@media (max-width: 600px) {
+  .modal-form .payment-form-grid { grid-template-columns: minmax(0, 1fr); }
+  .payment-form-panel .form-actions { flex-wrap: wrap; }
+}
 .modal-form .refund-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
 .refund-form-grid > .span-2 { grid-column: 1 / -1; }
 .refund-form-panel textarea.form-control { min-height: 88px; }
@@ -222,13 +226,13 @@ dialog.modal-form:has(.refund-form-panel) { width: min(680px, calc(var(--viewpor
   .modal-form .refund-form-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
 }
 .refund-form-heading { padding-bottom: var(--space-4); }
+.permission-section { min-width: 0; margin-inline: 0; padding: 0; border: 0; }
+.permission-section > legend { width: 100%; padding: 0 0 12px; font-weight: 600; }
+.permission-section:last-child { margin-bottom: 0; }
 .refund-form-heading h2 { font-size: var(--text-body); font-weight: 600; }
 @media (max-width: 600px) {
-  .writeoff-partial-grid { grid-template-columns: 1fr; }
-  .writeoff-required-note { flex-basis: 100%; order: -1; }
 }
 @media (max-width: 600px) {
   .import-preview-modal .modal-body { padding: 12px; }
-  .import-preview__actions { bottom: -12px; }
   .import-preview__actions .panel-footer > span { flex-basis: 100%; }
 }

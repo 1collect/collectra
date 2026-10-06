@@ -2,7 +2,9 @@ from django.contrib.auth.models import Group, Permission, User
 from django.test import TestCase
 from django.urls import reverse
 
-from imports.models import Counterparty, Debt, Debtor, ImportType
+from references.models import Counterparty
+from debts.models import Debt, Debtor
+from imports.models import ImportType
 from users.models import PermissionGroup, Role
 
 
@@ -12,7 +14,7 @@ class AccessControlTests(TestCase):
         self.user = User.objects.create_user('operator', password=self.password)
 
     def test_contracts_redirect_anonymous_user_to_existing_login_page(self):
-        response = self.client.get(reverse('imports:debts'))
+        response = self.client.get(reverse('debts:debts'))
         self.assertRedirects(response, '/login/?next=/contracts/')
 
     def test_login_page_uses_russian_test_app_interface(self):
@@ -136,7 +138,7 @@ class SidebarNavigationTests(TestCase):
 
         self.assertNotContains(response, '<th>Приложение</th>', html=True)
         self.assertNotContains(response, '<th>Объект</th>', html=True)
-        self.assertContains(response, 'Просмотр: пользователь')
+        self.assertContains(response, 'Просматривать пользователей')
 
 
 class ContractImportSchemaTests(TestCase):

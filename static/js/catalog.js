@@ -106,11 +106,6 @@ window.Admin.componentIndex = [
     "group": "feedback"
   },
   {
-    "id": "toasts",
-    "title": "Toast notifications",
-    "group": "feedback"
-  },
-  {
     "id": "progress",
     "title": "Progress bars",
     "group": "feedback"

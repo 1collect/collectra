@@ -59,7 +59,6 @@
   .table-advanced .form-field { width: calc(50% - 6px); }
   .table-footer { gap: 8px; }
   .kit-section-label small { display: none; }
-  .toast-container { right: 10px; }
   .master-detail { grid-template-columns: 1fr; }
   .master-detail--viewport { height: auto; min-height: 0; }
   .master-detail--viewport .master-detail__master { height: 260px; }
@@ -78,7 +77,7 @@
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 @media print {
-  .sidebar, .topbar, .page-actions, .kit-nav, .toast-container { display: none !important; }
+  .sidebar, .topbar, .page-actions, .kit-nav, .feedback-region { display: none !important; }
   .shell-main { margin: 0 !important; }
   .content { padding: 0; }
   .panel { break-inside: avoid; }

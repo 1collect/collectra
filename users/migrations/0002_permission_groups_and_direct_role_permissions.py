@@ -12,10 +12,10 @@ def migrate_grouped_permissions(apps, schema_editor):
         model='permissiongroup',
     )
     permission_names = {
-        'add': 'Can add Группа прав',
-        'change': 'Can change Группа прав',
-        'delete': 'Can delete Группа прав',
-        'view': 'Can view Группа прав',
+        'add': 'Создание: Группа прав',
+        'change': 'Изменение: Группа прав',
+        'delete': 'Удаление: Группа прав',
+        'view': 'Просмотр: Группа прав',
     }
 
     # Preserve access held by administrators of the old Django groups.

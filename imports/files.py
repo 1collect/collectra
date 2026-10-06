@@ -11,7 +11,7 @@ from openpyxl.cell import WriteOnlyCell
 from openpyxl.utils import get_column_letter
 from openpyxl.styles import Alignment
 
-from .models import ImportItem
+from imports.models import ImportItem
 
 
 def text_width(value):
@@ -33,7 +33,7 @@ def import_download_name(record):
     return f'{PurePosixPath(name).stem or "import-" + str(record.pk)}.xlsx'
 
 
-def build_import_workbook(record, *, include_status=False):
+def build_import_workbook(record, *, include_status=False, progress=None, total_rows=None, width_sample=None):
     rows = record.items.order_by('row_number', 'pk')
     columns = record.metadata.get('columns')
     if not isinstance(columns, list) or not columns or not all(isinstance(column, str) for column in columns):
@@ -48,11 +48,15 @@ def build_import_workbook(record, *, include_status=False):
     # A streaming worksheet writes column dimensions before its first row.
     export_columns = [*columns, 'Ошибка'] if include_status else columns
     widths = [text_width(column) for column in export_columns]
+    total_rows = rows.count() if total_rows is None else total_rows
+    if progress:
+        progress(0, 'Чтение данных')
 
     def row_status(status, error):
         return (error or 'Ошибка') if status == ImportItem.Status.FAILED else 'Нет'
 
-    for data, status, error in rows.values_list('data', 'status', 'error_message').iterator(chunk_size=500):
+    sizing_rows = rows if width_sample is None else rows[:width_sample]
+    for data, status, error in sizing_rows.values_list('data', 'status', 'error_message').iterator(chunk_size=2000):
         for index, column in enumerate(columns):
             widths[index] = max(widths[index], text_width(data.get(column)))
         if include_status:
@@ -81,8 +85,10 @@ def build_import_workbook(record, *, include_status=False):
         sheet.append(cells)
 
     append(export_columns)
+    if progress:
+        progress(10, 'Запись строк')
     next_row = 2
-    for row_number, data, status, error in rows.values_list('row_number', 'data', 'status', 'error_message').iterator(chunk_size=500):
+    for index, (row_number, data, status, error) in enumerate(rows.values_list('row_number', 'data', 'status', 'error_message').iterator(chunk_size=2000), start=1):
         # Retain skipped empty lines so source row numbers still match the preview.
         while next_row < row_number:
             sheet.append([])
@@ -92,8 +98,12 @@ def build_import_workbook(record, *, include_status=False):
             values = chain(values, [row_status(status, error)])
         append(values)
         next_row += 1
+        if progress and (index == 1 or index % 1000 == 0 or index == total_rows):
+            progress(min(94, 10 + int(index * 84 / max(total_rows, 1))), 'Запись строк')
     content = SpooledTemporaryFile(max_size=8 * 1024 * 1024, mode='w+b')
     try:
+        if progress:
+            progress(95, 'Упаковка XLSX')
         workbook.save(content)
         content.seek(0)
     except Exception:

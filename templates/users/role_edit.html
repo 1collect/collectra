@@ -14,7 +14,7 @@
     </section>
     <section class="panel">
         <div class="panel-header"><h2>{{ form.permissions.label }}</h2><span class="badge badge-neutral">{{ form.permissions.field.queryset.count }} доступно</span></div>
-        <div class="panel-body">{% for error in form.permissions.errors %}<div class="alert alert-danger mb-3">{{ error }}</div>{% endfor %}<div class="grid-3">{% for choice in form.permissions %}<label class="check">{{ choice.tag }}<span>{{ choice.choice_label }}</span></label>{% endfor %}</div></div>
+        <div class="panel-body">{% for error in form.permissions.errors %}<div class="alert alert-danger mb-3">{{ error }}</div>{% endfor %}{{ form.permissions }}</div>
         <div class="panel-footer"><a class="btn" href="{% url 'users:roles' %}">Отмена</a><button class="btn btn-primary" type="submit">Сохранить роль</button></div>
     </section>
 </form>

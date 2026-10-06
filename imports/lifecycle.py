@@ -2,7 +2,7 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
 
-from .models import Import, ImportType
+from imports.models import Import, ImportType
 
 
 TERMINAL_STATUSES = (Import.Status.CANCELLED, Import.Status.COMPLETED, Import.Status.FAILED)

@@ -1,3 +1,4 @@
+from imports.testing_legacy_apps import legacy_apps
 from datetime import date
 from decimal import Decimal
 from importlib import import_module
@@ -11,11 +12,14 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .audit import audit_user
-from .models import Debt, Debtor, Expense, FinancialRecordHistory, Payment, WriteOff
-from .services import (
-    cancel_payment_refund, create_financial_change_request, create_payment_refund,
-    create_writeoff, review_financial_change,
-)
+from debts.models import Debt, Debtor
+from expenses.models import Expense
+from finance.models import FinancialRecordHistory
+from payments.models import Payment
+from writeoffs.models import WriteOff
+from refunds.services import cancel_payment_refund, create_payment_refund
+from finance.services import create_financial_change_request, review_financial_change
+from writeoffs.services import create_writeoff
 
 
 class FinancialHistoryTests(TestCase):
@@ -23,8 +27,8 @@ class FinancialHistoryTests(TestCase):
         self.author = User.objects.create_user('history-author')
         self.reviewer = User.objects.create_user('history-reviewer')
         self.author.user_permissions.add(*Permission.objects.filter(
-            content_type__app_label='imports',
-            codename__in=('view_payment', 'change_payment', 'view_expense', 'view_writeoff', 'add_writeoff'),
+            content_type__app_label__in=['imports', 'debts', 'payments', 'refunds', 'writeoffs', 'expenses', 'finance', 'references'],
+            codename__in=('view_payment', 'change_payment', 'view_expense', 'view_writeoff', 'import_writeoff'),
         ))
         self.debt = Debt.objects.create(
             debtor=Debtor.objects.create(full_name='История', iin='900101300002'),
@@ -74,7 +78,7 @@ class FinancialHistoryTests(TestCase):
         self.assertEqual(event.actor, self.reviewer)
         self.assertEqual(event.reason, 'Уточнение суммы')
         self.assertEqual(self.payment.value_history.count(), 2)
-        response = self.client.get(reverse('imports:payment_history', args=[self.payment.pk]))
+        response = self.client.get(reverse('payments:payment_history', args=[self.payment.pk]))
         self.assertContains(response, 'История значений')
         self.assertContains(response, 'ЧСИ')
         self.assertContains(response, 'Физическое лицо')
@@ -105,7 +109,7 @@ class FinancialHistoryTests(TestCase):
         expense.save(audit_actor=self.author)
         self.assertEqual(expense.value_history.count(), 2)
         self.assertEqual(other.value_history.count(), 1)
-        response = self.client.get(reverse('imports:expense_history', args=[expense.pk]))
+        response = self.client.get(reverse('expenses:expense_history', args=[expense.pk]))
         self.assertContains(response, '100.00')
         self.assertContains(response, '150.00')
 
@@ -115,8 +119,8 @@ class FinancialHistoryTests(TestCase):
             amount=50, writeoff_date=date(2026, 10, 2), created_by=self.author,
         )
         self.assertEqual(item.value_history.get().actor, self.author)
-        url = reverse('imports:writeoff_history', args=[item.pk])
-        self.assertContains(self.client.get(reverse('imports:writeoffs')), url)
+        url = reverse('writeoffs:writeoff_history', args=[item.pk])
+        self.assertContains(self.client.get(reverse('writeoffs:writeoffs')), url)
         response = self.client.get(url)
         self.assertContains(response, 'История списания')
         self.assertContains(response, '50.00')
@@ -128,9 +132,9 @@ class FinancialHistoryTests(TestCase):
         for kind in ('payment', 'expense', 'writeoff'):
             self.assertEqual(self.client.get(reverse(f'imports:{kind}_history', args=[self.payment.pk])).status_code, 403)
         self.client.force_login(self.author)
-        self.assertEqual(self.client.get(reverse('imports:payment_history', args=[999999])).status_code, 404)
+        self.assertEqual(self.client.get(reverse('payments:payment_history', args=[999999])).status_code, 404)
         self.client.logout()
-        self.assertEqual(self.client.get(reverse('imports:payment_history', args=[self.payment.pk])).status_code, 302)
+        self.assertEqual(self.client.get(reverse('payments:payment_history', args=[self.payment.pk])).status_code, 302)
 
     def test_history_failure_rolls_back_record_change(self):
         self.payment.amount = 400
@@ -163,7 +167,7 @@ class FinancialHistoryTests(TestCase):
     def test_existing_record_gets_honest_baseline(self):
         self.payment.value_history.all().delete()
         migration = import_module('imports.migrations.0021_existing_financial_history')
-        migration.seed_existing_history(apps, SimpleNamespace(connection=connection))
+        migration.seed_existing_history(legacy_apps, SimpleNamespace(connection=connection))
         event = self.payment.value_history.get()
         self.assertEqual(event.action, 'snapshot')
         self.assertEqual(event.old_data, {})

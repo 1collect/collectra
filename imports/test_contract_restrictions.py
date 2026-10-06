@@ -3,7 +3,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Debt, Debtor
+from debts.models import Debt, Debtor
 from .operations import cancel_record, delete_record
 
 
@@ -22,7 +22,7 @@ class ContractRestrictionsTests(TestCase):
     def test_old_links_are_unavailable_even_for_administrator(self):
         urls = [f'/imports/contracts/{self.debt.pk}/edit/',
                 f'/imports/contracts/{self.debt.pk}/delete/']
-        urls += [reverse('imports:operation_action', args=['debt', self.debt.pk, action])
+        urls += [reverse('finance:operation_action', args=['debt', self.debt.pk, action])
                  for action in ('cancel', 'delete')]
         for url in urls:
             for method in (self.client.get, self.client.post):
@@ -34,13 +34,13 @@ class ContractRestrictionsTests(TestCase):
         self.assertNotEqual(self.debt.status, 'cancelled')
 
     def test_detail_has_no_contract_mutation_links(self):
-        response = self.client.get(reverse('imports:debt_detail', args=[self.debt.pk]))
+        response = self.client.get(reverse('debts:debt_detail', args=[self.debt.pk]))
         self.assertNotContains(response, f'/contracts/{self.debt.pk}/edit/')
         self.assertNotContains(response, f'/operations/debt/{self.debt.pk}/')
         self.assertContains(response, self.debt.contract_number)
 
     def test_permissions_are_removed_but_creation_and_reading_remain(self):
-        permissions = Permission.objects.filter(content_type__app_label='imports',
+        permissions = Permission.objects.filter(content_type__app_label__in=['imports', 'debts', 'payments', 'refunds', 'writeoffs', 'expenses', 'finance', 'references'],
                                                 content_type__model='debt')
         self.assertFalse(permissions.filter(codename__in=['change_debt', 'delete_debt']).exists())
         for code in ('view_debt', 'export_debt', 'recalculate_debt'):
@@ -56,13 +56,13 @@ class ContractRestrictionsTests(TestCase):
         self.assertNotEqual(self.debt.status, 'cancelled')
 
     def test_admin_cannot_edit_delete_or_bulk_delete_contracts(self):
-        change_url = reverse('admin:imports_debt_change', args=[self.debt.pk])
+        change_url = reverse('admin:debts_debt_change', args=[self.debt.pk])
         self.assertEqual(self.client.get(change_url).status_code, 200)
         self.assertEqual(self.client.post(change_url, {'contract_number': 'Changed'}).status_code, 403)
-        delete_url = reverse('admin:imports_debt_delete', args=[self.debt.pk])
+        delete_url = reverse('admin:debts_debt_delete', args=[self.debt.pk])
         self.assertEqual(self.client.get(delete_url).status_code, 403)
         self.assertEqual(self.client.post(delete_url, {'post': 'yes'}).status_code, 403)
-        self.client.post(reverse('admin:imports_debt_changelist'), {
+        self.client.post(reverse('admin:debts_debt_changelist'), {
             'action': 'delete_selected', '_selected_action': [self.debt.pk], 'post': 'yes',
         })
         self.debt.refresh_from_db()

@@ -15,6 +15,7 @@ class PermissionGroup(models.Model):
     class Meta:
         ordering = ('name',)
         verbose_name = 'Группа прав'
+        default_permissions = ('view',)
         verbose_name_plural = 'Группы прав'
 
     def __str__(self):

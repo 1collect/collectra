@@ -2,7 +2,6 @@
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-5); }
 .form-field { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .form-field.is-hidden { display: none; }
-.form-field[data-partial-writeoff][hidden] { display: none; }
 .multi-select { position: relative; }
 .multi-select__trigger { display: flex; align-items: center; justify-content: space-between; text-align: left; cursor: pointer; }
 .multi-select__trigger::after { content: ''; width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg) translateY(-2px); }
@@ -12,7 +11,14 @@
 .multi-select__option:hover { background: var(--bg-hover); }
 .multi-select__option input { margin-top: 2px; accent-color: var(--primary); }
 .searchable-select { position: relative; }
-.searchable-select > .form-control { padding-right: 32px; }
+.searchable-select > .form-control { padding-right: 64px; }
+.searchable-select > input::-webkit-search-cancel-button,
+.searchable-select > input::-webkit-search-decoration { -webkit-appearance: none; }
+.searchable-select__clear { position: absolute; right: 30px; top: calc(var(--control-height) / 2); transform: translateY(-50%); display: flex; align-items: center; justify-content: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 3px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.searchable-select__clear[hidden] { display: none; }
+.searchable-select__clear svg { width: 16px; height: 16px; pointer-events: none; }
+.searchable-select__clear:hover { background: var(--bg-hover); color: var(--text-primary); }
+.searchable-select__clear:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .searchable-select::after { content: ''; position: absolute; right: 14px; top: 15px; width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); pointer-events: none; color: var(--text-muted); }
 .multi-select__trigger:disabled { background: var(--bg-subtle); color: var(--text-muted); cursor: default; }
 .multi-select__option[hidden], .searchable-select__option[hidden], .multi-select__menu[hidden], .searchable-select__menu[hidden] { display: none; }

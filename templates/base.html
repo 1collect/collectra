@@ -7,9 +7,9 @@
     <meta name="description" content="Панель управления платежами">
     <title>{% block title %}Панель управления{% endblock %} — Collectra</title>
     <link href="{% static 'assets/icons/favicon.svg' %}" rel="icon" type="image/svg+xml">
-    <link href="{% static 'css/main.css' %}?v=20261006-24" rel="stylesheet">
+    <link href="{% static 'css/main.css' %}?v=20261008-5" rel="stylesheet">
 </head>
-<body data-page="{% block page_name %}dashboard{% endblock %}">
+<body data-page="{% block page_name %}dashboard{% endblock %}" data-user-id="{{ request.user.pk }}">
     <a class="skip-link" href="#main-content">Перейти к содержимому</a>
     <aside aria-label="Основная навигация" class="sidebar" id="sidebar">
         <a class="brand" href="{% url 'dashboard' %}">
@@ -17,20 +17,20 @@
         </a>
         <nav class="sidebar-nav">
             <div class="nav-group-title">ДАННЫЕ</div>
-            {% if perms.imports.view_debt %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:debts' %}active{% endif %}" href="{% url 'imports:debts' %}" title="Договоры">
+            {% if perms.debts.view_debt %}<a class="nav-link {% if request.resolver_match.view_name == 'debts:debts' %}active{% endif %}" href="{% url 'debts:debts' %}" title="Договоры">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><rect height="14" rx="2" width="18" x="3" y="7"></rect><path d="M8 7V3h8v4M3 12h18M10 12v3h4v-3"></path></svg>
                 <span>Договоры</span>
             </a>{% endif %}
-            {% if perms.imports.view_payment %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:payments' or request.resolver_match.view_name == 'imports:payment_edit' or request.resolver_match.view_name == 'imports:payment_history' %}active{% endif %}" href="{% url 'imports:payments' %}" title="Платежи">
+            {% if perms.payments.view_payment %}<a class="nav-link {% if request.resolver_match.view_name == 'payments:payments' or request.resolver_match.view_name == 'payments:payment_edit' or request.resolver_match.view_name == 'payments:payment_history' %}active{% endif %}" href="{% url 'payments:payments' %}" title="Платежи">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M3 6h18v12H3zM7 10h4m6 4h.01"></path></svg><span>Платежи</span>
             </a>{% endif %}
-            {% if perms.imports.view_expense %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:expenses' or request.resolver_match.view_name == 'imports:expense_new' or request.resolver_match.view_name == 'imports:expense_edit' or request.resolver_match.view_name == 'imports:expense_history' %}active{% endif %}" href="{% url 'imports:expenses' %}" title="Расходы">
+            {% if perms.expenses.view_expense %}<a class="nav-link {% if request.resolver_match.view_name == 'expenses:expenses' or request.resolver_match.view_name == 'expenses:expense_new' or request.resolver_match.view_name == 'expenses:expense_edit' or request.resolver_match.view_name == 'expenses:expense_history' %}active{% endif %}" href="{% url 'expenses:expenses' %}" title="Расходы">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 9h8m-8 4h8m-8 4h5"></path></svg><span>Расходы</span>
             </a>{% endif %}
-            {% if perms.imports.view_writeoff %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:writeoffs' or request.resolver_match.view_name == 'imports:writeoff_new' %}active{% endif %}" href="{% url 'imports:writeoffs' %}" title="Списания">
+            {% if perms.writeoffs.view_writeoff %}<a class="nav-link {% if request.resolver_match.view_name == 'writeoffs:writeoffs' %}active{% endif %}" href="{% url 'writeoffs:writeoffs' %}" title="Списания">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M4 4h16v16H4zM8 8h8m-8 4h8m-8 4h4m3-1 3 3m0-3-3 3"></path></svg><span>Списания</span>
             </a>{% endif %}
-            {% if perms.imports.view_paymentrefund %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:refunds' or request.resolver_match.view_name == 'imports:refund_new' %}active{% endif %}" href="{% url 'imports:refunds' %}" title="Возвраты платежей">
+            {% if perms.refunds.view_paymentrefund %}<a class="nav-link {% if request.resolver_match.view_name == 'refunds:refunds' or request.resolver_match.view_name == 'refunds:refund_new' %}active{% endif %}" href="{% url 'refunds:refunds' %}" title="Возвраты платежей">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M9 7H4v-5M4 7a9 9 0 1 1-1 7m6-3h7m-7 4h5"></path></svg>
                 <span>Возвраты</span>
             </a>{% endif %}
@@ -63,7 +63,7 @@
             </a>
             {% endif %}
             {% if perms.users.view_permissiongroup %}
-            <a class="nav-link {% if request.resolver_match.view_name == 'users:groups' or request.resolver_match.view_name == 'users:group_new' or request.resolver_match.view_name == 'users:group_edit' %}active{% endif %}" href="{% url 'users:groups' %}" title="Группы прав">
+            <a class="nav-link {% if request.resolver_match.view_name == 'users:groups' %}active{% endif %}" href="{% url 'users:groups' %}" title="Группы прав">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"></circle><circle cx="16" cy="8" r="3"></circle><path d="M2 20v-2a6 6 0 0 1 12 0v2m0-6a6 6 0 0 1 8 6"></path></svg>
                 <span>Группы прав</span>
             </a>
@@ -74,14 +74,14 @@
                 <span>Права доступа</span>
             </a>
             {% endif %}
-            {% if perms.imports.view_collectionagency or perms.imports.view_counterparty %}
+            {% if perms.references.view_collectionagency or perms.references.view_counterparty %}
             <div class="nav-group-title">СПРАВОЧНИКИ</div>
-            {% if perms.imports.view_counterparty %}<a class="nav-link {% if request.resolver_match.view_name == 'imports:counterparties' or request.resolver_match.view_name == 'imports:counterparty_new' or request.resolver_match.view_name == 'imports:counterparty_edit' or request.resolver_match.view_name == 'imports:counterparty_delete' %}active{% endif %}" href="{% url 'imports:counterparties' %}" title="Контрагенты">
+            {% if perms.references.view_counterparty %}<a class="nav-link {% if request.resolver_match.view_name == 'references:counterparties' or request.resolver_match.view_name == 'references:counterparty_new' or request.resolver_match.view_name == 'references:counterparty_edit' or request.resolver_match.view_name == 'references:counterparty_delete' %}active{% endif %}" href="{% url 'references:counterparties' %}" title="Контрагенты">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2m2-10h4m-2-2v4"></path></svg>
                 <span>Контрагенты</span>
             </a>{% endif %}
-            {% if perms.imports.view_collectionagency %}
-            <a class="nav-link {% if request.resolver_match.view_name == 'imports:collection_agencies' or request.resolver_match.view_name == 'imports:collection_agency_new' or request.resolver_match.view_name == 'imports:collection_agency_edit' or request.resolver_match.view_name == 'imports:collection_agency_delete' %}active{% endif %}" href="{% url 'imports:collection_agencies' %}" title="Коллекторские агентства">
+            {% if perms.references.view_collectionagency %}
+            <a class="nav-link {% if request.resolver_match.view_name == 'references:collection_agencies' or request.resolver_match.view_name == 'references:collection_agency_new' or request.resolver_match.view_name == 'references:collection_agency_edit' or request.resolver_match.view_name == 'references:collection_agency_delete' %}active{% endif %}" href="{% url 'references:collection_agencies' %}" title="Коллекторские агентства">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M4 21V3h16v18M2 21h20M8 7h2m4 0h2M8 11h2m4 0h2M10 21v-6h4v6"></path></svg>
                 <span>Коллекторские агентства</span>
             </a>
@@ -122,7 +122,7 @@
             </div>
         </header>
         <main class="content {% block content_class %}{% endblock %}" id="main-content" tabindex="-1">
-            {% block notifications %}{% if messages %}{% for message in messages %}<div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} mb-3">{{ message }}</div>{% endfor %}{% endif %}{% endblock %}
+            {% block notifications %}{% include 'partials/notifications.html' %}{% endblock %}
             {% if form_modal_page %}
             <dialog class="modal modal-form{% if form_modal_compact %} modal-form-compact{% endif %}" id="record-form-modal" data-form-auto-open data-return-url="{{ form_modal_return_url }}" aria-labelledby="record-form-title">
                 <div class="modal-header"><h2 id="record-form-title" data-form-title>Добавление и редактирование</h2>{% include 'partials/modal_close.html' %}</div>
@@ -138,15 +138,15 @@
         <div class="modal-body" data-form-body></div>
     </dialog>
     {% endif %}
-    <script defer src="{% static 'js/core.js' %}"></script>
-    <script defer src="{% static 'js/toast.js' %}?v=20261005-4"></script>
+    <script defer src="{% static 'js/core.js' %}?v=20261008-1"></script>
+    <script defer src="{% static 'js/notifications.js' %}?v=20261008-2"></script>
+    <script defer src="{% static 'js/import-exports.js' %}?v=20261008-7"></script>
     <script defer src="{% static 'js/sidebar.js' %}?v=20261005-7"></script>
     <script defer src="{% static 'js/dropdown.js' %}?v=20261005-2"></script>
     <script defer src="{% static 'js/modal.js' %}?v=20261005-2"></script>
-    <script defer src="{% static 'js/distribution.js' %}?v=20261005-1"></script>
-    <script defer src="{% static 'js/writeoffs.js' %}?v=20261006-2"></script>
-    <script defer src="{% static 'js/refund-select.js' %}?v=20261006-4"></script>
-    <script defer src="{% static 'js/form-modals.js' %}?v=20261006-4"></script>
+    <script defer src="{% static 'js/distribution.js' %}?v=20261006-4"></script>
+    <script defer src="{% static 'js/refund-select.js' %}?v=20261006-5"></script>
+    <script defer src="{% static 'js/form-modals.js' %}?v=20261008-1"></script>
     <script defer src="{% static 'js/integration.js' %}"></script>
     {% block scripts %}{% endblock %}
 </body>

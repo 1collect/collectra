@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content_class %}content--register{% endblock %}
+{% block title %}Возвраты платежей{% endblock %}
+{% block page_name %}refunds{% endblock %}
+{% block heading %}Возвраты платежей{% endblock %}
+{% block content %}
+<section class="panel data-register data-register--filters">
+    {% include 'finance/partials/record_header.html' %}
+    {% include 'finance/partials/record_filters.html' %}
+    <div class="p-0 table-container" tabindex="0" role="region" aria-label="{{ title|default:pagination_label }}">
+        <table class="table table-bordered table-compact refund-register-table">
+            <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col">ДБЗ</th><th scope="col">Исходные платежи</th><th scope="col" class="cell-number">Сумма возврата</th><th scope="col">Дата возврата</th><th scope="col">Основание</th><th scope="col">Создал</th></tr></thead>
+            <tbody>
+            {% for refund in page_obj %}
+                <tr><td class="font-mono row-number-column">{{ page_obj.start_index|add:forloop.counter|add:"-1" }}</td>
+                    <td><strong class="font-mono">{{ refund.payment.debt.contract_number }}</strong></td>
+                    <td class="refund-source-cell">{% for part in refund.operation_parts %}<div class="refund-source"><strong>{{ part.payment.amount|floatformat:'2g' }}</strong><div class="refund-source-meta">{{ part.payment.payment_date|date:'d.m.Y' }} · {{ part.get_payment_category_display }} · возврат {{ part.amount|floatformat:'2g' }}</div></div>{% endfor %}</td>
+                    <td class="cell-number refund-amount"><strong>{{ refund.total_amount|floatformat:'2g' }}</strong></td>
+                    <td class="cell-date">{{ refund.refund_date|date:'d.m.Y' }}</td>
+                    <td class="cell-text">{{ refund.reason }}</td>
+                    <td class="refund-author">{{ refund.created_by.get_full_name|default:refund.created_by.username }}</td>
+                </tr>
+            {% empty %}<tr><td colspan="7"><div class="empty-state"><h3>Ничего не найдено</h3></div></td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <div class="table-footer">{% include 'finance/partials/record_pagination.html' %}</div>
+</section>
+{% endblock %}
+
+{% block scripts %}<script defer src="{% static 'js/table-pagination.js' %}?v=20261006-6"></script>{% endblock %}

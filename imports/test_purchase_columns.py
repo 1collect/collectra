@@ -6,7 +6,10 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Debt, Debtor, Expense, Payment, WriteOff
+from debts.models import Debt, Debtor
+from expenses.models import Expense
+from payments.models import Payment
+from writeoffs.models import WriteOff
 
 
 class PurchaseColumnTests(TestCase):
@@ -23,7 +26,7 @@ class PurchaseColumnTests(TestCase):
     def test_register_uses_loaded_total_and_purchase_components_after_payment(self):
         for headers in ({}, {'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'}):
             with self.subTest(refresh=bool(headers)):
-                response = self.client.get(reverse('imports:debts'), **headers)
+                response = self.client.get(reverse('debts:debts'), **headers)
                 self.assertContains(response, '<strong>875,00</strong>')
                 self.assertContains(response, 'purchase-column-content">600,00</span>')
                 self.assertContains(response, 'purchase-column-content">40,00</span>')
@@ -55,7 +58,7 @@ class PurchaseColumnTests(TestCase):
             kind='partial', category='purchase_principal', amount=25,
             created_by=User.objects.get(username='purchase-reader'))
         for headers in ({}, {'HTTP_X_REQUESTED_WITH': 'XMLHttpRequest'}):
-            response = self.client.get(reverse('imports:debts'), **headers)
+            response = self.client.get(reverse('debts:debts'), **headers)
             shown = response.context['page_obj'][0]
             self.assertEqual(shown.total_debt_with_expenses, Decimal('938.03'))
             self.assertEqual(shown.accrued_expenses['state_duty'], Decimal('3.03'))
@@ -63,7 +66,7 @@ class PurchaseColumnTests(TestCase):
             self.assertContains(response, '<strong>875,00</strong>')
         first.state_duty = Decimal('7.01')
         first.save()
-        response = self.client.get(reverse('imports:debts'), HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        response = self.client.get(reverse('debts:debts'), HTTP_X_REQUESTED_WITH='XMLHttpRequest')
         self.assertContains(response, '<strong>944,03</strong>')
         self.debt.refresh_from_db()
         self.assertEqual(self.debt.purchase_total_debt, 875)

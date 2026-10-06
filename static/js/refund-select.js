@@ -80,6 +80,14 @@
       input.className = 'form-control';
       input.placeholder = select.options[0]?.textContent || 'Выберите ДБЗ';
       input.autocomplete = 'off';
+      const clearButton = document.createElement('button');
+      clearButton.type = 'button';
+      clearButton.className = 'searchable-select__clear';
+      clearButton.setAttribute('aria-label', 'Очистить выбор');
+      clearButton.title = 'Очистить выбор';
+      clearButton.hidden = true;
+      clearButton.innerHTML = '<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m7 7 10 10M17 7 7 17"/></svg>';
+      const updateClearButton = () => { clearButton.hidden = !input.value; };
       const label = root.querySelector(`label[for="${select.id}"]`);
       input.id = select.id + '-search';
       if (label) label.htmlFor = input.id;
@@ -96,6 +104,7 @@
           select.value = option.value;
           select.dispatchEvent(new Event('change', { bubbles: true }));
           input.value = option.textContent;
+          updateClearButton();
           menu.hidden = true;
         });
         menu.append(item);
@@ -109,10 +118,21 @@
       input.addEventListener('focus', filter);
       input.addEventListener('input', filter);
       input.addEventListener('input', () => {
+        updateClearButton();
         if (select.value) {
           select.value = '';
           select.dispatchEvent(new Event('change', { bubbles: true }));
         }
+      });
+      clearButton.addEventListener('click', () => {
+        input.value = '';
+        if (select.value) {
+          select.value = '';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+        updateClearButton();
+        input.focus();
+        filter();
       });
       input.addEventListener('keydown', event => {
         if (event.key === 'Escape') menu.hidden = true;
@@ -127,9 +147,10 @@
       });
       const selected = select.options[select.selectedIndex];
       if (selected && selected.value) input.value = selected.textContent;
+      updateClearButton();
       select.hidden = true;
       select.parentNode.insertBefore(wrapper, select);
-      wrapper.append(input, menu);
+      wrapper.append(input, clearButton, menu);
     });
 
   };

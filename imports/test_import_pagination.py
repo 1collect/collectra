@@ -4,7 +4,7 @@ from django.urls import reverse
 from django.utils import timezone
 from datetime import datetime
 
-from .models import Import, ImportType
+from imports.models import Import, ImportType
 
 
 class ImportPaginationTests(TestCase):

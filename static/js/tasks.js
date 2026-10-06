@@ -30,7 +30,7 @@
         const id = Number(button.dataset.taskDelete);
         if (await A.confirm({ title: 'Delete task?', message: 'Remove this task from local demonstration data?', label: 'Delete task', danger: true })) {
           A.data.saveTasks(A.data.tasks().filter(task => task.id !== id)); A.data.log('Deleted task', 'TSK-' + id);
-          A.toast('success', 'Task removed', 'The local task list was updated.');
+          A.notify('success', 'Task removed', 'The local task list was updated.');
         }
       }
     });
@@ -42,7 +42,7 @@
       const tasks = A.data.tasks();
       const task = { id: Math.max(0, ...tasks.map(item => item.id)) + 1, title: values.title.trim(), priority: values.priority, due: values.due, assignee: values.assignee.trim(), done: false };
       A.data.saveTasks([...tasks, task]); A.data.log('Created task', 'TSK-' + task.id);
-      A.modal.close(form.closest('dialog')); form.reset(); A.toast('success', 'Task added', task.title);
+      A.modal.close(form.closest('dialog')); form.reset(); A.notify('success', 'Task added', task.title);
     });
     document.addEventListener('demo:tasks-changed', render); render();
   };

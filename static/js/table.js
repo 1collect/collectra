@@ -94,12 +94,12 @@
         if (target.hasAttribute('data-apply')) {
           const from = A.$('[data-date-from]', this.element).value;
           const to = A.$('[data-date-to]', this.element).value;
-          if (from && to && from > to) { A.toast('error', 'Invalid range', 'The start date must be before the end date.'); return; }
+          if (from && to && from > to) { A.notify('error', 'Invalid range', 'The start date must be before the end date.'); return; }
           this.filters.department = A.$('[data-department]', this.element).value;
           this.filters.from = from; this.filters.to = to; this.page = 1; this.render();
         }
         if (target.hasAttribute('data-reset')) this.resetFilters();
-        if (target.hasAttribute('data-refresh')) { this.refresh(); A.toast('info', 'Table refreshed', 'Showing the latest browser-local demo data.'); }
+        if (target.hasAttribute('data-refresh')) { this.refresh(); A.notify('info', 'Table refreshed', 'Showing the latest browser-local demo data.'); }
         if (target.hasAttribute('data-export')) this.export();
         if (target.hasAttribute('data-clear-selection')) { this.selected.clear(); this.syncSelection(); }
         if (target.hasAttribute('data-row-action')) {
@@ -113,7 +113,7 @@
           else {
             const next = target.dataset.bulk;
             A.data.saveUsers(this.getRows().map(row => this.selected.has(row.id) ? { ...row, status: next } : row), 'Changed employee status', this.selected.size + ' employees');
-            A.toast('success', 'Status updated', this.selected.size + ' employees changed to ' + next + '.');
+            A.notify('success', 'Status updated', this.selected.size + ' employees changed to ' + next + '.');
           }
         }
       });

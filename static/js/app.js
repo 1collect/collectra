@@ -22,7 +22,7 @@
       const value = event.target.value === 'comfortable' ? 'comfortable' : 'compact';
       document.documentElement.dataset.density = value;
       try { localStorage.setItem('circuit.density', value); } catch (_) {}
-      A.toast('success', 'Density updated', 'Applied across the entire interface.');
+      A.notify('success', 'Density updated', 'Applied across the entire interface.');
     });
     const density = A.$('[data-density-select]'); if (density) density.value = document.documentElement.dataset.density || 'compact';
     A.$('[data-reset-demo]')?.addEventListener('click', async () => {
@@ -37,7 +37,7 @@
       const confirmation = security.elements.namedItem('confirm-password');
       if (password.value !== confirmation.value) { confirmation.setCustomValidity('The passwords do not match.'); confirmation.reportValidity(); return; }
       security.reset();
-      A.toast('info', 'Validation complete', 'No password was changed or stored. Connect a secure backend to enable this action.');
+      A.notify('info', 'Validation complete', 'No password was changed or stored. Connect a secure backend to enable this action.');
     });
   }
   function authenticationDemo() {
@@ -51,7 +51,7 @@
     A.$('[data-forgot-form]')?.addEventListener('submit', event => {
       event.preventDefault(); if (!A.forms.validate(event.target)) return;
       A.modal.close(event.target.closest('dialog'));
-      A.toast('info', 'Demo only', 'No email was sent. Add a backend password-reset endpoint to activate this flow.');
+      A.notify('info', 'Demo only', 'No email was sent. Add a backend password-reset endpoint to activate this flow.');
       event.target.reset();
     });
   }
@@ -69,7 +69,7 @@
     });
     const persistence = A.$('[data-storage-status]');
     if (persistence) persistence.textContent = A.storage.available ? 'Local demo storage' : 'Temporary session storage';
-    if (!A.storage.available) A.toast('warning', 'Storage unavailable', 'Changes may disappear on reload. Serve the folder over localhost for consistent storage.');
+    if (!A.storage.available) A.notify('warning', 'Storage unavailable', 'Changes may disappear on reload. Serve the folder over localhost for consistent storage.');
     document.documentElement.dataset.ready = 'true';
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();

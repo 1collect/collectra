@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}Удаление агентства{% endblock %}
+{% block page_name %}collection-agencies{% endblock %}
+{% block heading %}Удаление агентства{% endblock %}
+{% block content %}
+<div class="page-header"><div><div class="page-eyebrow">Справочники / Коллекторские агентства</div><h1>Удаление агентства</h1></div></div>
+<form method="post">{% csrf_token %}
+<section class="panel"><div class="panel-body">{% if has_debts %}<div class="alert alert-danger"><strong>Удаление невозможно.</strong> К КА привязаны договоры.</div>{% else %}<p>Удалить агентство <strong>{{ agency.name }}</strong>? Действие нельзя отменить.</p>{% endif %}</div>
+    <div class="panel-footer"><a class="btn" href="{% url 'references:collection_agencies' %}">Отмена</a>{% if not has_debts %}<button class="btn btn-danger" type="submit">Удалить</button>{% endif %}</div>
+</section>
+</form>
+{% endblock %}

@@ -3,7 +3,7 @@
 {% block title %}Импорты{% endblock %}
 {% block page_name %}imports{% endblock %}
 {% block heading %}Импорты{% endblock %}
-{% block notifications %}{% if messages %}<div hidden data-import-notifications>{% for message in messages %}<span data-toast-type="{{ message.tags|default:'info' }}">{{ message }}</span>{% endfor %}</div>{% endif %}{% endblock %}
+{% block notifications %}{% include 'partials/notifications.html' %}{% endblock %}
 {% block content %}
 <section class="panel import-history" aria-label="Список импортов">
     <div class="panel-header">
@@ -56,4 +56,4 @@
     {% endif %}
 </dialog>
 {% endblock %}
-{% block scripts %}<script defer src="{% static 'js/imports.js' %}?v=20261005-22"></script>{% endblock %}
+{% block scripts %}<script defer src="{% static 'js/imports.js' %}?v=20261008-5"></script>{% endblock %}

@@ -14,6 +14,8 @@
 .table-compact td { height: var(--row-height); }
 .table .cell-number { text-align: right; font-variant-numeric: tabular-nums; }
 .table.debt-register .cell-number { text-align: left; }
+.table.payment-register th, .table.payment-register td { text-align: left; }
+.table.expense-register th, .table.expense-register td { text-align: left; }
 .table th.cell-number { min-width: 8rem; max-width: 12rem; }
 .table .cell-date { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .table .cell-text { min-width: 14rem; max-width: 24rem; white-space: normal; overflow-wrap: anywhere; }
@@ -119,14 +121,16 @@ body[data-page="imports"] .content, .content.content--register { height: calc(va
 .import-header-actions .btn-primary .icon { color: var(--on-primary); }
 .import-filter-toggle { position: relative; }
 .import-filter-indicator { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--primary); }
-.import-filter-toggle .import-filter-chevron { width: 12px; height: 12px; transition: transform 240ms ease; }
+.import-filter-toggle .import-filter-chevron { width: 12px; height: 12px; }
+.import-filter-toggle.is-animated .import-filter-chevron { transition: transform 240ms ease; }
 .import-filter-toggle[aria-expanded="true"] .import-filter-chevron { transform: rotate(180deg); }
 :is(.import-history, .data-register--filters) .panel-header h1 { font-size: 18px; }
 @media (max-width: 600px) { :is(.import-history, .data-register--filters) .panel-header h1 { flex-basis: 100%; } }
 :is(.import-history, .data-register) .rows-control { margin: 0; align-self: center; }
 :is(.import-history, .data-register) .rows-control select { appearance: none; width: auto; min-width: 108px; height: var(--control-height); font-size: var(--text-small); line-height: normal; padding: 0 28px 0 10px; text-align: left; text-align-last: left; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
 :is(.import-history, .data-register) .rows-control select option { text-align: left; }
-.import-filter-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 240ms ease; }
+.import-filter-panel { display: grid; grid-template-rows: 0fr; }
+.import-filter-panel.is-animated { transition: grid-template-rows 240ms ease; }
 .import-filter-panel.is-open { grid-template-rows: 1fr; }
 .import-filter-clip { min-height: 0; overflow: hidden; }
 :is(.import-history, .data-register) .import-filter-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); gap: 24px; padding: 16px 16px 32px; margin: 0; background: var(--bg-panel); border-bottom-color: var(--border-strong); }
@@ -144,7 +148,7 @@ body[data-page="imports"] .content, .content.content--register { height: calc(va
   .import-table-settings-separated { border-right: 0; padding-right: 0; }
   .import-filter-fields { grid-template-columns: minmax(0, 1fr); }
 }
-@media (prefers-reduced-motion: reduce) { .import-filter-panel { transition: none; } }
+@media (prefers-reduced-motion: reduce) { .import-filter-panel.is-animated, .import-filter-toggle.is-animated .import-filter-chevron { transition: none; } }
 .import-table { width: 100%; table-layout: auto; }
 .import-table th, .import-table td { text-align: left; }
 .import-table .import-id-column { position: sticky; left: 0; z-index: 2; width: 1%; background: var(--table-row-background, var(--bg-panel)); }

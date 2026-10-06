@@ -8,12 +8,12 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 
 from .balances import calculate_balance
-from .models import Debt, Debtor, Expense, Payment, PaymentDistribution
+from debts.models import Debt, Debtor
+from expenses.models import Expense
+from payments.models import Payment, PaymentDistribution
 from .operations import balance_on, cancel_record
-from .services import (
-    FinancialChangeError, cancel_payment_refund, create_financial_change_request,
-    create_payment_refund, recalculate_debt, review_financial_change,
-)
+from finance.services import FinancialChangeError, create_financial_change_request, recalculate_debt, review_financial_change
+from refunds.services import cancel_payment_refund, create_payment_refund
 
 
 class RareFinancialEdgeTests(TestCase):

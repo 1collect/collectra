@@ -1,3 +1,4 @@
+from imports.testing_legacy_apps import legacy_apps
 from datetime import date, timedelta
 from importlib import import_module
 from types import SimpleNamespace
@@ -9,8 +10,12 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .models import Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment, WriteOff
-from .services import IMPORT_HANDLERS, ImportValidationError, confirm_import, process_xlsx_import, save_contract
+from debts.models import Debt, Debtor
+from expenses.models import Expense
+from imports.models import Import, ImportItem, ImportType
+from payments.models import Payment
+from writeoffs.models import WriteOff
+from imports.services import IMPORT_HANDLERS, ImportValidationError, confirm_import, process_xlsx_import, save_contract
 from .tests import xlsx_file
 
 
@@ -142,7 +147,7 @@ class ImportSourceTests(TestCase):
 
     def restore(self):
         return import_module('imports.migrations.0032_restore_import_sources').restore_sources(
-            apps, SimpleNamespace(connection=SimpleNamespace(alias='default')))
+            legacy_apps, SimpleNamespace(connection=SimpleNamespace(alias='default')))
 
     def test_backfill_links_unique_operation_with_creation_evidence(self):
         record = self.upload('payments', [['SOURCE-1', 20, 'ЧСИ', '02.10.2026']])

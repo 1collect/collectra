@@ -1,6 +1,6 @@
 from django.core.management.base import BaseCommand
-from imports.models import Debt
-from imports.services import recalculate_debt
+from debts.models import Debt
+from finance.services import recalculate_debt
 
 class Command(BaseCommand):
     help = 'Rebuild contract balances, statuses, distributions and dated snapshots.'

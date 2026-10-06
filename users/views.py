@@ -8,11 +8,10 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
 
 from .forms import (
-    PermissionGroupForm,
     RoleForm,
     UserAccessForm,
-    permission_display_name,
 )
+from .permission_names import group_permissions, permission_display_name
 from .models import PermissionGroup, Role
 
 User = get_user_model()
@@ -22,17 +21,17 @@ User = get_user_model()
 def dashboard(request):
     """Send the user to the first section available through effective permissions."""
     destinations = (
-        ('imports.view_debt', 'imports:debts'),
+        ('debts.view_debt', 'debts:debts'),
         ('auth.view_user', 'users:list'),
         ('users.view_role', 'users:roles'),
         ('users.view_permissiongroup', 'users:groups'),
         ('auth.view_permission', 'users:permissions'),
-        ('imports.view_debt', 'imports:debts'),
-        ('imports.view_payment', 'imports:payments'),
-        ('imports.view_expense', 'imports:expenses'),
-        ('imports.view_writeoff', 'imports:writeoffs'),
-        ('imports.view_counterparty', 'imports:counterparties'),
-        ('imports.view_collectionagency', 'imports:collection_agencies'),
+        ('debts.view_debt', 'debts:debts'),
+        ('payments.view_payment', 'payments:payments'),
+        ('expenses.view_expense', 'expenses:expenses'),
+        ('writeoffs.view_writeoff', 'writeoffs:writeoffs'),
+        ('references.view_counterparty', 'references:counterparties'),
+        ('references.view_collectionagency', 'references:collection_agencies'),
         ('imports.view_import', 'imports:list'),
     )
     for permission, route_name in destinations:
@@ -113,28 +112,6 @@ def group_list(request):
     return render(request, 'users/group_list.html', {'groups': groups})
 
 
-def group_edit(request, group_id=None):
-    required_permission = (
-        'users.change_permissiongroup' if group_id else 'users.add_permissiongroup'
-    )
-    if not request.user.is_authenticated:
-        return redirect(f'/login/?next={request.path}')
-    if not request.user.has_perm(required_permission):
-        raise PermissionDenied
-    group = (
-        get_object_or_404(PermissionGroup, pk=group_id)
-        if group_id else PermissionGroup()
-    )
-    form = PermissionGroupForm(request.POST or None, instance=group)
-
-    if request.method == 'POST' and form.is_valid():
-        form.save()
-        messages.success(request, 'Группа прав сохранена.')
-        return redirect('users:groups')
-
-    return render(request, 'users/group_edit.html', {'form': form, 'group': group})
-
-
 @permission_required('auth.view_permission')
 def permission_list(request):
     permissions = Permission.objects.select_related('content_type').order_by(
@@ -142,4 +119,7 @@ def permission_list(request):
     )
     for permission in permissions:
         permission.display_name = permission_display_name(permission)
-    return render(request, 'users/permission_list.html', {'permissions': permissions})
+    return render(request, 'users/permission_list.html', {
+        'permissions': permissions,
+        'permission_sections': group_permissions(permissions),
+    })

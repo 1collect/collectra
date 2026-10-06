@@ -11,15 +11,16 @@ def create_project_roles(sender, using='default', **kwargs):
         return
     with transaction.atomic(using=using):
         permissions = Permission.objects.using(using)
-        readonly = permissions.filter(content_type__app_label='imports', codename__startswith='view_').exclude(codename='view_actionlog')
-        export = permissions.filter(content_type__app_label='imports', codename='export_debt')
+        domain_apps = ['imports', 'references', 'debts', 'payments', 'refunds', 'expenses', 'writeoffs', 'finance']
+        readonly = permissions.filter(content_type__app_label__in=domain_apps, codename__startswith='view_').exclude(codename='view_actionlog')
+        export = permissions.filter(content_type__app_label='debts', codename='export_debt')
         coordinator_codes = [
             'add_import', 'add_debtor', 'change_debtor',
-            'change_payment', 'add_expense', 'change_expense',
-            'add_writeoff', 'change_writeoff', 'add_paymentrefund', 'change_paymentrefund',
+            'add_payment', 'change_payment', 'add_expense', 'change_expense',
+            'import_writeoff', 'change_writeoff', 'add_paymentrefund', 'change_paymentrefund',
             'add_financialchangerequest',
         ]
-        coordinator_permissions = permissions.filter(content_type__app_label='imports', codename__in=coordinator_codes)
+        coordinator_permissions = permissions.filter(content_type__app_label__in=domain_apps, codename__in=coordinator_codes)
         defaults = [('Администратор', permissions), ('Координатор', readonly | export | coordinator_permissions), ('Аналитик', readonly | export)]
         for name, grants in defaults:
             role, created = Role.objects.using(using).get_or_create(name=name)

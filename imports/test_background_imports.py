@@ -10,8 +10,10 @@ from django.urls import reverse
 from django.utils import timezone
 
 from .background import check_next_import, queue_check
-from .models import Debt, Debtor, Import, ImportItem, ImportType, Payment
-from .services import PAYMENT_IMPORT_COLUMNS, process_xlsx_import
+from debts.models import Debt, Debtor
+from imports.models import Import, ImportItem, ImportType
+from payments.models import Payment
+from imports.services import PAYMENT_IMPORT_COLUMNS, process_xlsx_import
 from .tests import xlsx_file
 
 

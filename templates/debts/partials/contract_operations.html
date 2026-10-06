@@ -1,0 +1,39 @@
+<div class="contract-table-toolbar">
+    {% if active_tab != 'payments' and active_tab != 'expenses' %}<span class="text-muted">Нажмите на строку, чтобы посмотреть подробности.</span>{% endif %}
+    {% include 'debts/partials/contract_page_size.html' %}
+</div>
+<div class="table-container" tabindex="0" role="region" aria-label="Операции выбранного договора">
+    <table class="table table-bordered table-compact contract-operations">
+        <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col">Дата</th><th scope="col">Операция</th><th scope="col" class="cell-number">Сумма</th><th scope="col">ДБЗ</th>{% if active_tab != 'payments' and active_tab != 'expenses' %}<th scope="col" class="cell-actions">Действия</th>{% endif %}</tr></thead>
+        <tbody>{% for item in page_obj %}
+            <tr{% if item.kind == 'payment' %} data-payment-row="{{ item.key }}"{% elif item.kind == 'expense' %} data-expense-row="{{ item.key }}"{% else %} data-operation-row="{{ item.key }}"{% endif %}>
+                <td class="row-number-column font-mono">{{ page_obj.start_index|add:forloop.counter|add:"-1" }}</td>
+                <td class="cell-date">{{ item.date|date:'d.m.Y' }}</td><td class="cell-text">{{ item.description }} <span class="text-muted">#{{ item.id }}</span></td>
+                <td class="cell-number">{{ item.amount|floatformat:'2g' }}</td><td class="font-mono">{{ item.contract_number }}</td>
+                {% if active_tab != 'payments' and active_tab != 'expenses' %}<td class="cell-actions">{% if item.kind != 'payment' and item.kind != 'expense' %}<button class="btn btn-sm" type="button" data-operation-toggle="{{ item.key }}" aria-expanded="false" aria-controls="operation-{{ item.key }}">Подробнее</button>{% endif %}</td>{% endif %}
+            </tr>
+            {% if item.kind != 'payment' and item.kind != 'expense' %}<tr class="contract-operation-detail" id="operation-{{ item.key }}" data-operation-details="{{ item.key }}" hidden><td colspan="6">
+                <dl class="contract-fields">
+                    {% if item.kind == 'writeoff' %}
+                        <div><dt>Категория</dt><dd>{{ item.record.get_category_display|default:'Все категории' }}</dd></div>
+                        <div><dt>Основание</dt><dd>{{ item.record.reason|default:'—' }}</dd></div>
+                    {% elif item.kind == 'refund' %}
+                        <div><dt>Исходный платёж</dt><dd>#{{ item.record.payment_id }}</dd></div>
+                        <div><dt>Основание</dt><dd>{{ item.record.reason|default:'—' }}</dd></div>
+                        <div><dt>Автор</dt><dd>{{ item.record.created_by|default:'—' }}</dd></div>
+                    {% endif %}
+                    {% if item.outstanding != None %}<div><dt>Остаток после операции</dt><dd>{{ item.outstanding|floatformat:'2g' }}</dd></div>{% endif %}
+                </dl>
+                {% if item.parts %}<h3>Распределение</h3><dl class="contract-fields">{% for part in item.parts %}<div><dt>{{ part.label }}</dt><dd>{{ part.amount|floatformat:'2g' }}</dd></div>{% endfor %}</dl>{% endif %}
+                <div class="form-actions">
+                    {% if item.kind == 'writeoff' %}
+                        {% if perms.writeoffs.change_writeoff %}<a class="btn btn-sm" data-form-modal href="{% url 'finance:operation_edit' 'writeoff' item.id %}">Изменить</a>{% endif %}<a class="btn btn-sm" href="{% url 'writeoffs:writeoff_history' item.id %}">История</a>
+                    {% elif item.kind == 'refund' and perms.refunds.change_paymentrefund %}
+                        <a class="btn btn-sm" data-form-modal href="{% url 'finance:operation_edit' 'refund' item.id %}">Изменить</a>
+                    {% endif %}
+                </div>
+            </td></tr>{% endif %}
+        {% empty %}<tr><td colspan="{% if active_tab == 'payments' or active_tab == 'expenses' %}5{% else %}6{% endif %}"><div class="empty-state">Операций пока нет</div></td></tr>{% endfor %}</tbody>
+    </table>
+</div>
+<div class="table-footer">{% include 'finance/partials/record_pagination.html' %}</div>

@@ -5,17 +5,19 @@ from django.contrib.auth.models import Permission, User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Debt, Debtor, Payment, WriteOff
-from .services import (
-    WriteOffValidationError, create_payment_refund, create_writeoff, recalculate_debt,
-)
+from debts.models import Debt, Debtor
+from payments.models import Payment
+from writeoffs.models import WriteOff
+from writeoffs.services import WriteOffValidationError, create_writeoff
+from refunds.services import create_payment_refund
+from finance.services import recalculate_debt
 
 
 class WriteOffTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('writeoff-user', password='test-password')
         self.user.user_permissions.add(*Permission.objects.filter(
-            content_type__app_label='imports', codename__in=['view_writeoff', 'add_writeoff'],
+            content_type__app_label__in=['imports', 'debts', 'payments', 'refunds', 'writeoffs', 'expenses', 'finance', 'references'], codename__in=['view_writeoff', 'import_writeoff'],
         ))
         self.debt = Debt.objects.create(
             contract_number='DBZ-WRITEOFF',
@@ -106,40 +108,18 @@ class WriteOffTests(TestCase):
         self.assertEqual(self.debt.status, Debt.Status.ACTIVE)
 
     def test_create_full_and_partial_through_form(self):
-        response = self.client.get(reverse('imports:writeoff_new'))
-        self.assertContains(response, 'Вознаграждение (выкуп)')
-        response = self.client.post(reverse('imports:writeoff_new'), {
-            'debt': self.debt.pk, 'kind': 'partial', 'category': 'purchase_interest',
-            'amount': '75.50', 'writeoff_date': '2026-10-01',
-            'reason': 'Тестовое списание',
-        })
-        self.assertRedirects(response, reverse('imports:writeoffs'))
-        self.assertEqual(WriteOff.objects.get().amount, Decimal('75.50'))
-        response = self.client.post(reverse('imports:writeoff_new'), {
-            'debt': self.debt.pk, 'kind': 'full', 'writeoff_date': '2026-10-02',
-            'reason': 'Тестовое списание',
-        })
-        self.assertRedirects(response, reverse('imports:writeoffs'))
-        self.debt.refresh_from_db()
-        self.assertEqual(self.debt.outstanding_amount, 0)
-        self.assertEqual(self.debt.written_off_amount, 1000)
+        self.assertEqual(self.client.get('/writeoffs/new/').status_code, 404)
+        self.assertEqual(self.client.post('/writeoffs/new/', {}).status_code, 404)
 
     def test_form_requires_category_and_amount_and_displays_limit_error(self):
-        payload = {'debt': self.debt.pk, 'kind': 'partial', 'writeoff_date': '2026-10-02', 'reason': 'Тестовое списание'}
-        response = self.client.post(reverse('imports:writeoff_new'), payload)
-        self.assertContains(response, 'Выберите категорию частичного списания.')
-        self.assertContains(response, 'Укажите сумму частичного списания.')
-        response = self.client.post(reverse('imports:writeoff_new'), {
-            **payload, 'category': 'purchase_interest', 'amount': '201',
-        })
-        self.assertContains(response, 'Сумма списания не может превышать')
-        self.assertFalse(WriteOff.objects.exists())
+        self.assertEqual(self.client.get('/writeoffs/new/').status_code, 404)
+        self.assertEqual(self.client.post('/writeoffs/new/', {}).status_code, 404)
 
     def test_list_search_and_permission_checks(self):
         self.writeoff()
-        self.assertContains(self.client.get(reverse('imports:writeoffs')), 'DBZ-WRITEOFF')
-        self.assertContains(self.client.get(reverse('imports:writeoffs'), {'q': 'missing'}), 'Ничего не найдено')
+        self.assertContains(self.client.get(reverse('writeoffs:writeoffs')), 'DBZ-WRITEOFF')
+        self.assertContains(self.client.get(reverse('writeoffs:writeoffs'), {'q': 'missing'}), 'Ничего не найдено')
         other = User.objects.create_user('no-writeoff-permissions')
         self.client.force_login(other)
-        self.assertEqual(self.client.get(reverse('imports:writeoffs')).status_code, 403)
-        self.assertEqual(self.client.post(reverse('imports:writeoff_new'), {}).status_code, 403)
+        self.assertEqual(self.client.get(reverse('writeoffs:writeoffs')).status_code, 403)
+        self.assertEqual(self.client.post('/writeoffs/new/', {}).status_code, 404)

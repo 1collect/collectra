@@ -1,20 +1,25 @@
 from datetime import date
 from decimal import Decimal
+from html.parser import HTMLParser
 from unittest.mock import patch
 
 from django.contrib.auth.models import Permission, User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Debt, Debtor, Expense, Import, ImportItem, ImportType, Payment, WriteOff
-from .services import CONTRACT_IMPORT_COLUMNS, EXPENSE_IMPORT_COLUMNS, PAYMENT_IMPORT_COLUMNS, WRITEOFF_IMPORT_COLUMNS, import_preview_summary, process_xlsx_import
+from debts.models import Debt, Debtor
+from expenses.models import Expense
+from imports.models import Import, ImportItem, ImportType
+from payments.models import Payment
+from writeoffs.models import WriteOff
+from imports.services import CONTRACT_IMPORT_COLUMNS, EXPENSE_IMPORT_COLUMNS, PAYMENT_IMPORT_COLUMNS, WRITEOFF_IMPORT_COLUMNS, import_preview_summary, process_xlsx_import
 from .tests import xlsx_file
 
 
 class ImportPreviewTests(TestCase):
     def setUp(self):
         self.user = User.objects.create_user('preview-author')
-        self.user.user_permissions.add(*Permission.objects.filter(codename__in=['add_import', 'view_import', 'add_writeoff']))
+        self.user.user_permissions.add(*Permission.objects.filter(codename__in=['add_import', 'view_import', 'import_writeoff']))
         self.client.force_login(self.user)
         debtor = Debtor.objects.create(iin='900101300001', full_name='Иванов Иван')
         self.debt = Debt.objects.create(contract_number='PREVIEW-1', debtor=debtor, purchase_total_debt=1000, purchase_interest=200)
@@ -45,6 +50,48 @@ class ImportPreviewTests(TestCase):
     def confirm(self, **extra):
         return self.client.post(self.url, {'action': 'confirm', 'reviewed': 'yes', **extra})
 
+    def test_preview_with_row_errors_only_offers_download_and_close(self):
+        record = self.upload(rows=[
+            ['PREVIEW-1', '100.25', 'ЧСИ', '02.10.2026'],
+            ['UNKNOWN', '50', 'ЧСИ', '02.10.2026'],
+        ])
+        for status in (Import.Status.REVIEW, Import.Status.FAILED):
+            with self.subTest(status=status):
+                Import.objects.filter(pk=record.pk).update(status=status)
+                response = self.client.get(self.url, headers={'X-Import-Modal': '1'})
+                self.assertContains(response, 'Скачать файл с ошибками')
+                self.assertContains(response, 'Закрыть')
+                self.assertNotContains(response, 'value="confirm"')
+                self.assertNotContains(response, 'value="cancel"')
+                self.assertNotContains(response, 'data-import-confirm')
+
+    def test_valid_preview_keeps_confirmation_and_cancellation(self):
+        self.upload()
+        response = self.client.get(self.url, headers={'X-Import-Modal': '1'})
+        self.assertContains(response, 'value="confirm"')
+        self.assertContains(response, 'value="cancel"')
+        self.assertContains(response, 'data-confirm-delay="5"')
+
+    def test_failed_preview_shows_row_errors_without_duplicate_alert(self):
+        record = Import.objects.create(import_type=ImportType.objects.get(code='payments'),
+            created_by=self.user, status=Import.Status.FAILED, failed_items=1,
+            error_message='В файле есть ошибки. Исправьте файл.')
+        ImportItem.objects.create(import_record=record, row_number=2,
+            status=ImportItem.Status.FAILED, error_message='Договор не найден', data={})
+        response = self.client.get(reverse('imports:preview', args=[record.pk]),
+            headers={'X-Import-Modal': '1'})
+        self.assertContains(response, 'Договор не найден', count=1)
+        self.assertNotContains(response, 'В файле есть ошибки. Исправьте файл.')
+        self.assertNotContains(response, 'role="alert"')
+
+    def test_failed_preview_without_row_details_keeps_actual_file_error(self):
+        record = Import.objects.create(import_type=ImportType.objects.get(code='payments'),
+            created_by=self.user, status=Import.Status.FAILED, error_message='Не удалось прочитать файл')
+        response = self.client.get(reverse('imports:preview', args=[record.pk]),
+            headers={'X-Import-Modal': '1'})
+        self.assertContains(response, 'Не удалось прочитать файл', count=1)
+        self.assertContains(response, 'role="alert"', count=1)
+
     def test_upload_only_stages_rows_and_preview_totals_exclude_errors(self):
         record = self.upload(rows=[
             ['PREVIEW-1', '100.25', 'ЧСИ', date(2026, 10, 2)],
@@ -65,7 +112,7 @@ class ImportPreviewTests(TestCase):
         self.assertContains(response, 'Подтверждение импорта')
         self.assertNotContains(response, 'import-preview__rows')
         self.assertContains(response, 'Физическое лицо')
-        self.assertContains(response, 'value="confirm" disabled')
+        self.assertNotContains(response, 'value="confirm"')
         response = self.confirm()
         self.assertContains(response, 'Импорт всего файла заблокирован')
         self.assertEqual(Payment.objects.count(), 0)
@@ -85,6 +132,52 @@ class ImportPreviewTests(TestCase):
         record.refresh_from_db()
         self.assertEqual(record.status, Import.Status.COMPLETED)
         self.assertEqual(record.items.get().status, ImportItem.Status.PROCESSED)
+
+    def test_preview_date_summary_has_no_redundant_success_caption(self):
+        self.upload()
+        response = self.client.get(self.url, headers={'X-Import-Modal': '1'})
+        self.assertContains(response, 'aria-label="Суммы импорта по датам"')
+        self.assertContains(response, 'aria-label="Суммы импорта по категориям платежей"')
+        self.assertNotContains(response, '<h2>Суммы по датам</h2>')
+        self.assertNotContains(response, '<h2>По категориям платежей</h2>')
+        self.assertNotContains(response, 'Все строки без ошибок')
+        self.assertContains(response, 'Строк без ошибок')
+
+    def test_preview_actions_are_outside_scrollable_summary(self):
+        self.upload()
+        response = self.client.get(self.url, headers={'X-Import-Modal': '1'})
+        class DivParser(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.divs = []
+                self.action_parents = None
+
+            def handle_starttag(self, tag, attrs):
+                classes = dict(attrs).get('class', '').split()
+                if 'import-preview__actions' in classes:
+                    self.action_parents = list(self.divs)
+                if tag == 'div':
+                    self.divs.append(classes)
+
+            def handle_endtag(self, tag):
+                if tag == 'div':
+                    self.divs.pop()
+
+        parser = DivParser()
+        parser.feed(response.content.decode())
+        self.assertIsNotNone(parser.action_parents)
+        self.assertFalse(any('modal-body' in classes for classes in parser.action_parents))
+        self.assertContains(response, 'class="import-preview__actions" data-import-confirm')
+        self.assertContains(response, 'Категория платежа')
+        self.assertNotContains(response, 'Статус платежа')
+
+    def test_completed_preview_has_close_footer(self):
+        self.upload()
+        self.confirm()
+        response = self.client.get(self.url, headers={'X-Import-Modal': '1'})
+        self.assertContains(response, 'class="modal-footer import-preview__actions"')
+        self.assertContains(response, 'data-modal-close>Закрыть</button>')
+        self.assertNotContains(response, 'data-import-confirm')
 
     def test_cancel_keeps_business_data_unchanged_and_prevents_confirmation(self):
         record = self.upload()
@@ -192,7 +285,7 @@ class ImportPreviewTests(TestCase):
 
     def test_write_failure_rolls_back_import_and_payments(self):
         record = self.upload(rows=[['PREVIEW-1', 100, 'ЧСИ', '02.10.2026']] * 2)
-        from .services import save_payment
+        from imports.services import save_payment
         calls = 0
 
         def fail_second(values, *, import_item=None):
@@ -202,7 +295,7 @@ class ImportPreviewTests(TestCase):
                 raise ValueError('write failed')
             save_payment(values, import_item=import_item)
 
-        from .services import IMPORT_HANDLERS
+        from imports.services import IMPORT_HANDLERS
         handler = (*IMPORT_HANDLERS['payments'][:3], fail_second)
         with patch.dict(IMPORT_HANDLERS, payments=handler):
             with self.assertRaises(ValueError):
@@ -299,17 +392,31 @@ class ImportPreviewTests(TestCase):
         self.assertNotContains(response, '<html')
         self.assertFalse(Payment.objects.exists())
 
-    def test_modal_confirmation_returns_result_for_toast_without_redirect(self):
+    def test_confirmation_does_not_add_redundant_success_message(self):
+        self.upload()
+        response = self.client.post(self.url, {'action': 'confirm', 'reviewed': 'yes'}, follow=True)
+        self.assertNotContains(response, 'data-server-messages')
+
+    def test_cancellation_does_not_add_redundant_success_message(self):
+        self.upload()
+        response = self.client.post(self.url, {'action': 'cancel'}, follow=True)
+        self.assertNotContains(response, 'data-server-messages')
+
+    def test_modal_confirmation_returns_status_without_redirect(self):
         record = self.upload()
         response = self.client.post(self.url, {'action': 'confirm', 'reviewed': 'yes'}, headers={'X-Import-Modal': '1'})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['status'], Import.Status.COMPLETED)
-        self.assertIn('Добавлено строк: 1', response.json()['message'])
-        self.assertEqual(Payment.objects.count(), 1)
+        self.assertEqual(response.json()['status'], Import.Status.IMPORTING)
+        self.assertIn('Импорт запущен', response.json()['message'])
+        self.assertEqual(Payment.objects.count(), 0)
+        record.refresh_from_db()
+        self.assertEqual(record.status, Import.Status.IMPORTING)
+        from .background import apply_next_import
+        self.assertTrue(apply_next_import())
         record.refresh_from_db()
         self.assertEqual(record.status, Import.Status.COMPLETED)
 
-    def test_modal_cancellation_returns_result_for_toast(self):
+    def test_modal_cancellation_returns_status(self):
         record = self.upload()
         response = self.client.post(self.url, {'action': 'cancel'}, headers={'X-Import-Modal': '1'})
         self.assertEqual(response.json()['status'], Import.Status.CANCELLED)
@@ -347,7 +454,7 @@ class ImportPreviewTests(TestCase):
                                   ['MISSING', 10, 'ЧСИ', '02.10.2026']])
         Import.objects.filter(pk=record.pk).update(failed_items=0)
         response = self.client.get(self.url, headers={'X-Import-Modal': '1'})
-        self.assertContains(response, 'value="confirm" disabled')
+        self.assertNotContains(response, 'value="confirm"')
         response = self.confirm()
         self.assertContains(response, 'Импорт всего файла заблокирован')
         self.assertFalse(Payment.objects.exists())
@@ -370,7 +477,7 @@ class ImportPreviewTests(TestCase):
         record = self.upload(rows=[['MISSING', '900', 'ЧСИ', '02.10.2026']])
         response = self.confirm()
         self.assertContains(response, 'Импорт всего файла заблокирован')
-        self.assertContains(response, 'value="confirm" disabled')
+        self.assertNotContains(response, 'value="confirm"')
         record.refresh_from_db()
         self.assertEqual(record.status, Import.Status.REVIEW)
         self.assertFalse(Payment.objects.exists())
@@ -420,8 +527,8 @@ class ImportPreviewTests(TestCase):
 
     def test_writeoffs_require_writeoff_permission(self):
         self.upload('writeoffs', [['PREVIEW-1', 'Полное', '', '', '03.10.2026']])
-        self.user.user_permissions.remove(Permission.objects.get(codename='add_writeoff'))
-        self.assertContains(self.confirm(), 'Нет права на добавление списаний')
+        self.user.user_permissions.remove(Permission.objects.get(codename='import_writeoff'))
+        self.assertContains(self.confirm(), 'Нет права на импорт списаний')
         self.assertFalse(WriteOff.objects.exists())
         response = self.client.get(reverse('imports:new'))
         self.assertFalse(response.context['upload_form'].fields['import_type'].queryset.filter(code='writeoffs').exists())

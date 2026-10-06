@@ -9,24 +9,16 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import Workbook
 
-from .models import (
-    Counterparty, Debt, Debtor, Expense, FinancialChangeRequest, Import,
-    ImportItem, ImportType, Payment, PaymentRefund,
-)
-from .services import (
-    CONTRACT_IMPORT_COLUMNS,
-    EXPENSE_IMPORT_COLUMNS,
-    EXPENSE_REQUIRED_COLUMNS,
-    PAYMENT_IMPORT_COLUMNS,
-    PAYMENT_REQUIRED_COLUMNS,
-    RefundValidationError,
-    FinancialChangeError,
-    cancel_payment_refund,
-    create_financial_change_request,
-    create_payment_refund,
-    recalculate_debt,
-    review_financial_change,
-)
+from references.models import Counterparty
+from debts.models import Debt, Debtor
+from expenses.models import Expense
+from finance.models import FinancialChangeRequest
+from imports.models import Import, ImportItem, ImportType
+from payments.models import Payment
+from refunds.models import PaymentRefund
+from imports.services import CONTRACT_IMPORT_COLUMNS, EXPENSE_IMPORT_COLUMNS, EXPENSE_REQUIRED_COLUMNS, PAYMENT_IMPORT_COLUMNS, PAYMENT_REQUIRED_COLUMNS
+from refunds.services import RefundValidationError, cancel_payment_refund, create_payment_refund
+from finance.services import FinancialChangeError, create_financial_change_request, recalculate_debt, review_financial_change
 
 
 def xlsx_file(headers, rows, name='contracts.xlsx'):
@@ -84,14 +76,14 @@ class DebtListTests(TestCase):
         )
 
     def test_page_uses_permission_and_renders_contracts(self):
-        response = self.client.get(reverse('imports:debts'))
+        response = self.client.get(reverse('debts:debts'))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'DBZ-ACTIVE')
         self.assertContains(response, 'DBZ-REPAID')
 
     def test_contract_filters_apply_search_and_status(self):
-        response = self.client.get(reverse('imports:debts'), {'q': 'Иванов', 'status': Debt.Status.ACTIVE})
+        response = self.client.get(reverse('debts:debts'), {'q': 'Иванов', 'status': Debt.Status.ACTIVE})
         self.assertContains(response, 'DBZ-ACTIVE')
         self.assertNotContains(response, 'DBZ-REPAID')
         self.assertContains(response, 'id="record-filter-q"')
@@ -100,7 +92,7 @@ class DebtListTests(TestCase):
         other_user = User.objects.create_user('no-access', password='test-password')
         self.client.force_login(other_user)
 
-        response = self.client.get(reverse('imports:debts'))
+        response = self.client.get(reverse('debts:debts'))
 
         self.assertEqual(response.status_code, 403)
 
@@ -275,7 +267,7 @@ class FinancialChangeWorkflowTests(TestCase):
 
     def test_payment_edit_creates_pending_request_without_changing_payment(self):
         self.client.force_login(self.author)
-        response = self.client.post(reverse('imports:payment_edit', args=[self.payment.pk]), {
+        response = self.client.post(reverse('payments:payment_edit', args=[self.payment.pk]), {
             'debt': self.debt.pk,
             'amount': '450.00',
             'status': Payment.Status.WITHHOLDING,
@@ -286,7 +278,7 @@ class FinancialChangeWorkflowTests(TestCase):
         if response.status_code == 200:
             self.fail(response.context['form'].errors.as_text())
         change = FinancialChangeRequest.objects.get()
-        self.assertRedirects(response, reverse('imports:payment_history', args=[self.payment.pk]))
+        self.assertRedirects(response, reverse('payments:payment_history', args=[self.payment.pk]))
         self.payment.refresh_from_db()
         self.assertEqual(self.payment.amount, Decimal('300.00'))
         self.assertEqual(change.status, FinancialChangeRequest.Status.PENDING)
@@ -295,7 +287,7 @@ class FinancialChangeWorkflowTests(TestCase):
 
     def test_reason_is_required(self):
         self.client.force_login(self.author)
-        response = self.client.post(reverse('imports:payment_edit', args=[self.payment.pk]), {
+        response = self.client.post(reverse('payments:payment_edit', args=[self.payment.pk]), {
             'debt': self.debt.pk, 'amount': '450.00',
             'status': Payment.Status.CHSI, 'payment_date': '2026-10-01',
             'reason': '',
@@ -580,17 +572,17 @@ class CounterpartyTests(TestCase):
         self.client.force_login(self.user)
 
     def test_create_and_edit_counterparty(self):
-        response = self.client.post(reverse('imports:counterparty_new'), {
+        response = self.client.post(reverse('references:counterparty_new'), {
             'name': 'ТОО Контрагент',
         })
         counterparty = Counterparty.objects.get(name='ТОО Контрагент')
-        self.assertRedirects(response, reverse('imports:counterparties'))
+        self.assertRedirects(response, reverse('references:counterparties'))
 
         response = self.client.post(
-            reverse('imports:counterparty_edit', args=[counterparty.pk]),
+            reverse('references:counterparty_edit', args=[counterparty.pk]),
             {'name': 'ТОО Новый контрагент'},
         )
-        self.assertRedirects(response, reverse('imports:counterparties'))
+        self.assertRedirects(response, reverse('references:counterparties'))
         counterparty.refresh_from_db()
         self.assertEqual(counterparty.name, 'ТОО Новый контрагент')
 
@@ -615,10 +607,10 @@ class CounterpartyTests(TestCase):
         )
 
         response = self.client.post(
-            reverse('imports:counterparty_delete', args=[counterparty.pk])
+            reverse('references:counterparty_delete', args=[counterparty.pk])
         )
 
-        self.assertRedirects(response, reverse('imports:counterparties'))
+        self.assertRedirects(response, reverse('references:counterparties'))
         self.assertTrue(Counterparty.objects.filter(pk=counterparty.pk).exists())
         with self.assertRaises(ProtectedError):
             counterparty.delete()
@@ -629,10 +621,10 @@ class CounterpartyTests(TestCase):
         )
 
         response = self.client.post(
-            reverse('imports:counterparty_delete', args=[counterparty.pk])
+            reverse('references:counterparty_delete', args=[counterparty.pk])
         )
 
-        self.assertRedirects(response, reverse('imports:counterparties'))
+        self.assertRedirects(response, reverse('references:counterparties'))
         self.assertFalse(Counterparty.objects.filter(pk=counterparty.pk).exists())
 
 
@@ -996,11 +988,11 @@ class PaymentRefundTests(TestCase):
             debt=self.debt, amount=Decimal('100'), status=Payment.Status.CHSI,
             payment_date=self.payment.payment_date,
         )
-        response = self.client.post(reverse('imports:refund_new'), {
+        response = self.client.post(reverse('refunds:refund_new'), {
             'debt': self.debt.pk, 'payment': [self.payment.pk, second.pk],
             'amount': '150.00', 'refund_date': '2026-10-02', 'reason': 'Общий возврат',
         })
-        self.assertRedirects(response, reverse('imports:refunds'))
+        self.assertRedirects(response, reverse('refunds:refunds'))
         refunds = list(PaymentRefund.objects.all())
         self.assertEqual(len(refunds), 2)
         self.assertEqual(sum(r.amount for r in refunds), Decimal('150'))
@@ -1013,7 +1005,7 @@ class PaymentRefundTests(TestCase):
         self.assertEqual(second.refunded_amount, Decimal('100'))
 
     def test_manual_form_creates_refund_and_history_entry(self):
-        response = self.client.post(reverse('imports:refund_new'), {
+        response = self.client.post(reverse('refunds:refund_new'), {
             'debt': self.debt.pk,
             'payment': self.payment.pk,
             'amount': '250.00',
@@ -1021,21 +1013,21 @@ class PaymentRefundTests(TestCase):
             'reason': 'Платёж поступил ошибочно',
         })
 
-        self.assertRedirects(response, reverse('imports:refunds'))
+        self.assertRedirects(response, reverse('refunds:refunds'))
         refund = PaymentRefund.objects.get()
         self.assertEqual(refund.created_by, self.user)
-        history = self.client.get(reverse('imports:refunds'))
+        history = self.client.get(reverse('refunds:refunds'))
         self.assertContains(history, 'Платёж поступил ошибочно')
         self.assertContains(history, 'DBZ-REFUND')
 
     def test_user_without_existing_permission_cannot_manage_refunds(self):
         self.client.force_login(User.objects.create_user('reader', password='test-password'))
 
-        self.assertEqual(self.client.get(reverse('imports:refunds')).status_code, 403)
-        self.assertEqual(self.client.get(reverse('imports:refund_new')).status_code, 403)
+        self.assertEqual(self.client.get(reverse('refunds:refunds')).status_code, 403)
+        self.assertEqual(self.client.get(reverse('refunds:refund_new')).status_code, 403)
 
     def test_form_rejects_zero_and_excessive_repeat(self):
-        response = self.client.post(reverse('imports:refund_new'), {
+        response = self.client.post(reverse('refunds:refund_new'), {
             'debt': self.debt.pk,
             'payment': self.payment.pk,
             'amount': '0',
@@ -1046,7 +1038,7 @@ class PaymentRefundTests(TestCase):
         self.assertContains(response, 'Сумма возврата должна быть больше нуля.')
 
         self.create_refund('1100.00')
-        response = self.client.post(reverse('imports:refund_new'), {
+        response = self.client.post(reverse('refunds:refund_new'), {
             'debt': self.debt.pk,
             'payment': self.payment.pk,
             'amount': '101.00',

@@ -28,5 +28,12 @@ urlpatterns = [
     path('dashboard/', user_views.dashboard, name='dashboard'),
     path('logout/', auth_views.LogoutView.as_view(), name='logout'),
     path('users/', include('users.urls')),
+    path('', include('debts.urls')),
+    path('', include('payments.urls')),
+    path('', include('expenses.urls')),
+    path('', include('writeoffs.urls')),
+    path('', include('refunds.urls')),
+    path('', include('references.urls')),
+    path('', include('finance.urls')),
     path('', include('imports.urls')),
 ]

@@ -8,9 +8,19 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 from .balances import calculate_balance
-from .models import ActionLog, BalanceSnapshot, Debt, Debtor, Payment, PaymentRefund, PaymentDistribution, Expense, WriteOff, CollectionAgency, Creditor, Cession, CompanyAccount, Import, ImportType
+from finance.models import ActionLog, BalanceSnapshot
+from debts.models import Debt, Debtor
+from payments.models import Payment, PaymentDistribution
+from refunds.models import PaymentRefund
+from expenses.models import Expense
+from writeoffs.models import WriteOff
+from references.models import CollectionAgency, Creditor, Cession, CompanyAccount
+from imports.models import Import, ImportType
 from .operations import cancel_record, delete_record, balance_on
-from .services import recalculate_debt, create_payment_refund, create_writeoff, process_xlsx_import, CONTRACT_IMPORT_COLUMNS, WRITEOFF_IMPORT_COLUMNS
+from finance.services import recalculate_debt
+from refunds.services import create_payment_refund
+from writeoffs.services import create_writeoff
+from imports.services import process_xlsx_import, CONTRACT_IMPORT_COLUMNS, WRITEOFF_IMPORT_COLUMNS
 from .reports import period_bounds, report_rows
 from .tests import xlsx_file
 
@@ -26,7 +36,7 @@ class ProjectFeaturesTests(TestCase):
         return Payment.objects.create(debt=self.debt, amount=amount, status='individual', payment_date=day)
 
     def test_contract_documents_are_removed(self):
-        response = self.client.get(reverse('imports:debt_detail', args=[self.debt.pk]))
+        response = self.client.get(reverse('debts:debt_detail', args=[self.debt.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, 'Добавить документ')
         self.assertNotContains(response, '/documents/')
@@ -39,12 +49,12 @@ class ProjectFeaturesTests(TestCase):
                 with self.subTest(path=path, method=method.__name__):
                     self.assertEqual(method(path).status_code, 404)
         self.assertFalse(Permission.objects.filter(
-            content_type__app_label='imports', content_type__model='casedocument',
+            content_type__app_label__in=['imports', 'debts', 'payments', 'refunds', 'writeoffs', 'expenses', 'finance', 'references'], content_type__model='casedocument',
         ).exists())
 
     def test_manual_payment_does_not_follow_automatic_queue(self):
         payment = self.payment(300)
-        response = self.client.post(reverse('imports:payment_distribution', args=[payment.pk]), {'mode': 'manual', 'comment': 'По заявлению', 'interest': '300'})
+        response = self.client.post(reverse('payments:payment_distribution', args=[payment.pk]), {'mode': 'manual', 'comment': 'По заявлению', 'interest': '300'})
         self.assertEqual(response.status_code, 302)
         result = calculate_balance(self.debt)
         self.assertEqual(result['current']['principal'], 600)
@@ -56,7 +66,7 @@ class ProjectFeaturesTests(TestCase):
 
     def test_manual_payment_invalid_total_and_missing_reason_are_rejected(self):
         payment = self.payment(300)
-        response = self.client.post(reverse('imports:payment_distribution', args=[payment.pk]), {'mode': 'manual', 'interest': '100'})
+        response = self.client.post(reverse('payments:payment_distribution', args=[payment.pk]), {'mode': 'manual', 'interest': '100'})
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context['form'].errors)
         payment.refresh_from_db()
@@ -132,13 +142,8 @@ class ProjectFeaturesTests(TestCase):
         self.assertEqual(writeoff.reason, 'Решение')
 
     def test_writeoff_form_accepts_multiple_categories_and_requires_reason(self):
-        url = reverse('imports:writeoff_new')
-        payload = {'debt': self.debt.pk, 'kind': 'partial', 'amount': '300', 'writeoff_date': '2026-10-02', 'part_principal': '100', 'part_interest': '200'}
-        response = self.client.post(url, payload)
-        self.assertTrue(response.context['form'].errors)
-        response = self.client.post(url, {**payload, 'reason': 'Решение суда'})
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(WriteOff.objects.get().category, '')
+        self.assertEqual(self.client.get('/writeoffs/new/').status_code, 404)
+        self.assertEqual(self.client.post('/writeoffs/new/', {}).status_code, 404)
 
     def test_cancelled_operations_are_excluded(self):
         payment = self.payment()
@@ -161,8 +166,8 @@ class ProjectFeaturesTests(TestCase):
         reader.user_permissions.add(*Permission.objects.filter(codename__in=['recalculate_debt', 'view_debt']))
         self.client.force_login(reader)
         payment = self.payment()
-        self.assertEqual(self.client.post(reverse('imports:operation_action', args=['payment', payment.pk, 'delete']), {'reason': 'Test'}).status_code, 404)
-        self.assertEqual(self.client.post(reverse('imports:recalculate')).status_code, 403)
+        self.assertEqual(self.client.post(reverse('finance:operation_action', args=['payment', payment.pk, 'delete']), {'reason': 'Test'}).status_code, 404)
+        self.assertEqual(self.client.post(reverse('finance:recalculate')).status_code, 403)
 
     def test_extended_import_creates_relations_borrower_and_own_expenses(self):
         agency = CollectionAgency.objects.create(name='КА')

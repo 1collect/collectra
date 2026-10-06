@@ -12,15 +12,13 @@
     let generation = 0;
 
     function message(text) {
-      let alert = body.querySelector('[data-form-message]');
-      if (!alert) {
-        alert = document.createElement('div');
-        alert.className = 'alert alert-danger mb-3';
-        alert.dataset.formMessage = '';
-        alert.setAttribute('role', 'alert');
-        body.prepend(alert);
+      A.notify('error', 'Не удалось выполнить действие', text);
+    }
+
+    function notifyValidationErrors() {
+      if (body.querySelector('.field-error, .errorlist, [aria-invalid="true"]')) {
+        A.notify('error', 'Проверьте форму', 'Исправьте отмеченные поля и попробуйте ещё раз.');
       }
-      alert.textContent = text;
     }
 
     function prepare() {
@@ -40,8 +38,12 @@
         }
       });
       if (body.querySelector('[name="mode"]')) A.initDistribution(body);
-      if (body.querySelector('#writeoff-form')) A.initWriteoffs(body);
       if (A.initRefundSelect) A.initRefundSelect(body);
+      if (A.initPaymentAllocation) A.initPaymentAllocation(body);
+      if (dialog.open) focusForm();
+    }
+
+    function focusForm() {
       if (!body.querySelector('[data-no-auto-focus]')) {
         const field = body.querySelector('[aria-invalid="true"]:not([disabled]):not([hidden])')
           || body.querySelector('[autofocus]:not([hidden]), input:not([type="hidden"]):not([disabled]):not([hidden]), select:not([disabled]):not([hidden]), textarea:not([disabled]):not([hidden])');
@@ -62,7 +64,7 @@
       prepare();
     }
 
-    async function openForm(url, label, compact = false) {
+    async function openForm(url, label, compact = false, trigger = null) {
       if (dialog.dataset.busy === 'true') return;
       if (controller) controller.abort();
       controller = new AbortController();
@@ -70,20 +72,26 @@
       sourceURL = url;
       dialog.classList.toggle('modal-form-compact', compact);
       title.textContent = label || 'Добавление и редактирование';
-      const loading = document.createElement('p');
-      loading.setAttribute('role', 'status');
-      loading.textContent = 'Загрузка формы…';
-      body.replaceChildren(loading);
-      A.modal.show(dialog);
+      body.replaceChildren();
+      trigger?.setAttribute('aria-busy', 'true');
       try {
         const response = await fetch(url, { credentials: 'same-origin', signal: controller.signal });
         if (version !== generation) return;
         if (response.redirected) { location.assign(response.url); return; }
         if (!response.ok) throw new Error(response.status === 403 ? 'Недостаточно прав для этой операции.' : 'Не удалось загрузить форму. Попробуйте снова.');
         const html = await response.text();
-        if (version === generation && dialog.open) render(html, url);
+        if (version === generation) {
+          render(html, url);
+          A.modal.show(dialog);
+          focusForm();
+        }
       } catch (error) {
-        if (error.name !== 'AbortError' && version === generation) message(error.message);
+        if (error.name !== 'AbortError' && version === generation) {
+          A.modal.show(dialog);
+          message(error.message);
+        }
+      } finally {
+        trigger?.removeAttribute('aria-busy');
       }
     }
 
@@ -93,7 +101,8 @@
       const link = event.target.closest('a[data-form-modal]');
       if (!link || event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
       event.preventDefault();
-      openForm(link.href, link.textContent.trim(), link.hasAttribute('data-form-modal-compact'));
+      if (link.getAttribute('aria-busy') === 'true') return;
+      openForm(link.href, link.textContent.trim(), link.hasAttribute('data-form-modal-compact'), link);
     });
 
     dialog.addEventListener('submit', async event => {
@@ -122,6 +131,7 @@
           location.assign(target.href);
         } else {
           render(await response.text(), form.action);
+          notifyValidationErrors();
         }
       } catch (error) {
         message(error.message);
@@ -140,6 +150,6 @@
       else body.replaceChildren();
     });
 
-    if (directPage) { A.modal.show(dialog); prepare(); }
+    if (directPage) { prepare(); A.modal.show(dialog); focusForm(); notifyValidationErrors(); }
   });
 })(window.Admin);

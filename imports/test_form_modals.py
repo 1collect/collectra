@@ -3,7 +3,8 @@ from django.test import Client, TestCase
 from django.urls import reverse
 
 from users.models import Role
-from .models import CollectionAgency, Counterparty, Debt, Debtor
+from references.models import CollectionAgency, Counterparty
+from debts.models import Debt, Debtor
 
 
 class FormModalTests(TestCase):
@@ -15,9 +16,9 @@ class FormModalTests(TestCase):
         self.client.force_login(self.admin)
 
     def test_direct_form_links_render_modal(self):
-        for route in ('users:role_new', 'users:group_new', 'imports:expense_new',
-                      'imports:writeoff_new', 'imports:refund_new',
-                      'imports:counterparty_new', 'imports:collection_agency_new'):
+        for route in ('users:role_new', 'expenses:expense_new',
+                      'refunds:refund_new',
+                      'references:counterparty_new', 'references:collection_agency_new'):
             with self.subTest(route=route):
                 response = self.client.get(reverse(route))
                 self.assertEqual(response.status_code, 200)
@@ -71,8 +72,8 @@ class FormModalTests(TestCase):
     def test_delete_confirmation_uses_compact_form_for_free_and_linked_records(self):
         debtor = Debtor.objects.create(full_name='Test', iin='900101300333')
         for model, route, relation in (
-            (Counterparty, 'imports:counterparty_delete', 'counterparty'),
-            (CollectionAgency, 'imports:collection_agency_delete', 'collection_agency'),
+            (Counterparty, 'references:counterparty_delete', 'counterparty'),
+            (CollectionAgency, 'references:collection_agency_delete', 'collection_agency'),
         ):
             with self.subTest(route=route):
                 record = model.objects.create(name='Удаляемая запись')
@@ -92,8 +93,8 @@ class FormModalTests(TestCase):
 
     def test_modal_delete_redirects_to_list_after_confirmation(self):
         for model, route, target in (
-            (Counterparty, 'imports:counterparty_delete', 'imports:counterparties'),
-            (CollectionAgency, 'imports:collection_agency_delete', 'imports:collection_agencies'),
+            (Counterparty, 'references:counterparty_delete', 'references:counterparties'),
+            (CollectionAgency, 'references:collection_agency_delete', 'references:collection_agencies'),
         ):
             with self.subTest(route=route):
                 record = model.objects.create(name='Удаляемая запись')

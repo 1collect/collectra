@@ -6,11 +6,12 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .balances import calculate_balance
-from .models import Debt, Debtor, Payment, WriteOff
-from .services import (
-    cancel_payment_refund, create_payment_refund, create_writeoff,
-    save_expense, save_payment,
-)
+from debts.models import Debt, Debtor
+from payments.models import Payment
+from writeoffs.models import WriteOff
+from refunds.services import cancel_payment_refund, create_payment_refund
+from writeoffs.services import create_writeoff
+from imports.services import save_expense, save_payment
 
 
 class FixedDebtTotalTests(TestCase):
@@ -40,7 +41,9 @@ class FixedDebtTotalTests(TestCase):
                     if url_name == 'debts':
                         self.assertContains(response, f'<strong>{accrued},00</strong>', html=True)
                     else:
-                        self.assertContains(response, 'Общая сумма задолженности:')
+                        self.assertContains(response, '<dt>Общая сумма задолженности</dt>', html=True)
+                        self.assertEqual(response.context['selected_debt'].total_amount, accrued)
+                        self.assertEqual(response.context['selected_balance']['outstanding_amount'], outstanding)
         self.debt.refresh_from_db()
         self.assertEqual(self.debt.purchase_total_debt, 1000)
         self.assertEqual(self.debt.purchase_principal, 600)

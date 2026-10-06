@@ -35,23 +35,17 @@ document.addEventListener('DOMContentLoaded', () => {
   const key = `${document.body.dataset.page}.filtersExpanded`;
   const isReload = performance.getEntriesByType('navigation')[0]?.type === 'reload';
   if (isReload) {
-    window.Admin.storage.remove(key);
-    if (location.search) {
-      location.replace(location.pathname);
-      return;
-    }
+    window.Admin.storage.set(key, false);
   }
   const setExpanded = expanded => {
     panel.classList.toggle('is-open', expanded);
     panel.inert = !expanded;
     toggle.setAttribute('aria-expanded', String(expanded));
   };
-  if (isReload) {
-    setExpanded(false);
-  } else if (toggle.getAttribute('aria-expanded') !== 'true') {
-    setExpanded(window.Admin.storage.get(key, false));
-  }
+  setExpanded(isReload ? false : window.Admin.storage.get(key, toggle.getAttribute('aria-expanded') === 'true'));
   toggle.addEventListener('click', () => {
+    panel.classList.add('is-animated');
+    toggle.classList.add('is-animated');
     const expanded = toggle.getAttribute('aria-expanded') !== 'true';
     setExpanded(expanded);
     window.Admin.storage.set(key, expanded);

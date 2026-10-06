@@ -8,30 +8,28 @@ FORM_ROUTES = {
     'users:edit': 'users:list',
     'users:role_new': 'users:roles',
     'users:role_edit': 'users:roles',
-    'users:group_new': 'users:groups',
-    'users:group_edit': 'users:groups',
-    'imports:payment_edit': 'imports:payments',
-    'imports:expense_new': 'imports:expenses',
-    'imports:expense_edit': 'imports:expenses',
-    'imports:writeoff_new': 'imports:writeoffs',
-    'imports:refund_new': 'imports:refunds',
-    'imports:operation_edit': 'imports:debts',
-    'imports:payment_distribution': 'imports:payments',
-    'imports:collection_agency_new': 'imports:collection_agencies',
-    'imports:collection_agency_edit': 'imports:collection_agencies',
-    'imports:counterparty_new': 'imports:counterparties',
-    'imports:counterparty_edit': 'imports:counterparties',
-    'imports:collection_agency_delete': 'imports:collection_agencies',
-    'imports:counterparty_delete': 'imports:counterparties',
+    'payments:payment_edit': 'payments:payments',
+    'payments:payment_new': 'payments:payments',
+    'expenses:expense_new': 'expenses:expenses',
+    'expenses:expense_edit': 'expenses:expenses',
+    'refunds:refund_new': 'refunds:refunds',
+    'finance:operation_edit': 'debts:debts',
+    'payments:payment_distribution': 'payments:payments',
+    'references:collection_agency_new': 'references:collection_agencies',
+    'references:collection_agency_edit': 'references:collection_agencies',
+    'references:counterparty_new': 'references:counterparties',
+    'references:counterparty_edit': 'references:counterparties',
+    'references:collection_agency_delete': 'references:collection_agencies',
+    'references:counterparty_delete': 'references:counterparties',
 }
 
 COMPACT_FORM_ROUTES = {
-    'imports:collection_agency_new',
-    'imports:collection_agency_edit',
-    'imports:counterparty_new',
-    'imports:counterparty_edit',
-    'imports:collection_agency_delete',
-    'imports:counterparty_delete',
+    'references:collection_agency_new',
+    'references:collection_agency_edit',
+    'references:counterparty_new',
+    'references:counterparty_edit',
+    'references:collection_agency_delete',
+    'references:counterparty_delete',
 }
 
 
@@ -44,8 +42,8 @@ def form_modal_context(request):
         return {'form_modal_page': False}
     route = FORM_ROUTES[match.view_name]
     kwargs = {}
-    if match.view_name == 'imports:operation_edit':
-        route = 'imports:writeoffs' if match.kwargs['kind'] == 'writeoff' else 'imports:refunds'
+    if match.view_name == 'finance:operation_edit':
+        route = 'writeoffs:writeoffs' if match.kwargs['kind'] == 'writeoff' else 'refunds:refunds'
     return {
         'form_modal_page': True,
         'form_modal_return_url': reverse(route, kwargs=kwargs),

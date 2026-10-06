@@ -20,7 +20,6 @@
     {% endif %}
     {% if summary.dates %}
     <section class="panel">
-        <div class="panel-header"><h2>Суммы по датам</h2><span class="text-muted text-xs">Все строки без ошибок</span></div>
         <div class="table-container" tabindex="0" role="region" aria-label="Суммы импорта по датам">
             <table class="table table-bordered table-compact">
                 <thead><tr><th scope="col">Дата</th><th scope="col">Количество записей</th><th scope="col">Сумма к добавлению</th></tr></thead>
@@ -31,15 +30,21 @@
     </section>
     {% endif %}
     {% if summary.categories %}
-    <section class="panel"><div class="panel-header"><h2>По статусу платежа</h2></div><div class="table-container"><table class="table table-bordered table-compact"><thead><tr><th scope="col">Статус платежа</th><th scope="col">Сумма</th></tr></thead><tbody>{% for group in summary.categories %}<tr><td>{{ group.label }}</td><td class="font-mono">{{ group.amount|floatformat:'2g' }}</td></tr>{% endfor %}</tbody></table></div></section>
+    <section class="panel"><div class="table-container" tabindex="0" role="region" aria-label="Суммы импорта по категориям платежей"><table class="table table-bordered table-compact"><thead><tr><th scope="col">Категория платежа</th><th scope="col">Сумма</th></tr></thead><tbody>{% for group in summary.categories %}<tr><td>{{ group.label }}</td><td class="font-mono">{{ group.amount|floatformat:'2g' }}</td></tr>{% endfor %}</tbody></table></div></section>
     {% endif %}
-    {% if can_confirm %}
-    <form action="{% url 'imports:preview' import_record.pk %}" method="post" class="panel import-preview__actions" data-import-confirm>
+</div>
+    {% if can_confirm and not has_errors %}
+    <form action="{% url 'imports:preview' import_record.pk %}" method="post" class="import-preview__actions" data-import-confirm>
         {% csrf_token %}
         <input type="hidden" name="reviewed" value="yes">
         <div class="panel-footer"><span class="{% if has_errors %}text-danger{% else %}text-muted{% endif %}">{% if has_errors %}Импорт заблокирован до исправления ошибок{% else %}К импорту: {{ import_record.successful_items }} записей{% endif %}</span>{% if has_errors and perms.imports.view_import %}{% include 'imports/partials/import_error_download.html' %}{% endif %}<button type="button" class="btn" data-modal-close>Закрыть</button><button type="submit" class="btn btn-danger" name="action" value="cancel" formnovalidate>Отменить импорт</button><button type="submit" class="btn btn-primary" name="action" value="confirm" disabled{% if not has_errors and import_record.successful_items %} data-confirm-delay="5"{% endif %}>Подтвердить импорт{% if not has_errors and import_record.successful_items %} (5 с){% endif %}</button></div>
     </form>
-    {% elif has_errors and perms.imports.view_import %}
-    <div class="modal-footer">{% include 'imports/partials/import_error_download.html' %}<button type="button" class="btn" data-modal-close>Закрыть</button></div>
+    {% elif can_retry %}
+    <form action="{% url 'imports:preview' import_record.pk %}" method="post" class="import-preview__actions" data-import-confirm>
+        {% csrf_token %}
+        <input type="hidden" name="reviewed" value="yes">
+        <div class="panel-footer"><span class="text-muted">К импорту: {{ import_record.successful_items }} записей</span><button type="button" class="btn" data-modal-close>Закрыть</button><button type="submit" class="btn btn-primary" name="action" value="retry" disabled data-confirm-delay="5">Перезапустить импорт (5 с)</button></div>
+    </form>
+    {% else %}
+    <div class="modal-footer import-preview__actions">{% if has_errors and perms.imports.view_import %}{% include 'imports/partials/import_error_download.html' %}{% endif %}<button type="button" class="btn" data-modal-close>Закрыть</button></div>
     {% endif %}
-</div>

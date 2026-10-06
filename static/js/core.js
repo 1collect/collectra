@@ -33,6 +33,17 @@
       try { localStorage.removeItem('circuit.' + key); } catch (_) { A.storage.available = false; }
     }
   };
+  // A reload resets expanded filter panels across all sections, not just this page.
+  if (performance.getEntriesByType('navigation')[0]?.type === 'reload') {
+    try {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (key?.startsWith('circuit.') && key.endsWith('.filtersExpanded')) {
+          A.storage.set(key.slice('circuit.'.length), false);
+        }
+      }
+    } catch (_) { A.storage.available = false; }
+  }
   A.copyText = async function (text) {
     try {
       if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
@@ -46,10 +57,10 @@
         textarea.remove(); if (previous) previous.focus();
         if (!copied) throw new Error('Clipboard is unavailable');
       }
-      A.toast('success', 'Copied', 'The example is on your clipboard.');
+      A.notify('success', 'Copied', 'The example is on your clipboard.');
       return true;
     } catch (_) {
-      A.toast('warning', 'Clipboard unavailable', 'Select the visible code and copy it manually.');
+      A.notify('warning', 'Clipboard unavailable', 'Select the visible code and copy it manually.');
       return false;
     }
   };
@@ -65,7 +76,7 @@
     const link = document.createElement('a'); link.href = url; link.download = filename;
     document.body.append(link); link.click(); link.remove();
     window.setTimeout(() => URL.revokeObjectURL(url), 5000);
-    A.toast('success', 'Export ready', rows.length + ' rows exported as CSV.');
+    A.notify('success', 'Export ready', rows.length + ' rows exported as CSV.');
   };
   A.pageHref = function (slug) {
     const base = document.body.dataset.base || './';

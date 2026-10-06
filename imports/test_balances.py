@@ -6,8 +6,14 @@ from django.test import TestCase
 from django.urls import reverse
 
 from .balances import calculate_balance
-from .models import Debt, Debtor, Expense, Payment, WriteOff
-from .services import recalculate_debt, save_expense, create_writeoff, create_payment_refund, WriteOffValidationError
+from debts.models import Debt, Debtor
+from expenses.models import Expense
+from payments.models import Payment
+from writeoffs.models import WriteOff
+from finance.services import recalculate_debt
+from imports.services import save_expense
+from writeoffs.services import create_writeoff, WriteOffValidationError
+from refunds.services import create_payment_refund
 
 
 class DynamicBalanceTests(TestCase):
@@ -26,7 +32,7 @@ class DynamicBalanceTests(TestCase):
         expense = Expense.objects.create(debt=self.debt, state_duty=80, claim_security=20, expense_date=date(2026, 10, 1))
         WriteOff.objects.create(debt=self.debt, kind='partial', category='purchase_interest', amount=40,
                                 writeoff_date=date(2026, 10, 2), created_by=self.user)
-        response = self.client.get(reverse('imports:debts'))
+        response = self.client.get(reverse('debts:debts'))
         shown = response.context['page_obj'][0]
         self.assertEqual(shown.current['principal'], 0)
         self.assertEqual(shown.current['interest'], 110)
@@ -38,7 +44,7 @@ class DynamicBalanceTests(TestCase):
         self.assertContains(response, 'purchase-column-content">600,00</span>')
         expense.state_duty = 180
         expense.save()
-        response = self.client.get(reverse('imports:debts'))
+        response = self.client.get(reverse('debts:debts'))
         self.assertEqual(response.context['page_obj'][0].outstanding_amount, 510)
         self.debt.refresh_from_db()
         self.assertEqual(self.debt.purchase_interest, 200)
@@ -109,7 +115,7 @@ class DynamicBalanceTests(TestCase):
         self.assertEqual(balance['outstanding_amount'], 1030)
 
     def test_real_refunds_are_used_even_when_payment_cache_is_stale(self):
-        from .models import PaymentRefund
+        from refunds.models import PaymentRefund
         payment = Payment.objects.create(debt=self.debt, amount=500, status='individual', payment_date=date(2026, 10, 1))
         PaymentRefund.objects.create(payment=payment, amount=200, refund_date=date(2026, 10, 2),
                                      reason='Refund', payment_category='individual', created_by=self.user)
@@ -117,7 +123,7 @@ class DynamicBalanceTests(TestCase):
         self.assertEqual(calculate_balance(self.debt, as_of=date(2026, 10, 1))['paid_amount'], 500)
 
     def test_detail_and_refresh_show_live_values_without_writing_opening_amounts(self):
-        url = reverse('imports:debt_detail', args=[self.debt.pk])
+        url = reverse('debts:debt_detail', args=[self.debt.pk])
         response = self.client.get(url)
         self.assertContains(response, 'Исходные суммы и текущие остатки')
         self.assertContains(response, 'balances.js')
@@ -131,8 +137,9 @@ class DynamicBalanceTests(TestCase):
         self.assertEqual(self.debt.purchase_total_debt, 1000)
 
     def test_registry_refresh_keeps_search_and_plain_contract_number(self):
-        response = self.client.get(reverse('imports:debts'), {'q': 'DYNAMIC'}, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
-        self.assertContains(response, f'<a class="btn btn-sm" href="{reverse("imports:debt_detail", args=[self.debt.pk])}">Открыть</a>')
+        response = self.client.get(reverse('debts:debts'), {'q': 'DYNAMIC'}, HTTP_X_REQUESTED_WITH='XMLHttpRequest')
+        self.assertContains(response, '<button type="button" class="btn btn-sm contract-open-disabled" disabled aria-disabled="true">Открыть</button>', html=True)
+        self.assertNotContains(response, f'href="{reverse("debts:debt_detail", args=[self.debt.pk])}"')
         self.assertNotContains(response, '<a class="font-mono"')
         self.assertContains(response, f'<span class="font-mono">{self.debt.contract_number}</span>')
         self.assertNotContains(response, '<html')
@@ -157,7 +164,7 @@ class DynamicBalanceTests(TestCase):
         self.assertTrue(all(value >= 0 for value in balance['current'].values()))
 
     def test_writeoff_preview_accounts_for_operations_between_file_dates(self):
-        from .services import reserve_writeoff
+        from imports.services import reserve_writeoff
 
         Expense.objects.create(debt=self.debt, state_duty=200, expense_date=date(2026, 10, 2))
         Payment.objects.create(debt=self.debt, amount=100, status='individual', payment_date=date(2026, 10, 3))

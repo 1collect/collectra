@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% block title %}Новый платёж{% endblock %}
+{% block page_name %}payments{% endblock %}
+{% block heading %}Новый платёж{% endblock %}
+{% block content %}
+<div class="page-header"><h1>Новый платёж</h1></div>
+<div class="payment-form-panel">
+    <form method="post" novalidate data-no-auto-focus data-payment-allocation-form>
+        {% csrf_token %}
+        <div class="payment-form-scroll">
+        {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+        {% for section in form.field_sections %}
+        <fieldset class="payment-form-section">
+            <legend>{{ section.title }}</legend>
+            <div class="form-grid payment-form-grid">
+            {% for field in section.fields %}
+            <div class="form-field {% if field.name == 'debt' or field.name == 'claim_security' %}span-2{% endif %}">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required">*</span>{% endif %}</label>
+                {{ field }}
+                {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+            </div>
+            {% endfor %}
+            </div>
+        </fieldset>
+        {% endfor %}
+        </div>
+        <footer class="payment-form-footer">
+            <div class="payment-form-summary"><span>Общая сумма</span><output name="amount" data-payment-total aria-live="polite" aria-atomic="true">0,00</output></div>
+            <div class="form-actions">
+                <a class="btn" href="{% url 'payments:payments' %}">Отмена</a>
+                <button class="btn btn-primary" type="submit">Сохранить платёж</button>
+            </div>
+        </footer>
+    </form>
+</div>
+{% endblock %}

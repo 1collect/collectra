@@ -4,7 +4,13 @@ from django.contrib.auth.models import User, Permission
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Debt, Debtor, Counterparty, CollectionAgency, Payment, ImportType, Expense, WriteOff, PaymentRefund
+from debts.models import Debt, Debtor
+from references.models import Counterparty, CollectionAgency
+from payments.models import Payment
+from imports.models import ImportType
+from expenses.models import Expense
+from writeoffs.models import WriteOff
+from refunds.models import PaymentRefund
 
 
 class RecordFilterTests(TestCase):
@@ -54,12 +60,12 @@ class RecordFilterTests(TestCase):
         for headers in ({}, {'X-Requested-With': 'XMLHttpRequest'}):
             for status in ('closed', 'closed_paid', 'active'):
                 with self.subTest(status=status, headers=headers):
-                    response = self.client.get(reverse('imports:debts'), {'status': status}, headers=headers)
+                    response = self.client.get(reverse('debts:debts'), {'status': status}, headers=headers)
                     self.assertEqual({item.pk for item in response.context['page_obj']}, {self.debt.pk, self.other.pk})
                     self.assertNotIn('status', response.context['record_filters'].fields)
 
     def test_payment_category_and_invalid_filter_values(self):
-        response = self.client.get(reverse('imports:payments'), {'status': 'individual'})
+        response = self.client.get(reverse('payments:payments'), {'status': 'individual'})
         self.assertEqual([item.pk for item in response.context['page_obj']], [self.payment.pk])
         for route in ('debts', 'payments'):
             response = self.client.get(reverse(f'imports:{route}'), {'status': 'bad', 'counterparty': 'bad', 'date_from': 'bad'})
@@ -77,7 +83,7 @@ class RecordFilterTests(TestCase):
             response = self.client.get(reverse('imports:new'), {'import_type': code})
             self.assertEqual(response.context['upload_form'].initial['import_type'], ImportType.objects.get(code=code).pk)
         viewer = User.objects.create_user('filters-viewer')
-        viewer.user_permissions.add(*Permission.objects.filter(codename__in=['view_debt', 'view_payment'], content_type__app_label='imports'))
+        viewer.user_permissions.add(*Permission.objects.filter(codename__in=['view_debt', 'view_payment'], content_type__app_label__in=['imports', 'debts', 'payments', 'refunds', 'writeoffs', 'expenses', 'finance', 'references']))
         self.client.force_login(viewer)
         for route in ('debts', 'payments'):
             self.assertNotContains(self.client.get(reverse(f'imports:{route}')), '?import_type=')
@@ -85,7 +91,7 @@ class RecordFilterTests(TestCase):
     def test_expense_writeoff_refund_filters_and_creation_permissions(self):
         for route, record, specific, permission, create_route in (
             ('expenses', self.expense, {'q': 'Иванов'}, 'add_expense', 'expense_new'),
-            ('writeoffs', self.writeoff, {'status': 'cancelled', 'kind': 'partial', 'category': 'purchase_principal'}, 'add_writeoff', 'writeoff_new'),
+            ('writeoffs', self.writeoff, {'status': 'cancelled', 'kind': 'partial', 'category': 'purchase_principal'}, 'import_writeoff', None),
             ('refunds', self.refund, {'status': 'cancelled', 'category': 'individual'}, 'add_paymentrefund', 'refund_new'),
         ):
             for params in [
@@ -99,17 +105,18 @@ class RecordFilterTests(TestCase):
                     self.assertTrue(response.context['filters_active'])
             response = self.client.get(reverse(f'imports:{route}'))
             if route == 'expenses':
-                self.assertNotContains(response, reverse('imports:expense_new'))
-                self.assertNotContains(response, reverse('imports:expense_edit', args=[record.pk]))
-                self.assertNotContains(response, reverse('imports:expense_history', args=[record.pk]))
-            else:
+                self.assertNotContains(response, reverse('expenses:expense_new'))
+                self.assertNotContains(response, reverse('expenses:expense_edit', args=[record.pk]))
+                self.assertNotContains(response, reverse('expenses:expense_history', args=[record.pk]))
+            elif create_route:
                 self.assertContains(response, f'href="{reverse("imports:" + create_route)}" data-form-modal')
             if route != 'expenses':
                 response = self.client.get(reverse(f'imports:{route}'), {'author': self.user.pk})
                 self.assertEqual(response.context['page_obj'].paginator.count, 2)
             viewer = User.objects.create_user('viewer-' + route)
             view_permission = 'view_paymentrefund' if route == 'refunds' else 'view_' + route[:-1]
-            viewer.user_permissions.add(Permission.objects.get(codename=view_permission, content_type__app_label='imports'))
+            viewer.user_permissions.add(Permission.objects.get(codename=view_permission, content_type__app_label__in=['imports', 'debts', 'payments', 'refunds', 'writeoffs', 'expenses', 'finance', 'references']))
             self.client.force_login(viewer)
-            self.assertNotContains(self.client.get(reverse(f'imports:{route}')), reverse('imports:' + create_route))
+            if create_route:
+                self.assertNotContains(self.client.get(reverse(f'imports:{route}')), reverse('imports:' + create_route))
             self.client.force_login(self.user)

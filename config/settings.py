@@ -40,6 +40,13 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'users',
     'imports',
+    'references',
+    'debts',
+    'payments',
+    'refunds',
+    'writeoffs',
+    'expenses',
+    'finance',
 ]
 
 MIDDLEWARE = [
@@ -48,7 +55,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'imports.audit.FinancialAuditMiddleware',
+    'finance.audit.FinancialAuditMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'config.form_modals.FormModalMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -97,6 +104,12 @@ DATABASES = {
     }
 }
 
+# Progress is committed independently of the atomic financial-data write.
+DATABASES['import_progress'] = {
+    **DATABASES['default'], 'TEST': {'MIRROR': 'default'},
+}
+IMPORT_PROGRESS_DB_ALIAS = 'import_progress'
+
 
 # Password validation
 # https://docs.djangoproject.com/en/6.1/ref/settings/#auth-password-validators
@@ -134,6 +147,8 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 MEDIA_ROOT = BASE_DIR / 'media'
+IMPORT_REPORT_ROOT = MEDIA_ROOT / 'imports' / 'reports'
+IMPORT_PREBUILD_ERROR_REPORTS = True
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
 

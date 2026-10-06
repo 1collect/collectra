@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block title %}{% if counterparty.pk %}Изменение контрагента{% else %}Новый контрагент{% endif %}{% endblock %}
+{% block page_name %}counterparties{% endblock %}
+{% block heading %}{% if counterparty.pk %}Изменение контрагента{% else %}Новая запись{% endif %}{% endblock %}
+{% block content %}
+<div class="page-header"><div><div class="page-eyebrow">Справочники / Контрагенты</div><h1>{% if counterparty.pk %}{{ counterparty.name }}{% else %}Новая запись{% endif %}</h1></div><div class="page-actions"><a class="btn" href="{% url 'references:counterparties' %}">Назад</a></div></div>
+<form method="post">{% csrf_token %}
+    <section class="panel"><div class="panel-header"><h2>Основные данные</h2></div><div class="panel-body">{{ form.non_field_errors }}<div class="form-grid">
+        <div class="form-field"><label class="form-label" for="{{ form.name.id_for_label }}">{{ form.name.label }}</label>{{ form.name }}{% for error in form.name.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>
+    </div></div><div class="panel-footer"><a class="btn" href="{% url 'references:counterparties' %}">Отмена</a><button class="btn btn-primary" type="submit">Сохранить контрагента</button></div></section>
+</form>
+{% endblock %}

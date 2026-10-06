@@ -166,18 +166,10 @@ dialog.modal { overscroll-behavior: contain; }
 [data-tooltip-position="left"]::after { left: auto; right: calc(100% + 7px); bottom: 50%; transform: translateY(50%); }
 [data-tooltip-position="right"]::after { left: calc(100% + 7px); bottom: 50%; transform: translateY(50%); }
 .popover { width: 230px; padding: 12px; font-size: var(--text-small); }
-.toast-container { position: fixed; z-index: 300; inset: 57px 12px auto auto; width: min(360px, calc(var(--viewport-width) - 24px)); display: grid; gap: 8px; pointer-events: none; margin: 0; padding: 0; border: 0; background: transparent; overflow: visible; }
-.toast-container[popover]:not(:popover-open) { display: none; }
-.toast { display: flex; align-items: flex-start; gap: 9px; padding: 11px 12px; border: 1px solid var(--border-color); border-left: 3px solid var(--toast-tone, var(--info)); border-radius: 4px; background: var(--bg-panel); box-shadow: var(--shadow-float); pointer-events: auto; font-size: var(--text-small); }
-.toast > .icon { color: var(--toast-tone, var(--info)); margin-top: 2px; }
-.toast strong { display: block; font-size: var(--text-small); margin-bottom: 2px; }
-.toast p { color: var(--text-secondary); overflow-wrap: anywhere; }
-.toast > div { min-width: 0; }
-.toast .btn { margin: -3px -5px 0 auto; }
-.toast { position: relative; overflow: hidden; padding-bottom: 14px; animation: toast-enter 180ms ease-out; }
-.toast__progress { position: absolute; height: 3px; inset: auto 0 0; background: var(--toast-tone, var(--info)); transform-origin: left; }
-@keyframes toast-enter { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
-@media (prefers-reduced-motion: reduce) { .toast { animation: none; } }
+.feedback-region { display: grid; gap: var(--space-2); margin-bottom: var(--space-3); }
+.feedback-region:empty { display: none; }
+.feedback-message > div { min-width: 0; }
+.feedback-message p { overflow-wrap: anywhere; }
 .progress { display: block; height: 6px; width: 100%; border-radius: 3px; overflow: hidden; background: var(--neutral-soft); }
 .progress-bar { display: block; height: 100%; width: var(--progress, 50%); background: var(--primary); border-radius: inherit; }
 .progress-success .progress-bar { background: var(--success); }

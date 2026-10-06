@@ -4,7 +4,11 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Debt, Debtor, Expense, Payment, PaymentRefund, WriteOff
+from debts.models import Debt, Debtor
+from expenses.models import Expense
+from payments.models import Payment
+from refunds.models import PaymentRefund
+from writeoffs.models import WriteOff
 
 
 class RecordPaginationTests(TestCase):
@@ -75,7 +79,7 @@ class RecordPaginationTests(TestCase):
                 self.assertEqual(self.client.get(url, {'page': 999}).context['page_obj'].number, 3)
 
     def test_contract_refresh_keeps_pagination_and_current_balances(self):
-        response = self.client.get(reverse('imports:debts'), {'per_page': 10, 'page': 5},
+        response = self.client.get(reverse('debts:debts'), {'per_page': 10, 'page': 5},
                                    HTTP_X_REQUESTED_WITH='XMLHttpRequest')
         self.assertContains(response, 'Записи с 41 до 43 из 43')
         self.assertContains(response, '?per_page=10&amp;page=4')

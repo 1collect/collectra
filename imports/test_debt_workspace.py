@@ -4,7 +4,12 @@ from django.contrib.auth.models import Permission, User
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import ActionLog, Debt, Debtor, Expense, Payment, PaymentRefund, WriteOff
+from finance.models import ActionLog
+from debts.models import Debt, Debtor
+from expenses.models import Expense
+from payments.models import Payment
+from refunds.models import PaymentRefund
+from writeoffs.models import WriteOff
 
 
 class DebtWorkspaceTests(TestCase):
@@ -20,7 +25,7 @@ class DebtWorkspaceTests(TestCase):
         self.other_debt = Debt.objects.create(debtor=other, contract_number='UNRELATED')
         self.payment = Payment.objects.create(debt=self.debt, amount=20, status='individual', payment_date=date(2026, 10, 1))
         self.other_payment = Payment.objects.create(debt=self.other_debt, amount=30, status='individual', payment_date=date(2026, 10, 1))
-        self.url = reverse('imports:debt_detail', args=[self.debt.pk])
+        self.url = reverse('debts:debt_detail', args=[self.debt.pk])
 
     def test_overview_shows_only_borrowers_contracts_and_discloses_calculations(self):
         response = self.client.get(self.url)
@@ -30,7 +35,7 @@ class DebtWorkspaceTests(TestCase):
         self.assertNotContains(response, 'data-operation-row=')
         self.assertContains(response, '<details class="contract-disclosure" id="contract-calculation">')
         self.assertEqual(len(response.context['contract_tabs']), 6)
-        sibling = self.client.get(reverse('imports:debt_detail', args=[self.sibling.pk]))
+        sibling = self.client.get(reverse('debts:debt_detail', args=[self.sibling.pk]))
         self.assertEqual(sibling.context['debt'].pk, self.sibling.pk)
 
     def test_operations_are_filtered_by_contract_and_paginated_with_tab(self):
@@ -46,11 +51,11 @@ class DebtWorkspaceTests(TestCase):
         self.assertContains(response, 'data-payment-row=')
         self.assertNotContains(response, 'data-operation-details=')
         self.assertNotContains(response, 'data-operation-toggle=')
-        self.assertNotContains(response, reverse('imports:payment_edit', args=[self.payment.pk]))
+        self.assertNotContains(response, reverse('payments:payment_edit', args=[self.payment.pk]))
 
     def test_tabs_and_actions_follow_permissions_including_direct_query(self):
         reader = User.objects.create_user('reader', password='test')
-        reader.user_permissions.add(Permission.objects.get(codename='view_debt', content_type__app_label='imports'))
+        reader.user_permissions.add(Permission.objects.get(codename='view_debt', content_type__app_label__in=['imports', 'debts', 'payments', 'refunds', 'writeoffs', 'expenses', 'finance', 'references']))
         self.client.force_login(reader)
         response = self.client.get(self.url, {'tab': 'payments'})
         self.assertEqual(response.context['active_tab'], 'overview')
@@ -106,7 +111,7 @@ class DebtWorkspaceTests(TestCase):
         self.assertContains(response, 'Перерасчёт')
 
     def test_expense_from_workspace_is_scoped_and_returns_to_contract(self):
-        url = reverse('imports:expense_new') + f'?debt={self.debt.pk}'
+        url = reverse('expenses:expense_new') + f'?debt={self.debt.pk}'
         response = self.client.get(url)
         self.assertEqual(response.context['form'].initial['debt'], self.debt.pk)
         self.assertEqual(list(response.context['form'].fields['debt'].queryset), [self.debt])
@@ -120,7 +125,7 @@ class DebtWorkspaceTests(TestCase):
         self.assertEqual(Expense.objects.get().debt_id, self.debt.pk)
 
     def test_refund_choices_are_scoped_on_get_and_post(self):
-        url = reverse('imports:refund_new') + f'?debt={self.debt.pk}'
+        url = reverse('refunds:refund_new') + f'?debt={self.debt.pk}'
         response = self.client.get(url)
         self.assertEqual(list(response.context['form'].fields['payment'].queryset), [self.payment])
         response = self.client.post(url, {'payment': self.other_payment.pk, 'amount': 1,
@@ -129,14 +134,11 @@ class DebtWorkspaceTests(TestCase):
         self.assertFalse(PaymentRefund.objects.exists())
 
     def test_writeoff_from_workspace_returns_to_selected_tab(self):
-        url = reverse('imports:writeoff_new') + f'?debt={self.debt.pk}'
-        response = self.client.post(url, {'debt': self.debt.pk, 'kind': 'partial', 'category': 'purchase_principal',
-                                         'amount': 10, 'writeoff_date': '2026-10-02', 'reason': 'Списание'})
-        self.assertRedirects(response, self.url + '?tab=writeoffs')
-        self.assertEqual(WriteOff.objects.get().debt_id, self.debt.pk)
+        self.assertEqual(self.client.get('/writeoffs/new/').status_code, 404)
+        self.assertEqual(self.client.post('/writeoffs/new/', {}).status_code, 404)
 
     def test_invalid_contract_context_returns_not_found(self):
-        for route in ('expense_new', 'writeoff_new', 'refund_new'):
+        for route in ('expense_new', 'refund_new'):
             with self.subTest(route=route):
                 response = self.client.get(reverse('imports:' + route), {'debt': 'invalid'})
                 self.assertEqual(response.status_code, 404)

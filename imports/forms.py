@@ -4,264 +4,14 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.db.models import F, Sum
 
-from .models import CollectionAgency, Counterparty, Debt, Expense, Import, ImportType, Payment, PaymentRefund, WriteOff
+from references.models import CollectionAgency, Counterparty
+from debts.models import Debt
+from expenses.models import Expense
+from imports.models import Import, ImportType
+from payments.models import Payment
+from refunds.models import PaymentRefund
+from writeoffs.models import WriteOff
 
-
-class ImportFilterForm(forms.Form):
-    import_type = forms.ModelChoiceField(label='Тип импорта', queryset=ImportType.objects.all(), required=False, empty_label='Все типы')
-    status = forms.ChoiceField(label='Статус', choices=[('', 'Все статусы'), *Import.Status.choices], required=False)
-    author = forms.ModelChoiceField(label='Автор', queryset=get_user_model().objects.none(), required=False, empty_label='Все авторы')
-    date_from = forms.DateField(label='Дата с', required=False, widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'))
-    date_to = forms.DateField(label='Дата по', required=False, widget=forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'))
-
-    def __init__(self, *args, **kwargs):
-        kwargs.setdefault('auto_id', 'import-filter-%s')
-        super().__init__(*args, **kwargs)
-        self.fields['author'].queryset = get_user_model().objects.filter(pk__in=Import.objects.values('created_by_id')).order_by('username')
-        for field in self.fields.values():
-            field.widget.attrs['class'] = 'form-control'
-
-    def clean(self):
-        data = super().clean()
-        if data.get('date_from') and data.get('date_to') and data['date_from'] > data['date_to']:
-            self.add_error('date_to', 'Дата окончания должна быть не раньше даты начала.')
-        return data
-
-
-class DebtFilterForm(ImportFilterForm):
-    import_type = None
-    author = None
-    q = forms.CharField(label='ДБЗ, ФИО или ИИН', required=False)
-    counterparty = forms.ModelChoiceField(label='Контрагент', queryset=Counterparty.objects.all(), required=False, empty_label='Все контрагенты')
-    collection_agency = forms.ModelChoiceField(label='Коллекторское агентство', queryset=CollectionAgency.objects.all(), required=False, empty_label='Все агентства')
-    status = None
-
-    def __init__(self, *args, **kwargs):
-        # The import-specific author field is intentionally absent here.
-        forms.Form.__init__(self, *args, auto_id='record-filter-%s', **kwargs)
-        self.order_fields(['q', 'counterparty', 'collection_agency', 'status', 'date_from', 'date_to'])
-        for field in self.fields.values():
-            field.widget.attrs['class'] = 'form-control'
-        self.fields['q'].widget.attrs['placeholder'] = 'Поиск по договору или должнику'
-        self.fields['date_from'].label = 'Дата ДБЗ с'
-        self.fields['date_to'].label = 'Дата ДБЗ по'
-
-
-class PaymentFilterForm(DebtFilterForm):
-    status = forms.ChoiceField(label='Категория', choices=[('', 'Все категории'), *Payment.Status.choices], required=False)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['date_from'].label = 'Дата платежа с'
-        self.fields['date_to'].label = 'Дата платежа по'
-
-
-class ExpenseFilterForm(DebtFilterForm):
-    status = None
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['date_from'].label = 'Дата расхода с'
-        self.fields['date_to'].label = 'Дата расхода по'
-
-
-class WriteOffFilterForm(ExpenseFilterForm):
-    kind = forms.ChoiceField(label='Тип списания', choices=[('', 'Все типы'), *WriteOff.Kind.choices], required=False)
-    category = forms.ChoiceField(label='Категория', choices=[('', 'Все категории'), *WriteOff.Category.choices], required=False)
-    author = forms.ModelChoiceField(label='Создал', queryset=get_user_model().objects.none(), required=False, empty_label='Все авторы')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['author'].queryset = get_user_model().objects.filter(pk__in=WriteOff.objects.values('created_by_id')).order_by('username')
-        self.order_fields(['q', 'counterparty', 'collection_agency', 'status', 'kind', 'category', 'author', 'date_from', 'date_to'])
-        self.fields['date_from'].label = 'Дата списания с'
-        self.fields['date_to'].label = 'Дата списания по'
-
-
-class RefundFilterForm(DebtFilterForm):
-    status = forms.ChoiceField(label='Статус', choices=[('', 'Все статусы'), *PaymentRefund.Status.choices], required=False)
-    category = forms.ChoiceField(label='Категория платежа', choices=[('', 'Все категории'), *Payment.Status.choices], required=False)
-    author = forms.ModelChoiceField(label='Создал', queryset=get_user_model().objects.none(), required=False, empty_label='Все авторы')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['author'].queryset = get_user_model().objects.filter(pk__in=PaymentRefund.objects.values('created_by_id')).order_by('username')
-        self.order_fields(['q', 'counterparty', 'collection_agency', 'status', 'category', 'author', 'date_from', 'date_to'])
-        self.fields['date_from'].label = 'Дата возврата с'
-        self.fields['date_to'].label = 'Дата возврата по'
-
-
-class WriteOffForm(forms.ModelForm):
-    reason = forms.CharField(label='Основание списания', widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Укажите документ или причину списания'}))
-    amount = forms.DecimalField(
-        label='Сумма списания', max_digits=20, decimal_places=2,
-        min_value=Decimal('0.01'), required=False,
-        widget=forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
-    )
-
-    class Meta:
-        model = WriteOff
-        fields = ('debt', 'writeoff_date', 'kind', 'category')
-        widgets = {
-            'debt': forms.Select(attrs={'class': 'form-control', 'data-searchable-select': ''}),
-            'writeoff_date': forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
-            'kind': forms.Select(attrs={'class': 'form-control'}),
-            'category': forms.Select(attrs={'class': 'form-control'}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['debt'].queryset = Debt.objects.order_by('contract_number')
-        self.fields['debt'].label = 'ДБЗ'
-        self.fields['debt'].empty_label = 'Выберите ДБЗ'
-        self.fields['category'].choices = [('', 'Выберите категорию'), *WriteOff.Category.choices]
-        self.fields['category'].help_text = 'Для частичного списания выберите одну категорию.'
-        from .balances import CATEGORY_LABELS
-        for key, label in CATEGORY_LABELS.items():
-            self.fields['part_' + key] = forms.DecimalField(label=label, min_value=0, max_digits=20, decimal_places=2, required=False, widget=forms.NumberInput(attrs={'class': 'form-control', 'step': '.01'}))
-
-    def clean(self):
-        data = super().clean()
-        parts = {name.removeprefix('part_'): str(value) for name, value in data.items() if name.startswith('part_') and value}
-        data['distribution'] = parts
-        if data.get('kind') == WriteOff.Kind.PARTIAL and not data.get('category') and not parts:
-            self.add_error('category', 'Выберите категорию частичного списания.')
-        if data.get('kind') == WriteOff.Kind.PARTIAL and data.get('amount') is None:
-            self.add_error('amount', 'Укажите сумму частичного списания.')
-        if data.get('kind') == WriteOff.Kind.FULL:
-            data['category'] = ''
-            data['amount'] = None
-        if data.get('kind') == WriteOff.Kind.PARTIAL and parts and sum((Decimal(v) for v in parts.values()), Decimal('0')) != data.get('amount'):
-            self.add_error('amount', 'Сумма по категориям должна равняться сумме списания.')
-        return data
-
-
-class ChangeReasonMixin(forms.ModelForm):
-    reason = forms.CharField(
-        label='Причина изменения',
-        widget=forms.Textarea(attrs={
-            'class': 'form-control', 'rows': 3,
-            'placeholder': 'Обязательно укажите, почему данные нужно изменить',
-        }),
-    )
-
-    def clean_reason(self):
-        reason = self.cleaned_data['reason'].strip()
-        if not reason:
-            raise forms.ValidationError('Укажите причину изменения.')
-        return reason
-
-
-class PaymentChangeForm(ChangeReasonMixin, forms.ModelForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['account'].widget.attrs['class'] = 'form-control'
-        self.fields['transfer_date'].widget = forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'})
-    def clean(self):
-        data = forms.ModelForm.clean(self)
-        account, debt = data.get('account'), data.get('debt')
-        if account and debt and debt.collection_agency_id and account.agency_id != debt.collection_agency_id:
-            self.add_error('account', 'Счёт принадлежит другому КА.')
-        return data
-    class Meta:
-        model = Payment
-        fields = ('debt', 'amount', 'status', 'payment_date', 'account', 'transfer_date')
-        widgets = {
-            'debt': forms.Select(attrs={'class': 'form-control'}),
-            'amount': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
-            'status': forms.Select(attrs={'class': 'form-control'}),
-            'payment_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-        }
-
-    def clean_amount(self):
-        amount = self.cleaned_data['amount']
-        if amount <= 0:
-            raise forms.ValidationError('Сумма платежа должна быть больше нуля.')
-        if self.instance.pk and amount < self.instance.refunded_amount:
-            raise forms.ValidationError(
-                f'Сумма не может быть меньше уже возвращённой суммы {self.instance.refunded_amount:.2f}.'
-            )
-        return amount
-
-
-class ExpenseChangeForm(ChangeReasonMixin, forms.ModelForm):
-    def clean(self):
-        data = super().clean()
-        for field in self.Meta.fields:
-            if field not in ('debt', 'expense_date') and data.get(field) is not None and data[field] < 0:
-                self.add_error(field, 'Сумма расхода не может быть отрицательной.')
-        return data
-    class Meta:
-        model = Expense
-        fields = (
-            'debt', 'state_duty', 'representative_expenses', 'notary_expenses',
-            'postal_expenses', 'claim_security', 'additional_expenses', 'expense_date',
-        )
-        widgets = {
-            'debt': forms.Select(attrs={'class': 'form-control'}),
-            'state_duty': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
-            'representative_expenses': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
-            'notary_expenses': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
-            'postal_expenses': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
-            'claim_security': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
-            'additional_expenses': forms.NumberInput(attrs={'class': 'form-control', 'min': '0', 'step': '0.01'}),
-            'expense_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
-        }
-
-
-class ExpenseCreateForm(forms.ModelForm):
-    class Meta(ExpenseChangeForm.Meta):
-        widgets = {
-            **ExpenseChangeForm.Meta.widgets,
-            'expense_date': forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['additional_expenses'].widget = forms.HiddenInput()
-        self.fields['additional_expenses'].disabled = True
-        self.fields['additional_expenses'].initial = 0
-        for name in self.Meta.fields:
-            if name not in ('debt', 'expense_date'):
-                self.fields[name].required = False
-                self.fields[name].min_value = Decimal('0')
-
-    def clean(self):
-        data = super().clean()
-        total = Decimal('0')
-        for name in self.Meta.fields:
-            if name in ('debt', 'expense_date'):
-                continue
-            value = data.get(name) or Decimal('0')
-            data[name] = value
-            if value < 0:
-                self.add_error(name, 'Сумма расхода не может быть отрицательной.')
-            total += value
-        if total <= 0:
-            raise forms.ValidationError('Укажите положительную сумму хотя бы одного расхода.')
-        return data
-
-
-class FinancialChangeReviewForm(forms.Form):
-    action = forms.ChoiceField(
-        label='Решение',
-        choices=(('approve', 'Подтвердить'), ('reject', 'Отклонить')),
-        widget=forms.RadioSelect,
-    )
-    comment = forms.CharField(
-        label='Комментарий', required=False,
-        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
-    )
-
-
-class PaymentChoiceField(forms.ModelChoiceField):
-    def label_from_instance(self, payment):
-        amount = f'{payment.amount:,.2f}'.replace(',', ' ').replace('.', ',')
-        available = f'{payment.refundable_amount:,.2f}'.replace(',', ' ').replace('.', ',')
-        return (
-            f'Сумма платежа: {amount} · {payment.payment_date:%d.%m.%Y} · '
-            f'доступно к возврату: {available}'
-        )
 
 
 class ImportUploadForm(forms.Form):
@@ -288,7 +38,8 @@ class ImportUploadForm(forms.Form):
         self.fields['import_type'].queryset = ImportType.objects.filter(
             is_active=True,
         ).order_by('name')
-        self.fields['import_type'].queryset = self.fields['import_type'].queryset.exclude(code='writeoffs')
+        if user is not None and not user.has_perm('writeoffs.import_writeoff'):
+            self.fields['import_type'].queryset = self.fields['import_type'].queryset.exclude(code='writeoffs')
 
     def clean_import_type(self):
         from .lifecycle import ensure_type_available
@@ -305,99 +56,21 @@ class ImportUploadForm(forms.Form):
         return uploaded_file
 
 
-class CollectionAgencyForm(forms.ModelForm):
-    class Meta:
-        model = CollectionAgency
-        fields = ('name', 'shortname')
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-            'shortname': forms.TextInput(attrs={'class': 'form-control'}),
-        }
-
-
-class CounterpartyForm(forms.ModelForm):
-    class Meta:
-        model = Counterparty
-        fields = ('name',)
-        widgets = {
-            'name': forms.TextInput(attrs={'class': 'form-control'}),
-        }
-
-
-class RefundPaymentSelect(forms.SelectMultiple):
-    def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
-        option = super().create_option(name, value, label, selected, index, subindex, attrs)
-        payment_id = str(value.value if hasattr(value, 'value') else value)
-        debt_id = getattr(self, 'payment_debt_ids', {}).get(payment_id)
-        if debt_id:
-            option['attrs']['data-debt-id'] = str(debt_id)
-        return option
-
-
-class RefundPaymentChoiceField(forms.ModelMultipleChoiceField):
-    def label_from_instance(self, payment):
-        return PaymentChoiceField.label_from_instance(self, payment)
-
-
-class PaymentRefundForm(forms.ModelForm):
-    debt = forms.ModelChoiceField(
-        label='ДБЗ', queryset=Debt.objects.all(), empty_label='Выберите ДБЗ',
-        widget=forms.Select(attrs={'class': 'form-control', 'data-searchable-select': ''}),
-    )
-    payment = RefundPaymentChoiceField(
-        label='Платежи для возврата', queryset=Payment.objects.none(),
-        widget=RefundPaymentSelect(attrs={'class': 'form-control', 'data-multi-select': ''}),
-    )
-
-    class Meta:
-        model = PaymentRefund
-        fields = ('debt', 'payment', 'amount', 'refund_date', 'reason')
-        widgets = {
-            'amount': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
-            'refund_date': forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
-            'reason': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Укажите документ или причину возврата'}),
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        available = Payment.objects.select_related('debt').filter(
-            amount__gt=F('refunded_amount'), operation_status__in=('active', 'corrected'),
-        ).order_by('-payment_date', '-id')
-        self.fields['payment'].queryset = available
-        self.fields['payment'].widget.payment_debt_ids = {str(item.pk): item.debt_id for item in available}
-        if self.initial.get('payment') and not self.initial.get('debt'):
-            source = available.filter(pk=self.initial['payment']).first()
-            if source:
-                self.initial['debt'] = source.debt_id
-        if self.initial.get('payment'):
-            self.initial['payment'] = [self.initial['payment']]
-
-    def clean(self):
-        data = super().clean()
-        payments = list(data.get('payment') or [])
-        # The model stores a single source payment; the view creates one row per allocation.
-        data['payment'] = payments[0] if payments else None
-        debt, amount = data.get('debt'), data.get('amount')
-        if not payments:
-            return data
-        if debt and any(payment.debt_id != debt.pk for payment in payments):
-            self.add_error('payment', 'Выберите платежи выбранного ДБЗ.')
-            return data
-        if data.get('refund_date') and any(data['refund_date'] < payment.payment_date for payment in payments):
-            self.add_error('refund_date', 'Возврат не может быть раньше платежа.')
-        balances = []
-        for payment in payments:
-            refunded = payment.refunds.filter(status=PaymentRefund.Status.ACTIVE).aggregate(total=Sum('amount'))['total'] or Decimal('0')
-            balances.append((payment, max(payment.amount - refunded, Decimal('0'))))
-        available = sum((balance for _, balance in balances), Decimal('0'))
-        if amount is not None and amount > available:
-            self.add_error('amount', f'Сумма возврата не может превышать доступный остаток {available:.2f}.')
-        elif amount is not None and amount > 0:
-            remaining = amount
-            data['payment_allocations'] = []
-            for payment, balance in balances:
-                part = min(balance, remaining)
-                if part > 0:
-                    data['payment_allocations'].append((payment.pk, part))
-                    remaining -= part
-        return data
+from imports.filter_forms import ImportFilterForm  # noqa: F401
+from debts.forms import DebtFilterForm  # noqa: F401
+from payments.forms import PaymentFilterForm  # noqa: F401
+from expenses.forms import ExpenseFilterForm  # noqa: F401
+from writeoffs.forms import WriteOffFilterForm  # noqa: F401
+from refunds.forms import RefundFilterForm  # noqa: F401
+from finance.forms import ChangeReasonMixin  # noqa: F401
+from payments.forms import PaymentChangeForm  # noqa: F401
+from payments.forms import PaymentCreateForm  # noqa: F401
+from expenses.forms import ExpenseChangeForm  # noqa: F401
+from expenses.forms import ExpenseCreateForm  # noqa: F401
+from finance.forms import FinancialChangeReviewForm  # noqa: F401
+from payments.forms import PaymentChoiceField  # noqa: F401
+from references.forms import CollectionAgencyForm  # noqa: F401
+from references.forms import CounterpartyForm  # noqa: F401
+from refunds.forms import RefundPaymentSelect  # noqa: F401
+from refunds.forms import RefundPaymentChoiceField  # noqa: F401
+from refunds.forms import PaymentRefundForm  # noqa: F401

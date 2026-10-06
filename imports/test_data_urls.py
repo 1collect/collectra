@@ -3,7 +3,7 @@ from django.urls import resolve, reverse
 
 
 class DataURLTests(SimpleTestCase):
-    def test_data_routes_have_no_imports_prefix_and_keep_namespaces(self):
+    def test_data_routes_use_domain_namespaces_and_keep_legacy_reverse_names(self):
         routes = [
             ('debts', {}, '/contracts/'), ('debt_detail', {'debt_id': 1}, '/contracts/1/'),
             ('payments', {}, '/payments/'), ('payment_edit', {'record_id': 2}, '/payments/2/edit/'),
@@ -11,7 +11,7 @@ class DataURLTests(SimpleTestCase):
             ('payment_distribution', {'pk': 2}, '/payments/2/distribution/'),
             ('expenses', {}, '/expenses/'), ('expense_new', {}, '/expenses/new/'),
             ('expense_edit', {'record_id': 3}, '/expenses/3/edit/'),
-            ('writeoffs', {}, '/writeoffs/'), ('writeoff_new', {}, '/writeoffs/new/'),
+            ('writeoffs', {}, '/writeoffs/'),
             ('refunds', {}, '/refunds/'), ('refund_new', {}, '/refunds/new/'),
             ('operation_edit', {'kind': 'refund', 'pk': 4}, '/operations/refund/4/edit/'),
             ('counterparties', {}, '/counterparties/'),
@@ -26,7 +26,10 @@ class DataURLTests(SimpleTestCase):
         for name, kwargs, url in routes:
             with self.subTest(name=name):
                 self.assertEqual(reverse('imports:' + name, kwargs=kwargs), url)
-                self.assertEqual(resolve(url).view_name, 'imports:' + name)
+                match = resolve(url)
+                self.assertNotEqual(match.namespace, 'imports')
+                self.assertEqual(match.url_name, name)
+                self.assertEqual(reverse(match.view_name, kwargs=kwargs), url)
 
     def test_old_data_addresses_redirect_with_query_and_post_preserved(self):
         for url in ('contracts/', 'payments/', 'expenses/', 'writeoffs/', 'refunds/', 'expenses/new/',

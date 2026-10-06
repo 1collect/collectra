@@ -5,8 +5,8 @@ from django.test import TestCase
 from django.urls import reverse
 from openpyxl import load_workbook
 
-from .models import ImportType
-from .services import IMPORT_HANDLERS
+from imports.models import ImportType
+from imports.services import IMPORT_HANDLERS
 
 
 class ImportTemplatePageTests(TestCase):

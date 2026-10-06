@@ -11,8 +11,8 @@ from django.test import TestCase, TransactionTestCase, override_settings, skipUn
 from django.urls import reverse
 
 from .lifecycle import reserve_import
-from .models import Import, ImportType
-from .services import PAYMENT_IMPORT_COLUMNS
+from imports.models import Import, ImportType
+from imports.services import PAYMENT_IMPORT_COLUMNS
 from .tests import xlsx_file
 
 

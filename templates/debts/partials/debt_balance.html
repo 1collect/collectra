@@ -1,0 +1,65 @@
+<div class="borrower-columns">
+    <aside class="panel borrower-contract-picker" aria-label="Выбор договоров">
+        <div class="panel-header"><h2>Договоры <span class="badge badge-neutral">{{ borrower_contracts|length }}</span></h2></div>
+        <form method="get" data-contract-selection>
+            <input type="hidden" name="scope" value="1">
+            <input type="hidden" name="tab" value="{{ active_tab }}">
+            <input type="hidden" name="per_page" value="{{ page_size }}">
+            <div class="contract-picker-tools">
+                <label class="sr-only" for="contract-search">Поиск договора</label>
+                <input id="contract-search" class="form-control" type="search" name="contract_search" value="{{ contract_search }}" placeholder="Номер ДБЗ" autocomplete="off" data-contract-search>
+                <div class="contract-picker-actions">
+                    <button class="btn btn-sm" type="button" data-contract-select-all>Выбрать все</button>
+                    <button class="btn btn-sm btn-ghost" type="button" data-contract-clear>Сбросить</button>
+                </div>
+            </div>
+            <div class="contract-picker-list">
+                {% for contract in borrower_contracts %}<label class="contract-picker-item{% if contract.workspace_selected %} is-checked{% endif %}" data-contract-option="{{ contract.contract_number }}">
+                    <input type="checkbox" name="contract" value="{{ contract.pk }}"{% if contract.workspace_selected %} checked{% endif %}>
+                    <span class="font-mono">{{ contract.contract_number }}</span>
+                </label>{% endfor %}
+                <p class="text-muted contract-picker-empty" data-contract-search-empty hidden>Договоры не найдены</p>
+            </div>
+            <div class="panel-footer"><span>Выбрано: {{ selected_contracts|length }} из {{ borrower_contracts|length }}</span><noscript><button class="btn btn-sm" type="submit">Показать</button></noscript></div>
+        </form>
+    </aside>
+    <section class="panel selected-contract">
+        <div class="panel-header contract-workspace-header">
+            <div><h2>{% if selected_debt %}ДБЗ {{ selected_debt.contract_number }}{% elif selected_contracts %}Выбрано договоров: {{ selected_contracts|length }}{% else %}Договоры не выбраны{% endif %}</h2>
+            {% if selected_debt %}<p class="text-muted">{{ selected_debt.original_creditor|default:selected_debt.counterparty|default:'Кредитор не указан' }}</p>{% endif %}</div>
+        </div>
+        {% if selected_contracts %}
+            {% for contract in selected_contracts %}
+                {% if contract.needs_manual_review %}<div class="alert alert-danger contract-alert">ДБЗ {{ contract.contract_number }}: {{ contract.recalculation_error_message }}</div>{% endif %}
+            {% endfor %}
+            <dl class="contract-summary">
+                <div class="contract-summary-primary"><dt>Остаток</dt><dd>{{ contract_totals.outstanding_amount|floatformat:'2g' }}</dd></div>
+                <div><dt>Оплачено</dt><dd>{{ contract_totals.paid_amount|floatformat:'2g' }}</dd></div>
+                <div><dt>Списано</dt><dd>{{ contract_totals.written_off_amount|floatformat:'2g' }}</dd></div>
+                <div><dt>Переплата</dt><dd>{{ contract_totals.overpayment_amount|floatformat:'2g' }}</dd></div>
+            </dl>
+        {% endif %}
+        <nav class="tabs-nav contract-tabs" aria-label="Разделы выбранных договоров">{% for tab in contract_tabs %}
+            <a class="tab" href="?{{ selection_query }}&amp;tab={{ tab.key }}&amp;per_page={{ page_size }}"{% if active_tab == tab.key %} aria-current="page"{% endif %}>{{ tab.label }}{% if tab.count != None %} <span class="contract-tab-count">{{ tab.count }}</span>{% endif %}</a>
+        {% endfor %}</nav>
+        <div class="contract-tab-content" id="contract-tab-content">
+            {% if not selected_contracts %}
+                <div class="empty-state"><h3>Выберите договоры</h3><p>Отметьте один или несколько ДБЗ в списке слева.</p></div>
+            {% elif active_tab == 'overview' %}
+                {% if selected_debt %}
+                    {% include 'debts/partials/contract_overview.html' with debt=selected_debt %}
+                {% else %}
+                    <div class="contract-table-toolbar"><span class="text-muted">Сводка по выбранным договорам</span></div>
+                    <div class="table-container"><table class="table table-bordered table-compact">
+                        <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col">ДБЗ</th><th scope="col">Кредитор</th><th scope="col" class="cell-number">Остаток</th></tr></thead>
+                        <tbody>{% for contract in selected_contracts %}<tr><td class="row-number-column">{{ forloop.counter }}</td><td class="font-mono"><a href="?scope=1&amp;contract={{ contract.pk }}&amp;tab=overview&amp;per_page={{ page_size }}">{{ contract.contract_number }}</a></td><td class="cell-text">{{ contract.original_creditor|default:contract.counterparty|default:'—' }}</td><td class="cell-number">{{ contract.outstanding_amount|floatformat:'2g' }}</td></tr>{% endfor %}</tbody>
+                    </table></div>
+                {% endif %}
+            {% elif active_tab == 'history' %}
+                {% include 'debts/partials/contract_history.html' %}
+            {% else %}
+                {% include 'debts/partials/contract_operations.html' %}
+            {% endif %}
+        </div>
+    </section>
+</div>

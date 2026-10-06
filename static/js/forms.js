@@ -50,7 +50,7 @@
     }
     A.data.saveUsers(existing ? users.map(row => row.id === id ? next : row) : [...users, next], existing ? 'Updated employee' : 'Created employee', 'USR-' + next.id);
     const dialog = form.closest('dialog'); if (dialog) A.modal.close(dialog, 'saved');
-    A.toast('success', existing ? 'Employee updated' : 'Employee added', next.name + ' was saved in this browser.');
+    A.notify('success', existing ? 'Employee updated' : 'Employee added', next.name + ' was saved in this browser.');
     if (!existing) form.reset();
     return true;
   }
@@ -84,7 +84,7 @@
       const confirmed = await A.confirm({ title: chosen.length === 1 ? 'Delete employee?' : 'Delete ' + chosen.length + ' employees?', message: chosen.length === 1 ? chosen[0].name + ' will be removed from local demo data. You can restore the seed data in Settings.' : 'The selected local demo records will be removed. Restore the seed data in Settings when needed.', label: 'Delete', danger: true });
       if (!confirmed) return;
       A.data.saveUsers(A.data.users().filter(row => !ids.includes(row.id)), 'Deleted employees', chosen.length + ' records');
-      A.toast('success', 'Employees deleted', chosen.length + ' local records removed.');
+      A.notify('success', 'Employees deleted', chosen.length + ' local records removed.');
     }
   };
   function initCombobox(group) {
@@ -125,7 +125,7 @@
     }
     function add(incoming) {
       Array.from(incoming).forEach(file => {
-        if (file.size > 10 * 1024 * 1024) { A.toast('warning', 'File too large', file.name + ' exceeds the 10 MB demo limit.'); return; }
+        if (file.size > 10 * 1024 * 1024) { A.notify('warning', 'File too large', file.name + ' exceeds the 10 MB demo limit.'); return; }
         if (!files.some(existing => existing.name === file.name && existing.size === file.size && existing.lastModified === file.lastModified)) files.push(file);
       });
       render(); input.value = '';
@@ -173,7 +173,7 @@
       A.$$('input[type="checkbox"]', form).forEach(control => { if (control.name) values[control.name] = control.checked; });
       A.storage.set(key, values); A.emit('demo:settings-changed');
       const dialog = form.closest('dialog'); if (dialog) A.modal.close(dialog, 'saved');
-      A.toast('success', 'Changes saved', 'These settings are stored in this browser only.');
+      A.notify('success', 'Changes saved', 'These settings are stored in this browser only.');
     }));
     A.$$('[data-counter]').forEach(textarea => {
       const counter = document.getElementById(textarea.dataset.counter);

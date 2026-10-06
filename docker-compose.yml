@@ -45,5 +45,18 @@ services:
       web:
         condition: service_started
 
+  export-worker:
+    build: .
+    command: python manage.py export_worker
+    restart: unless-stopped
+    volumes:
+      - .:/app
+    environment: *app_environment
+    depends_on:
+      db:
+        condition: service_healthy
+      web:
+        condition: service_started
+
 volumes:
   postgres_data:

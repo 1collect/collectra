@@ -1,0 +1,15 @@
+<div{% if widget.attrs.id %} id="{{ widget.attrs.id }}"{% endif %}>
+    {% for title, options, index in widget.optgroups %}
+    <fieldset class="permission-section mb-4">
+        <legend class="form-label">{{ title }}</legend>
+        <div class="grid-3">
+            {% for option in options %}
+            <label class="check"{% if option.attrs.id %} for="{{ option.attrs.id }}"{% endif %}>
+                {% include 'django/forms/widgets/input.html' with widget=option %}
+                <span>{{ option.label }}</span>
+            </label>
+            {% endfor %}
+        </div>
+    </fieldset>
+    {% endfor %}
+</div>

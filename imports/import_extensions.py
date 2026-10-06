@@ -1,6 +1,6 @@
 """Extended project-map columns, retaining support for legacy XLSX files."""
 from decimal import Decimal
-from .models import CollectionAgency, Creditor, Cession, CompanyAccount
+from references.models import CollectionAgency, Creditor, Cession, CompanyAccount
 from .balances import CATEGORY_LABELS, PURCHASE_FIELDS
 from contract_generator.schema import BORROWER_COLUMNS, CASE_COLUMNS, OPENING_OWN_COLUMNS, CONTRACT_EXTRA_COLUMNS
 
@@ -10,7 +10,7 @@ WRITEOFF_EXTRAS = ('ИИН', 'Основание списания', *CATEGORY_LA
 
 
 def extend_contract(data, original):
-    from .services import ImportValidationError, parse_date
+    from imports.services import ImportValidationError, import_reference, parse_date
     values = original(data)
     fields = values[3]
     for f in PURCHASE_FIELDS:
@@ -43,26 +43,25 @@ def extend_contract(data, original):
             fields[f] = value
     for col, model, field in [('Наименование КА', CollectionAgency, 'collection_agency'), ('Первичный кредитор', Creditor, 'original_creditor')]:
         if data.get(col):
-            records = model.objects.filter(name=str(data[col]))
-            if records.count() != 1: raise ImportValidationError(f'«{col}»: добавьте однозначную запись в справочник.')
-            fields[field] = records.first()
+            fields[field] = import_reference(model, {'name': str(data[col])},
+                f'«{col}»: добавьте однозначную запись в справочник.')
     if data.get('Номер договора цессии'):
-        qs = Cession.objects.filter(number=str(data['Номер договора цессии']))
-        if data.get('Дата договора цессии'): qs = qs.filter(date=parse_date(data['Дата договора цессии'], 'Дата договора цессии'))
-        if fields.get('original_creditor'): qs = qs.filter(creditor=fields['original_creditor'])
-        if qs.count() != 1: raise ImportValidationError('Договор цессии не найден или неоднозначен. Добавьте его в справочник.')
-        fields['cession'] = qs.first()
+        filters = {'number': str(data['Номер договора цессии'])}
+        if data.get('Дата договора цессии'): filters['date'] = parse_date(data['Дата договора цессии'], 'Дата договора цессии')
+        if fields.get('original_creditor'): filters['creditor'] = fields['original_creditor']
+        fields['cession'] = import_reference(Cession, filters,
+            'Договор цессии не найден или неоднозначен. Добавьте его в справочник.')
         fields['original_creditor'] = fields['cession'].creditor
     return values
 
 
 def validate_iin(data, debt):
-    from .services import ImportValidationError
+    from imports.services import ImportValidationError
     if data.get('ИИН') and str(data['ИИН']) != debt.debtor.iin: raise ImportValidationError('ИИН не совпадает с заёмщиком ДБЗ.')
 
 
 def extend_payment(data, original):
-    from .services import ImportValidationError, parse_date
+    from imports.services import ImportValidationError, parse_date
     values = original(data)
     validate_iin(data, values['debt'])
     if values['amount'] <= 0: raise ImportValidationError('Платёж должен быть больше нуля.')
@@ -76,7 +75,7 @@ def extend_payment(data, original):
 
 
 def extend_writeoff(data, original):
-    from .services import ImportValidationError, debt_for_contract, parse_date
+    from imports.services import ImportValidationError, debt_for_contract, parse_date
     debt = debt_for_contract(data['ДБЗ'])
     validate_iin(data, debt)
     reason = str(data.get('Основание списания') or '').strip()

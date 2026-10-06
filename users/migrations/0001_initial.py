@@ -13,10 +13,10 @@ def migrate_groups_to_roles(apps, schema_editor):
         model='role',
     )
     permission_names = {
-        'add': 'Can add Роль',
-        'change': 'Can change Роль',
-        'delete': 'Can delete Роль',
-        'view': 'Can view Роль',
+        'add': 'Создание: Роль',
+        'change': 'Изменение: Роль',
+        'delete': 'Удаление: Роль',
+        'view': 'Просмотр: Роль',
     }
     for action, name in permission_names.items():
         role_permission, _ = Permission.objects.get_or_create(

@@ -28,7 +28,6 @@
       }
       if (target.hasAttribute('data-copy-text')) A.copyText(target.dataset.copyText);
       if (target.hasAttribute('data-alert-close')) target.closest('.alert').remove();
-      if (target.hasAttribute('data-toast')) A.toast(target.dataset.toast, target.dataset.toastTitle || 'Component preview', target.dataset.toastMessage || 'This is a local notification example.');
       if (target.hasAttribute('data-tree-toggle')) {
         const expanded = target.getAttribute('aria-expanded') !== 'true';
         target.setAttribute('aria-expanded', String(expanded)); document.getElementById(target.getAttribute('aria-controls')).hidden = !expanded;
@@ -39,13 +38,13 @@
       if (group) A.$$('button', group).forEach(button => button.setAttribute('aria-pressed', String(button === target)));
       if (target.hasAttribute('data-demo-confirm')) {
         const confirmed = await A.confirm({ title: 'Delete this demo item?', message: 'This preview demonstrates confirmation. No employee records will be changed.', label: 'Delete item', danger: true });
-        if (confirmed) A.toast('success', 'Confirmed', 'The confirmation flow is complete. Demo data was not changed.');
+        if (confirmed) A.notify('success', 'Confirmed', 'The confirmation flow is complete. Demo data was not changed.');
       }
       if (target.hasAttribute('data-loading-action')) {
         const original = target.innerHTML; target.disabled = true;
         target.innerHTML = '<span class="spinner spinner-sm" aria-hidden="true"></span> Working...';
         target.setAttribute('aria-busy', 'true');
-        setTimeout(() => { target.innerHTML = original; target.disabled = false; target.removeAttribute('aria-busy'); A.toast('success', 'Simulation complete', 'The button returned to its default state.'); }, 800);
+        setTimeout(() => { target.innerHTML = original; target.disabled = false; target.removeAttribute('aria-busy'); A.notify('success', 'Simulation complete', 'The button returned to its default state.'); }, 800);
       }
       if (target.hasAttribute('data-retry')) {
         const state = target.closest('[data-error-state]');
@@ -78,7 +77,7 @@
         A.$$('.notification-button').forEach(button => button.classList.add('is-read'));
         A.$$('[data-unread-badge]').forEach(badge => { badge.hidden = true; });
         target.textContent = 'All read'; target.disabled = true;
-        A.toast('success', 'Notifications cleared', 'All demonstration notifications are marked as read.');
+        A.notify('success', 'Notifications cleared', 'All demonstration notifications are marked as read.');
       }
     });
     A.$$('[data-range-output]').forEach(input => {

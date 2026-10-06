@@ -1,8 +1,0 @@
-<div class="contract-table-toolbar"><span class="text-muted">Изменения, перерасчёты и действия по договору.</span>{% include 'imports/partials/contract_page_size.html' %}</div>
-<div class="table-container" tabindex="0" role="region" aria-label="История выбранного договора">
-    <table class="table table-bordered table-compact">
-        <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col">Дата</th><th scope="col">Действие</th><th scope="col">Объект</th><th scope="col">Автор</th><th scope="col">Подробности</th></tr></thead>
-        <tbody>{% for event in page_obj %}<tr><td class="row-number-column font-mono">{{ page_obj.start_index|add:forloop.counter|add:"-1" }}</td><td class="cell-date">{{ event.created_at|date:'d.m.Y H:i' }}</td><td>{{ event.workspace_label }}</td><td>{{ event.workspace_object }} #{{ event.object_id }}</td><td>{{ event.actor|default:'Не указан' }}</td><td class="cell-text"><details id="history-{{ event.pk }}"><summary>Подробнее</summary><p>{{ event.reason|default:'Основание не указано' }}</p>{% if event.workspace_details %}<dl class="contract-history-fields">{% for detail in event.workspace_details %}<div><dt>{{ detail.label }}</dt><dd>{{ detail.value }}</dd></div>{% endfor %}</dl>{% endif %}</details></td></tr>{% empty %}<tr><td colspan="6"><div class="empty-state">История пока пуста</div></td></tr>{% endfor %}</tbody>
-    </table>
-</div>
-<div class="table-footer">{% include 'imports/partials/record_pagination.html' %}</div>
