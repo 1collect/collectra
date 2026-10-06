@@ -57,7 +57,7 @@ def prepare_history_event(event):
 
 def workspace_context(request, debt, balance):
     contracts = list(Debt.objects.filter(debtor=debt.debtor).select_related(
-        'original_creditor', 'counterparty', 'collection_agency', 'cession__creditor').prefetch_related('payments__refunds', 'payments__refund_records', 'expenses', 'writeoffs')
+        'original_creditor', 'counterparty', 'collection_agency', 'cession__creditor').prefetch_related('payments__refunds', 'expenses', 'writeoffs')
         .order_by('contract_number'))
     requested_ids = set(request.GET.getlist('contract')) if request.GET.get('scope') == '1' else {str(debt.pk)}
     selected = []
@@ -74,7 +74,7 @@ def workspace_context(request, debt, balance):
         'payments': [payment for contract in selected for payment in contract.payments.all()],
         'expenses': [expense for contract in selected for expense in contract.expenses.all()],
         'writeoffs': [writeoff for contract in selected for writeoff in contract.writeoffs.all()],
-        'refunds': list({refund.pk: refund for contract in selected for payment in contract.payments.all() for refund in (list(payment.refunds.all()) + list(payment.refund_records.all()))}.values()),
+        'refunds': [refund for contract in selected for payment in contract.payments.all() for refund in payment.refunds.all()],
     }
     tabs = [{'key': key, 'label': label, 'count': len(sources[key]) if key in sources else None}
             for key, label, model in TABS if model is None or request.user.has_perm('imports.view_' + model)]

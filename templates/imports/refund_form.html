@@ -7,20 +7,17 @@
     <div><div class="page-eyebrow">Возвраты / Ручное создание</div><h1>Новый возврат платежа</h1></div>
 </div>
 <div class="refund-form-panel">
-    <div class="refund-form-heading"><h2>Данные возврата</h2></div>
         <form method="post" novalidate data-no-auto-focus>
             {% csrf_token %}
             {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
-            <div class="form-grid">
+            <div class="form-grid refund-form-grid">
                 {% for field in form %}
-                {% if field.name != 'payment' %}
-                <div class="form-field {% if field.name == 'debt' or field.name == 'payments' or field.name == 'reason' %}span-2{% endif %}">
+                <div class="form-field {% if field.name == 'debt' or field.name == 'payment' or field.name == 'reason' %}span-2{% endif %}">
                     <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}<span class="required">*</span></label>
                     {{ field }}
                     {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
                     {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
                 </div>
-                {% endif %}
                 {% endfor %}
             </div>
             <div class="form-actions">

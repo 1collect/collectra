@@ -54,7 +54,7 @@ def delete_record(record, *, actor, reason):
         FinancialRecordHistory.objects.filter(**{name: record}).delete()
         if name == 'expense': FinancialChangeRequest.objects.filter(expense=record).delete()
     if isinstance(record, Payment):
-        if record.refunds.exists() or record.refund_records.exists(): raise ValidationError('Сначала удалите возвраты этого платежа.')
+        if record.refunds.exists(): raise ValidationError('Сначала удалите возвраты этого платежа.')
     payment = record.payment if isinstance(record, PaymentRefund) else None
     ActionLog.objects.filter(object_type=name, object_id=identifier).delete()
     record.delete()

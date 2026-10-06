@@ -2,6 +2,74 @@
   'use strict';
 
   A.initRefundSelect = function (root = document) {
+    root.querySelectorAll('select[data-multi-select]').forEach(select => {
+      if (select.dataset.initialized) return;
+      select.dataset.initialized = 'true';
+      const debt = select.form.querySelector('select[name="debt"]');
+      const wrapper = document.createElement('div');
+      wrapper.className = 'multi-select';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'form-control multi-select__trigger';
+      button.id = select.id + '-trigger';
+      button.setAttribute('aria-expanded', 'false');
+      const label = select.form.querySelector(`label[for="${select.id}"]`);
+      if (label) label.htmlFor = button.id;
+      const menu = document.createElement('div');
+      menu.className = 'multi-select__menu';
+      menu.hidden = true;
+      const rows = Array.from(select.options).map(option => {
+        const row = document.createElement('label');
+        row.className = 'multi-select__option';
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = option.selected;
+        row.append(checkbox, document.createTextNode(option.textContent));
+        checkbox.addEventListener('change', () => {
+          option.selected = checkbox.checked;
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+          update();
+        });
+        menu.append(row);
+        return { option, row, checkbox };
+      });
+      function update() {
+        const selected = rows.filter(({ option }) => option.selected);
+        button.textContent = selected.length === 1 ? selected[0].option.textContent : selected.length ? `Выбрано платежей: ${selected.length}` : 'Выберите платежи';
+      }
+      function close() {
+        menu.hidden = true;
+        button.setAttribute('aria-expanded', 'false');
+      }
+      function sync() {
+        rows.forEach(({ option, row, checkbox }) => {
+          row.hidden = !debt.value || option.dataset.debtId !== debt.value;
+          if (row.hidden) option.selected = false;
+          checkbox.checked = option.selected;
+        });
+        update();
+        const available = rows.some(({ row }) => !row.hidden);
+        button.disabled = !debt.value || !available;
+        if (!debt.value) button.textContent = 'Сначала выберите ДБЗ';
+        else if (!available) button.textContent = 'Нет доступных платежей';
+        close();
+      }
+      button.addEventListener('click', () => {
+        menu.hidden = !menu.hidden;
+        button.setAttribute('aria-expanded', String(!menu.hidden));
+      });
+      wrapper.addEventListener('keydown', event => {
+        if (event.key === 'Escape') { close(); button.focus(); }
+      });
+      document.addEventListener('click', event => {
+        if (!wrapper.contains(event.target)) close();
+      });
+      select.hidden = true;
+      select.parentNode.insertBefore(wrapper, select);
+      wrapper.append(button, menu);
+      debt.addEventListener('change', sync);
+      sync();
+    });
     root.querySelectorAll('select[data-searchable-select]').forEach(select => {
       if (select.dataset.initialized) return;
       select.dataset.initialized = 'true';
@@ -12,6 +80,9 @@
       input.className = 'form-control';
       input.placeholder = select.options[0]?.textContent || 'Выберите ДБЗ';
       input.autocomplete = 'off';
+      const label = root.querySelector(`label[for="${select.id}"]`);
+      input.id = select.id + '-search';
+      if (label) label.htmlFor = input.id;
       const menu = document.createElement('div');
       menu.className = 'searchable-select__menu';
       menu.hidden = true;
@@ -37,6 +108,20 @@
       };
       input.addEventListener('focus', filter);
       input.addEventListener('input', filter);
+      input.addEventListener('input', () => {
+        if (select.value) {
+          select.value = '';
+          select.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+      });
+      input.addEventListener('keydown', event => {
+        if (event.key === 'Escape') menu.hidden = true;
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          filter();
+          options.find(({ item }) => !item.hidden)?.item.focus();
+        }
+      });
       document.addEventListener('click', event => {
         if (!wrapper.contains(event.target)) menu.hidden = true;
       });
@@ -47,76 +132,6 @@
       wrapper.append(input, menu);
     });
 
-    root.querySelectorAll('select[data-multi-select]').forEach(select => {
-      if (select.dataset.initialized) return;
-      select.dataset.initialized = 'true';
-
-      const wrapper = document.createElement('div');
-      wrapper.className = 'multi-select';
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'form-control multi-select__trigger';
-      button.setAttribute('aria-haspopup', 'listbox');
-      button.setAttribute('aria-expanded', 'false');
-      const menu = document.createElement('div');
-      menu.className = 'multi-select__menu';
-      menu.hidden = true;
-
-      const update = () => {
-        const selected = Array.from(select.options).filter(option => option.selected);
-        button.textContent = selected.length ? `${selected.length} выбрано` : 'Выберите платежи';
-        button.classList.toggle('is-empty', !selected.length);
-      };
-      Array.from(select.options).forEach((option, index) => {
-        const label = document.createElement('label');
-        label.className = 'multi-select__option';
-        label.dataset.optionValue = option.value;
-        label.dataset.debtId = option.dataset.debtId || '';
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = option.selected;
-        checkbox.value = option.value;
-        checkbox.addEventListener('change', () => {
-          option.selected = checkbox.checked;
-          select.dispatchEvent(new Event('change', { bubbles: true }));
-          update();
-        });
-        label.append(checkbox, document.createTextNode(option.textContent));
-        menu.append(label);
-      });
-      button.addEventListener('click', () => {
-        menu.hidden = !menu.hidden;
-        button.setAttribute('aria-expanded', String(!menu.hidden));
-      });
-      document.addEventListener('click', event => {
-        if (!wrapper.contains(event.target)) {
-          menu.hidden = true;
-          button.setAttribute('aria-expanded', 'false');
-        }
-      });
-      select.hidden = true;
-      select.parentNode.insertBefore(wrapper, select);
-      wrapper.append(button, menu);
-      update();
-
-      const debtSelect = root.querySelector('select[name="debt"]');
-      const filterPayments = () => {
-        const debtId = debtSelect?.value || '';
-        Array.from(select.options).forEach(option => {
-          const visible = !debtId || option.dataset.debtId === debtId;
-          option.hidden = !visible;
-          if (!visible) option.selected = false;
-          const item = menu.querySelector(`[data-option-value="${CSS.escape(option.value)}"]`);
-          if (item) {
-            item.hidden = !visible;
-            item.querySelector('input').checked = option.selected;
-          }
-        });
-        update();
-      };
-      debtSelect?.addEventListener('change', filterPayments);
-      filterPayments();
-    });
   };
 
   document.addEventListener('DOMContentLoaded', () => A.initRefundSelect());

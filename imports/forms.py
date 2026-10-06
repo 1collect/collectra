@@ -34,7 +34,7 @@ class DebtFilterForm(ImportFilterForm):
     q = forms.CharField(label='ДБЗ, ФИО или ИИН', required=False)
     counterparty = forms.ModelChoiceField(label='Контрагент', queryset=Counterparty.objects.all(), required=False, empty_label='Все контрагенты')
     collection_agency = forms.ModelChoiceField(label='Коллекторское агентство', queryset=CollectionAgency.objects.all(), required=False, empty_label='Все агентства')
-    status = forms.ChoiceField(label='Статус', choices=[('', 'Все статусы'), *Debt.Status.choices], required=False)
+    status = None
 
     def __init__(self, *args, **kwargs):
         # The import-specific author field is intentionally absent here.
@@ -57,7 +57,7 @@ class PaymentFilterForm(DebtFilterForm):
 
 
 class ExpenseFilterForm(DebtFilterForm):
-    status = forms.ChoiceField(label='Состояние', choices=[('', 'Все состояния'), *Expense._meta.get_field('operation_status').choices], required=False)
+    status = None
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -92,7 +92,7 @@ class RefundFilterForm(DebtFilterForm):
 
 
 class WriteOffForm(forms.ModelForm):
-    reason = forms.CharField(label='Основание списания', widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
+    reason = forms.CharField(label='Основание списания', widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Укажите документ или причину списания'}))
     amount = forms.DecimalField(
         label='Сумма списания', max_digits=20, decimal_places=2,
         min_value=Decimal('0.01'), required=False,
@@ -103,7 +103,7 @@ class WriteOffForm(forms.ModelForm):
         model = WriteOff
         fields = ('debt', 'writeoff_date', 'kind', 'category')
         widgets = {
-            'debt': forms.Select(attrs={'class': 'form-control'}),
+            'debt': forms.Select(attrs={'class': 'form-control', 'data-searchable-select': ''}),
             'writeoff_date': forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
             'kind': forms.Select(attrs={'class': 'form-control'}),
             'category': forms.Select(attrs={'class': 'form-control'}),
@@ -112,7 +112,8 @@ class WriteOffForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['debt'].queryset = Debt.objects.order_by('contract_number')
-        self.fields['debt'].empty_label = 'Выберите договор'
+        self.fields['debt'].label = 'ДБЗ'
+        self.fields['debt'].empty_label = 'Выберите ДБЗ'
         self.fields['category'].choices = [('', 'Выберите категорию'), *WriteOff.Category.choices]
         self.fields['category'].help_text = 'Для частичного списания выберите одну категорию.'
         from .balances import CATEGORY_LABELS
@@ -255,9 +256,11 @@ class FinancialChangeReviewForm(forms.Form):
 
 class PaymentChoiceField(forms.ModelChoiceField):
     def label_from_instance(self, payment):
+        amount = f'{payment.amount:,.2f}'.replace(',', ' ').replace('.', ',')
+        available = f'{payment.refundable_amount:,.2f}'.replace(',', ' ').replace('.', ',')
         return (
-            f'{payment.debt.contract_number} · {payment.payment_date:%d.%m.%Y} · '
-            f'{payment.amount:.2f} · доступно {payment.refundable_amount:.2f}'
+            f'Сумма платежа: {amount} · {payment.payment_date:%d.%m.%Y} · '
+            f'доступно к возврату: {available}'
         )
 
 
@@ -321,12 +324,7 @@ class CounterpartyForm(forms.ModelForm):
         }
 
 
-class PaymentMultipleChoiceField(forms.ModelMultipleChoiceField):
-    def label_from_instance(self, payment):
-        return PaymentChoiceField.label_from_instance(self, payment)
-
-
-class RefundPaymentSelectMultiple(forms.SelectMultiple):
+class RefundPaymentSelect(forms.SelectMultiple):
     def create_option(self, name, value, label, selected, index, subindex=None, attrs=None):
         option = super().create_option(name, value, label, selected, index, subindex, attrs)
         payment_id = str(value.value if hasattr(value, 'value') else value)
@@ -336,110 +334,70 @@ class RefundPaymentSelectMultiple(forms.SelectMultiple):
         return option
 
 
+class RefundPaymentChoiceField(forms.ModelMultipleChoiceField):
+    def label_from_instance(self, payment):
+        return PaymentChoiceField.label_from_instance(self, payment)
+
+
 class PaymentRefundForm(forms.ModelForm):
     debt = forms.ModelChoiceField(
-        label='ДБЗ',
-        queryset=Debt.objects.all(),
-        empty_label='Выберите ДБЗ',
+        label='ДБЗ', queryset=Debt.objects.all(), empty_label='Выберите ДБЗ',
         widget=forms.Select(attrs={'class': 'form-control', 'data-searchable-select': ''}),
     )
-    payments = PaymentMultipleChoiceField(
-        label='Платежи для возврата',
-        queryset=Payment.objects.none(),
-        required=False,
-        widget=RefundPaymentSelectMultiple(attrs={'class': 'form-control', 'data-multi-select': '', 'data-payment-select': ''}),
-    )
-    payment = PaymentChoiceField(
-        label='Исходный платёж',
-        queryset=Payment.objects.none(),
-        empty_label='Выберите платёж',
-        required=False,
-        widget=forms.HiddenInput(),
+    payment = RefundPaymentChoiceField(
+        label='Платежи для возврата', queryset=Payment.objects.none(),
+        widget=RefundPaymentSelect(attrs={'class': 'form-control', 'data-multi-select': ''}),
     )
 
     class Meta:
         model = PaymentRefund
-        fields = ('debt', 'payment', 'payments', 'amount', 'refund_date', 'reason')
+        fields = ('debt', 'payment', 'amount', 'refund_date', 'reason')
         widgets = {
-            'amount': forms.NumberInput(attrs={
-                'class': 'form-control',
-                'min': '0.01',
-                'step': '0.01',
-            }),
-            'refund_date': forms.DateInput(attrs={
-                'class': 'form-control',
-                'type': 'date',
-            }, format='%Y-%m-%d'),
-            'reason': forms.Textarea(attrs={
-                'class': 'form-control',
-                'rows': 3,
-                'placeholder': 'Укажите документ или причину возврата',
-            }),
+            'amount': forms.NumberInput(attrs={'class': 'form-control', 'min': '0.01', 'step': '0.01'}),
+            'refund_date': forms.DateInput(format='%Y-%m-%d', attrs={'class': 'form-control', 'type': 'date'}),
+            'reason': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Укажите документ или причину возврата'}),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        available = Payment.objects.select_related(
-            'debt',
-        ).filter(
-            amount__gt=F('refunded_amount'),
-            operation_status__in=('active', 'corrected'),
+        available = Payment.objects.select_related('debt').filter(
+            amount__gt=F('refunded_amount'), operation_status__in=('active', 'corrected'),
         ).order_by('-payment_date', '-id')
         self.fields['payment'].queryset = available
-        self.fields['payments'].queryset = available
-        self.fields['payments'].widget.payment_debt_ids = {
-            str(item.pk): item.debt_id for item in available
-        }
-        if self.initial.get('debt'):
-            self.fields['payments'].queryset = available.filter(debt_id=self.initial['debt'])
-        if self.initial.get('payment') and not self.initial.get('payments'):
-            self.initial['payments'] = [self.initial['payment']]
+        self.fields['payment'].widget.payment_debt_ids = {str(item.pk): item.debt_id for item in available}
+        if self.initial.get('payment') and not self.initial.get('debt'):
+            source = available.filter(pk=self.initial['payment']).first()
+            if source:
+                self.initial['debt'] = source.debt_id
+        if self.initial.get('payment'):
+            self.initial['payment'] = [self.initial['payment']]
 
     def clean(self):
-        cleaned_data = super().clean()
-        debt = cleaned_data.get('debt')
-        payments = list(cleaned_data.get('payments') or [])
-        payment = payments[0] if payments else cleaned_data.get('payment')
-        amount = cleaned_data.get('amount')
-        if not payments and payment:
-            payments = [payment]
-        cleaned_data['payment'] = payment
+        data = super().clean()
+        payments = list(data.get('payment') or [])
+        # The model stores a single source payment; the view creates one row per allocation.
+        data['payment'] = payments[0] if payments else None
+        debt, amount = data.get('debt'), data.get('amount')
         if not payments:
-            self.add_error('payments', 'Выберите хотя бы один платёж.')
-            return cleaned_data
-        if debt is None:
-            self.add_error('debt', 'Выберите ДБЗ.')
-            return cleaned_data
-        if payment is None or amount is None or amount <= 0:
-            return cleaned_data
-
-        if any(item.debt_id != debt.pk for item in payments):
-            self.add_error('payments', 'Выберите платежи только выбранного ДБЗ.')
-            return cleaned_data
-        available_by_payment = {}
-        for item in payments:
-            refunded_amount = item.refund_allocations.filter(
-                refund__status=PaymentRefund.Status.ACTIVE,
-            ).aggregate(total=Sum('amount'))['total'] or 0
-            if not refunded_amount:
-                refunded_amount = item.refunds.filter(
-                    status=PaymentRefund.Status.ACTIVE,
-                ).aggregate(total=Sum('amount'))['total'] or 0
-            available_by_payment[item.pk] = item.amount - refunded_amount
-        total_available = sum(available_by_payment.values(), Decimal('0'))
-        if amount > total_available:
-            self.add_error(
-                'amount',
-                'Сумма возврата не может превышать общий доступный остаток '
-                f'{total_available:.2f}.',
-            )
-        else:
+            return data
+        if debt and any(payment.debt_id != debt.pk for payment in payments):
+            self.add_error('payment', 'Выберите платежи выбранного ДБЗ.')
+            return data
+        if data.get('refund_date') and any(data['refund_date'] < payment.payment_date for payment in payments):
+            self.add_error('refund_date', 'Возврат не может быть раньше платежа.')
+        balances = []
+        for payment in payments:
+            refunded = payment.refunds.filter(status=PaymentRefund.Status.ACTIVE).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+            balances.append((payment, max(payment.amount - refunded, Decimal('0'))))
+        available = sum((balance for _, balance in balances), Decimal('0'))
+        if amount is not None and amount > available:
+            self.add_error('amount', f'Сумма возврата не может превышать доступный остаток {available:.2f}.')
+        elif amount is not None and amount > 0:
             remaining = amount
-            allocations = []
-            for item in payments:
-                allocation = min(remaining, available_by_payment[item.pk])
-                if allocation:
-                    allocations.append((item, allocation))
-                    remaining -= allocation
-            cleaned_data['payment_allocations'] = allocations
-        return cleaned_data
+            data['payment_allocations'] = []
+            for payment, balance in balances:
+                part = min(balance, remaining)
+                if part > 0:
+                    data['payment_allocations'].append((payment.pk, part))
+                    remaining -= part
+        return data

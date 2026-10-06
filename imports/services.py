@@ -16,7 +16,7 @@ from .balances import apply_balance, calculate_balance, WRITEOFF_CATEGORIES
 from .audit import audit_user, log_action
 from .models import (
     Debt, Debtor, Expense, FinancialChangeRequest, Import, ImportItem,
-    Payment, PaymentRefund, PaymentRefundAllocation, WriteOff,
+    Payment, PaymentRefund, WriteOff,
 )
 
 
@@ -226,13 +226,6 @@ class RefundValidationError(Exception):
 
 
 def _active_refund_total(payment_id):
-    allocated = PaymentRefundAllocation.objects.filter(
-        payment_id=payment_id,
-        refund__status=PaymentRefund.Status.ACTIVE,
-    ).aggregate(total=Sum('amount'))['total']
-    if allocated is not None:
-        return allocated
-    # Compatibility for rows created before the allocation table was introduced.
     return PaymentRefund.objects.filter(
         payment_id=payment_id,
         status=PaymentRefund.Status.ACTIVE,
@@ -433,8 +426,7 @@ def review_financial_change(*, change_id, reviewer, approve, comment=''):
         for field, value in change.new_data.items():
             setattr(record, field, _restore_value(record, field, value))
         if isinstance(record, Payment):
-            if (record.refunds.filter(refund_date__lt=record.payment_date).exists()
-                    or record.refund_records.filter(refund__refund_date__lt=record.payment_date).exists()):
+            if record.refunds.filter(refund_date__lt=record.payment_date).exists():
                 raise FinancialChangeError('Дата платежа не может быть позже уже оформленного возврата.')
             active_refunds = _active_refund_total(record.pk)
             if record.amount < active_refunds:
@@ -465,23 +457,11 @@ def review_financial_change(*, change_id, reviewer, approve, comment=''):
 
 
 @transaction.atomic
-def create_payment_refund(*, payment_id=None, payment_ids=None, payment_allocations=None, amount, refund_date, reason, created_by):
-    """Create one refund linked to one or more payments through allocations."""
-    if payment_allocations is None:
-        ids = list(payment_ids or ([payment_id] if payment_id else []))
-        payment_allocations = [(pk, amount) for pk in ids]
-    payment_allocations = [(getattr(payment, 'pk', payment), Decimal(value)) for payment, value in payment_allocations]
-    if not payment_allocations:
-        raise RefundValidationError('Выберите хотя бы один платёж.')
-    payments = list(Payment.objects.select_for_update().select_related('debt').filter(
-        pk__in=[pk for pk, _ in payment_allocations],
-    ))
-    payments_by_id = {item.pk: item for item in payments}
-    if len(payments_by_id) != len(set(pk for pk, _ in payment_allocations)):
-        raise RefundValidationError('Один из выбранных платежей не найден.')
-    if len({item.debt_id for item in payments}) != 1:
-        raise RefundValidationError('Платежи должны относиться к одному договору.')
-    payment = payments_by_id[payment_allocations[0][0]]
+def create_payment_refund(*, payment_id, amount, refund_date, reason, created_by):
+    """Create a refund while serializing changes for the source payment."""
+    payment = Payment.objects.select_for_update().select_related('debt').get(
+        pk=payment_id,
+    )
     Debt.objects.select_for_update().get(pk=payment.debt_id)
     amount = Decimal(amount)
     reason = reason.strip()
@@ -489,18 +469,16 @@ def create_payment_refund(*, payment_id=None, payment_ids=None, payment_allocati
         raise RefundValidationError('Сумма возврата должна быть больше нуля.')
     if not reason:
         raise RefundValidationError('Укажите основание возврата.')
-    total_allocated = Decimal('0')
-    for item in payments:
-        if item.operation_status == 'cancelled': raise RefundValidationError('Нельзя вернуть отменённый платёж.')
-        if refund_date < item.payment_date: raise RefundValidationError('Дата возврата не может быть раньше одного из платежей.')
-        allocation = dict(payment_allocations).get(item.pk, Decimal('0'))
-        if allocation <= 0: raise RefundValidationError('Суммы по платежам должны быть больше нуля.')
-        refundable_amount = item.amount - _active_refund_total(item.pk)
-        if allocation > refundable_amount:
-            raise RefundValidationError(f'Сумма возврата по платежу не может превышать доступный остаток {refundable_amount:.2f}.')
-        total_allocated += allocation
-    if total_allocated != amount:
-        raise RefundValidationError('Сумма распределения по платежам должна равняться сумме возврата.')
+    if payment.operation_status == 'cancelled': raise RefundValidationError('Нельзя вернуть отменённый платёж.')
+    if refund_date < payment.payment_date: raise RefundValidationError('Дата возврата не может быть раньше платежа.')
+
+    active_refunds = _active_refund_total(payment.pk)
+    refundable_amount = payment.amount - active_refunds
+    if amount > refundable_amount:
+        raise RefundValidationError(
+            'Сумма возврата не может превышать доступный остаток '
+            f'{refundable_amount:.2f}.'
+        )
 
     refund = PaymentRefund.objects.create(
         payment=payment,
@@ -510,12 +488,7 @@ def create_payment_refund(*, payment_id=None, payment_ids=None, payment_allocati
         payment_category=payment.status,
         created_by=created_by,
     )
-    PaymentRefundAllocation.objects.bulk_create([
-        PaymentRefundAllocation(refund=refund, payment_id=payment_pk, amount=allocation)
-        for payment_pk, allocation in payment_allocations
-    ])
-    for item in payments:
-        recalculate_payment(item, actor=created_by, reason=f'Возврат #{refund.pk}: {reason}')
+    recalculate_payment(payment, actor=created_by, reason=f'Возврат #{refund.pk}: {reason}')
     recalculate_debt(payment.debt_id)
     return refund
 
@@ -525,15 +498,13 @@ def cancel_payment_refund(refund_id, *, cancelled_by=None):
     refund = PaymentRefund.objects.select_for_update().select_related(
         'payment',
     ).get(pk=refund_id)
-    payment_ids = list(refund.payment_allocations.values_list('payment_id', flat=True)) or [refund.payment_id]
-    payments = list(Payment.objects.select_for_update().filter(pk__in=payment_ids))
+    Payment.objects.select_for_update().get(pk=refund.payment_id)
     Debt.objects.select_for_update().get(pk=refund.payment.debt_id)
     if refund.status == PaymentRefund.Status.ACTIVE:
         refund.status = PaymentRefund.Status.CANCELLED
         refund.cancelled_at = timezone.now()
         refund.save(update_fields=('status', 'cancelled_at'))
-        for payment in payments:
-            recalculate_payment(payment, actor=cancelled_by, reason=f'Отмена возврата #{refund.pk}')
+        recalculate_payment(refund.payment, actor=cancelled_by, reason=f'Отмена возврата #{refund.pk}')
         recalculate_debt(refund.payment.debt_id)
     return refund
 
@@ -570,7 +541,7 @@ def reserve_writeoff(values, balances):
     """Check cumulative file limits without changing contracts or creating entries."""
     debt_id = values['debt_id']
     if debt_id not in balances:
-        debt = Debt.objects.prefetch_related('payments__refunds', 'payments__refund_records', 'expenses', 'writeoffs').get(pk=debt_id)
+        debt = Debt.objects.prefetch_related('payments__refunds', 'expenses', 'writeoffs').get(pk=debt_id)
         balances[debt_id] = {'debt': debt, 'staged': []}
     state = balances[debt_id]
     projected = copy(state['debt'])

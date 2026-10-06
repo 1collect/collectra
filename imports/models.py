@@ -587,13 +587,6 @@ class PaymentRefund(ImportSourceModel):
         related_name='refunds',
         verbose_name='Исходный платёж',
     )
-    payments = models.ManyToManyField(
-        Payment,
-        through='PaymentRefundAllocation',
-        related_name='refund_records',
-        blank=True,
-        verbose_name='Исходные платежи',
-    )
     amount = models.DecimalField(
         'Сумма возврата',
         max_digits=20,
@@ -642,28 +635,6 @@ class PaymentRefund(ImportSourceModel):
             raise ValidationError({'amount': 'Сумма возврата должна быть больше нуля.'})
         if not (self.reason or '').strip():
             raise ValidationError({'reason': 'Укажите основание возврата.'})
-
-
-class PaymentRefundAllocation(models.Model):
-    """Amount of a refund allocated to one source payment."""
-    refund = models.ForeignKey(
-        PaymentRefund,
-        on_delete=models.CASCADE,
-        related_name='payment_allocations',
-    )
-    payment = models.ForeignKey(
-        Payment,
-        on_delete=models.PROTECT,
-        related_name='refund_allocations',
-    )
-    amount = models.DecimalField('Сумма по платежу', max_digits=20, decimal_places=2)
-
-    class Meta:
-        db_table = 'payment_refund_allocations'
-        constraints = [
-            models.UniqueConstraint(fields=('refund', 'payment'), name='unique_refund_payment_allocation'),
-            models.CheckConstraint(condition=models.Q(amount__gt=0), name='payment_refund_allocation_positive'),
-        ]
 
 
 class Creditor(models.Model):

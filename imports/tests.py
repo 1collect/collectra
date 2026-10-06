@@ -991,8 +991,30 @@ class PaymentRefundTests(TestCase):
         self.assertEqual(self.payment.effective_amount, Decimal('1200.00'))
         self.assertEqual(self.debt.overpayment_amount, Decimal('200.00'))
 
+    def test_multiple_payments_create_separate_refunds(self):
+        second = Payment.objects.create(
+            debt=self.debt, amount=Decimal('100'), status=Payment.Status.CHSI,
+            payment_date=self.payment.payment_date,
+        )
+        response = self.client.post(reverse('imports:refund_new'), {
+            'debt': self.debt.pk, 'payment': [self.payment.pk, second.pk],
+            'amount': '150.00', 'refund_date': '2026-10-02', 'reason': 'Общий возврат',
+        })
+        self.assertRedirects(response, reverse('imports:refunds'))
+        refunds = list(PaymentRefund.objects.all())
+        self.assertEqual(len(refunds), 2)
+        self.assertEqual(sum(r.amount for r in refunds), Decimal('150'))
+        self.assertEqual({r.payment_id: r.amount for r in refunds}, {
+            second.pk: Decimal('100'), self.payment.pk: Decimal('50'),
+        })
+        self.payment.refresh_from_db()
+        second.refresh_from_db()
+        self.assertEqual(self.payment.refunded_amount, Decimal('50'))
+        self.assertEqual(second.refunded_amount, Decimal('100'))
+
     def test_manual_form_creates_refund_and_history_entry(self):
         response = self.client.post(reverse('imports:refund_new'), {
+            'debt': self.debt.pk,
             'payment': self.payment.pk,
             'amount': '250.00',
             'refund_date': '2026-10-02',
@@ -1014,6 +1036,7 @@ class PaymentRefundTests(TestCase):
 
     def test_form_rejects_zero_and_excessive_repeat(self):
         response = self.client.post(reverse('imports:refund_new'), {
+            'debt': self.debt.pk,
             'payment': self.payment.pk,
             'amount': '0',
             'refund_date': '2026-10-02',
@@ -1024,6 +1047,7 @@ class PaymentRefundTests(TestCase):
 
         self.create_refund('1100.00')
         response = self.client.post(reverse('imports:refund_new'), {
+            'debt': self.debt.pk,
             'payment': self.payment.pk,
             'amount': '101.00',
             'refund_date': '2026-10-02',

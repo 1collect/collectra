@@ -29,7 +29,7 @@ def period_bounds(data):
 
 def report_rows(data):
     start, end = period_bounds(data)
-    debts = Debt.objects.select_related('debtor', 'collection_agency', 'original_creditor', 'cession').prefetch_related('payments__refunds', 'payments__refund_records', 'payments__refund_allocations__refund', 'expenses', 'writeoffs').order_by('contract_number')
+    debts = Debt.objects.select_related('debtor', 'collection_agency', 'original_creditor', 'cession').prefetch_related('payments__refunds', 'expenses', 'writeoffs').order_by('contract_number')
     for key, field in [('agency', 'collection_agency'), ('creditor', 'original_creditor'), ('dbz', 'contract_number__icontains'), ('iin', 'debtor__iin__icontains'), ('cession_number', 'cession__number__icontains'), ('cession_date', 'cession__date'), ('registry_date', 'registry_date')]:
         if data.get(key): debts = debts.filter(**{field: data[key]})
     rows = []
@@ -40,9 +40,7 @@ def report_rows(data):
         payments = [p for p in debt.payments.all() if p.operation_status != 'cancelled' and p.payment_date <= end and (start is None or p.payment_date >= start)]
         writeoffs = [w for w in debt.writeoffs.all() if w.operation_status != 'cancelled' and w.writeoff_date <= end and (start is None or w.writeoff_date >= start)]
         if any(data.get(key) and bool(items) != (data[key] == 'yes') for key, items in [('payments', payments), ('writeoffs', writeoffs)]): continue
-        refunded = sum((allocation.amount for p in debt.payments.all() for allocation in p.refund_allocations.all() if p.operation_status != 'cancelled' and allocation.refund.status == 'active' and allocation.refund.refund_date <= end and (start is None or allocation.refund.refund_date >= start)), Decimal('0'))
-        if not refunded:
-            refunded = sum((r.amount for p in debt.payments.all() for r in p.refunds.all() if p.operation_status != 'cancelled' and r.status == 'active' and r.refund_date <= end and (start is None or r.refund_date >= start)), Decimal('0'))
+        refunded = sum((r.amount for p in debt.payments.all() for r in p.refunds.all() if p.operation_status != 'cancelled' and r.status == 'active' and r.refund_date <= end and (start is None or r.refund_date >= start)), Decimal('0'))
         rows.append({'debt': debt, 'balance': b, 'paid': sum((p.amount for p in payments), Decimal('0')), 'refunded': refunded, 'written': sum((w.amount for w in writeoffs), Decimal('0'))})
     return rows, start, end
 

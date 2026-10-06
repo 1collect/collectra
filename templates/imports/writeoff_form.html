@@ -1,64 +1,35 @@
 {% extends 'base.html' %}
-{% load static %}
 {% block title %}Новое списание{% endblock %}
 {% block page_name %}writeoffs{% endblock %}
 {% block heading %}Новое списание{% endblock %}
-{% block content_class %}writeoff-create-content{% endblock %}
 {% block content %}
 <div class="page-header"><div><div class="page-eyebrow">Списания / Создание</div><h1>Новое списание</h1></div></div>
-<div class="writeoff-form-panel">
-    <div class="writeoff-form-heading"><h2>Данные списания</h2><p class="panel-subtitle">Заполните обязательные поля и проверьте параметры операции перед сохранением.</p></div>
-        <div class="writeoff-intro">
-            <span class="writeoff-intro-icon" aria-hidden="true">i</span>
-            <p><strong>Как выбрать тип списания</strong><br>Полное списание погашает текущий остаток. Для частичного укажите сумму и одну категорию или распределите её по нескольким категориям.</p>
+<div class="refund-form-panel writeoff-form-panel">
+    <form method="post" novalidate id="writeoff-form" data-no-auto-focus>
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="form-grid refund-form-grid">
+            {% for field in form %}
+            {% if field.name != 'reason' %}
+            <div class="form-field {% if field.name == 'debt' %}span-2{% endif %}" {% if field.name == 'category' or field.name == 'amount' or field.name|slice:':5' == 'part_' %}data-partial-writeoff{% if form.kind.value != 'partial' %} hidden{% endif %}{% endif %}>
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required or field.name == 'amount' %}<span class="required" aria-hidden="true">*</span>{% endif %}</label>
+                {{ field }}
+                {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+            </div>
+            {% endif %}
+            {% endfor %}
+            {% with field=form.reason %}
+            <div class="form-field span-2">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}<span class="required" aria-hidden="true">*</span></label>
+                {{ field }}
+                {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
+            </div>
+            {% endwith %}
         </div>
-        <form method="post" novalidate id="writeoff-form">
-            {% csrf_token %}
-            {% if form.non_field_errors %}<div class="alert alert-danger mb-3">{{ form.non_field_errors }}</div>{% endif %}
-            <div class="writeoff-section">
-                <div class="writeoff-section-heading"><span class="writeoff-step">1</span><div><h3>Основные данные</h3><p>Выберите договор и укажите дату операции.</p></div></div>
-                <div class="form-grid writeoff-main-grid">
-                    {% for field in form %}
-                        {% if field.name == 'debt' or field.name == 'writeoff_date' or field.name == 'kind' %}
-                        <div class="form-field {% if field.name == 'debt' %}span-2{% endif %}">
-                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required" aria-hidden="true">*</span>{% endif %}</label>
-                            {{ field }}
-                            {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
-                        </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="writeoff-section writeoff-partial-section" data-partial-section hidden>
-                <div class="writeoff-section-heading"><span class="writeoff-step">2</span><div><h3>Параметры частичного списания</h3><p>Эти поля нужны только при выборе частичного списания.</p></div></div>
-                <div class="form-grid writeoff-partial-grid">
-                    {% for field in form %}
-                        {% if field.name == 'amount' or field.name == 'category' or field.name|slice:':5' == 'part_' %}
-                        <div class="form-field" data-partial-writeoff>
-                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}{% if field.field.required %}<span class="required" aria-hidden="true">*</span>{% endif %}</label>
-                            {{ field }}
-                            {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
-                            {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
-                        </div>
-                        {% endif %}
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="writeoff-section writeoff-reason-section">
-                <div class="writeoff-section-heading"><span class="writeoff-step">3</span><div><h3>Основание</h3><p>Коротко опишите причину операции — это попадёт в историю.</p></div></div>
-                {% with field=form.reason %}
-                <div class="form-field">
-                    <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}<span class="required" aria-hidden="true">*</span></label>
-                    {{ field }}
-                    {% for error in field.errors %}<div class="field-error">{{ error }}</div>{% endfor %}
-                </div>
-                {% endwith %}
-            </div>
-            <div class="form-actions writeoff-actions">
-                <span class="writeoff-required-note"><span class="required" aria-hidden="true">*</span> Обязательные поля</span>
-                {% if perms.imports.view_writeoff %}<a class="btn btn-outline-secondary" href="{% url 'imports:writeoffs' %}">Отмена</a>{% endif %}
-                <button class="btn btn-primary" type="submit">Сохранить списание</button>
-            </div>
-        </form>
+        <div class="form-actions">
+            {% if perms.imports.view_writeoff %}<a class="btn btn-outline-secondary" href="{% url 'imports:writeoffs' %}">Отмена</a>{% endif %}
+            <button class="btn btn-primary" type="submit">Сохранить списание</button>
+        </div>
+    </form>
 </div>
 {% endblock %}

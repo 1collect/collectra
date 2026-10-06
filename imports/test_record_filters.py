@@ -50,12 +50,13 @@ class RecordFilterTests(TestCase):
                     self.assertTrue(response.context['filters_active'])
                     self.assertContains(response, 'aria-expanded="true"')
 
-    def test_contract_status_uses_current_balance_including_ajax(self):
+    def test_contract_status_filter_is_removed_including_ajax(self):
         for headers in ({}, {'X-Requested-With': 'XMLHttpRequest'}):
-            for status, expected in [('closed', self.debt), ('closed_paid', self.debt), ('active', self.other)]:
+            for status in ('closed', 'closed_paid', 'active'):
                 with self.subTest(status=status, headers=headers):
                     response = self.client.get(reverse('imports:debts'), {'status': status}, headers=headers)
-                    self.assertEqual([item.pk for item in response.context['page_obj']], [expected.pk])
+                    self.assertEqual({item.pk for item in response.context['page_obj']}, {self.debt.pk, self.other.pk})
+                    self.assertNotIn('status', response.context['record_filters'].fields)
 
     def test_payment_category_and_invalid_filter_values(self):
         response = self.client.get(reverse('imports:payments'), {'status': 'individual'})
@@ -83,7 +84,7 @@ class RecordFilterTests(TestCase):
 
     def test_expense_writeoff_refund_filters_and_creation_permissions(self):
         for route, record, specific, permission, create_route in (
-            ('expenses', self.expense, {'status': 'active'}, 'add_expense', 'expense_new'),
+            ('expenses', self.expense, {'q': 'Иванов'}, 'add_expense', 'expense_new'),
             ('writeoffs', self.writeoff, {'status': 'cancelled', 'kind': 'partial', 'category': 'purchase_principal'}, 'add_writeoff', 'writeoff_new'),
             ('refunds', self.refund, {'status': 'cancelled', 'category': 'individual'}, 'add_paymentrefund', 'refund_new'),
         ):

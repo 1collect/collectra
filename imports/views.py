@@ -392,7 +392,7 @@ def debt_list(request):
         ('claim_security', 'Обеспечение иска (ПКБ)'),
     ]
     page_obj = context['page_obj']
-    page_obj.object_list = list(page_obj.object_list.prefetch_related('payments__refunds', 'payments__refund_records', 'expenses', 'writeoffs'))
+    page_obj.object_list = list(page_obj.object_list.prefetch_related('payments__refunds', 'expenses', 'writeoffs'))
     today = timezone.localdate()
     for debt in page_obj.object_list:
         apply_balance(debt, calculate_balance(debt))
@@ -429,7 +429,7 @@ def debt_detail(request, debt_id):
     from .debt_workspace import workspace_context, prepare_history_event
 
     debt = get_object_or_404(
-        Debt.objects.select_related('debtor', 'original_creditor', 'cession__creditor', 'counterparty', 'collection_agency').prefetch_related('payments__refunds', 'payments__refund_records', 'expenses', 'writeoffs'),
+        Debt.objects.select_related('debtor', 'original_creditor', 'cession__creditor', 'counterparty', 'collection_agency').prefetch_related('payments__refunds', 'expenses', 'writeoffs'),
         pk=debt_id,
     )
     balance = calculate_balance(debt)
@@ -521,9 +521,7 @@ def scope_operation_form(request, form):
     if 'debt' in form.fields:
         form.fields['debt'].queryset = Debt.objects.filter(pk=debt.pk)
         form.initial['debt'] = debt.pk
-    if 'payments' in form.fields:
-        form.fields['payments'].queryset = form.fields['payments'].queryset.filter(debt=debt)
-    elif 'payment' in form.fields:
+    if 'payment' in form.fields:
         form.fields['payment'].queryset = form.fields['payment'].queryset.filter(debt=debt)
 
 
@@ -744,7 +742,7 @@ def refund_list(request):
         'payment__debt',
         'created_by',
         'import_item__import_record', 'payment__import_item__import_record',
-    ).prefetch_related('payment_allocations__payment')
+    )
     filters = RefundFilterForm(request.GET)
     refunds = filter_register_records(refunds, filters, debt_prefix='payment__debt__', date_field='refund_date',
                                       extra_lookups={'category': 'payment_category', 'author': 'created_by'})
@@ -765,14 +763,15 @@ def refund_create(request):
     scope_operation_form(request, form)
     if request.method == 'POST' and form.is_valid():
         try:
-            create_payment_refund(
-                payment_id=form.cleaned_data['payment'].pk,
-                payment_allocations=form.cleaned_data.get('payment_allocations'),
-                amount=form.cleaned_data['amount'],
-                refund_date=form.cleaned_data['refund_date'],
-                reason=form.cleaned_data['reason'],
-                created_by=request.user,
-            )
+            with transaction.atomic():
+                for payment_id, amount in form.cleaned_data['payment_allocations']:
+                    create_payment_refund(
+                        payment_id=payment_id,
+                        amount=amount,
+                        refund_date=form.cleaned_data['refund_date'],
+                        reason=form.cleaned_data['reason'],
+                        created_by=request.user,
+                    )
         except RefundValidationError as error:
             form.add_error('amount', str(error))
         else:

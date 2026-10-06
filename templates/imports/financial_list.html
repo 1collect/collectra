@@ -10,7 +10,7 @@
     {% include 'imports/partials/record_filters.html' %}
     <div class="p-0 table-container" tabindex="0" role="region" aria-label="{{ title|default:pagination_label }}"><table class="table table-bordered table-compact">
         {% if kind == 'payment' %}
-        <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col">Договор</th><th scope="col" class="cell-number">Сумма</th><th scope="col">Категория</th><th scope="col">Дата</th><th scope="col" class="cell-number">Возвращено</th></tr></thead>
+        <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col">Договор</th><th scope="col" class="cell-number">Сумма платежа</th><th scope="col">Категория</th><th scope="col">Дата</th><th scope="col" class="cell-number">Возвращено</th></tr></thead>
         <tbody>{% for item in page_obj %}<tr><td class="font-mono row-number-column">{{ page_obj.start_index|add:forloop.counter|add:"-1" }}</td>
             <td class="cell-text"><strong class="font-mono">{{ item.debt.contract_number }}</strong><br><span class="text-muted">{{ item.debt.debtor.full_name }}</span></td>
             <td class="cell-number">{{ item.amount|floatformat:2 }}</td><td>{{ item.get_status_display }}</td><td class="cell-date">{{ item.payment_date|date:'d.m.Y' }}</td><td class="cell-number">{{ item.refunded_amount|floatformat:2 }}</td>

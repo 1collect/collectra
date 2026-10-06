@@ -66,16 +66,11 @@ def calculate_balance(debt, *, as_of=None):
     events += [(w.writeoff_date, 1, w.pk, 'writeoff', w) for w in writeoffs]
     events += [(p.payment_date, 2, p.pk, 'payment', p) for p in payments]
     for p in payments:
-        allocations = list(p.refund_allocations.select_related('refund'))
-        if allocations:
-            refund_events = [(allocation.refund, allocation.amount) for allocation in allocations]
-        else:
-            # Compatibility for historical rows created before allocations existed.
-            refund_events = [(refund, refund.amount) for refund in p.refunds.all()]
+        refunds = list(p.refunds.all())
         # A same-day refund follows its source payment; older payments are
         # refunded before the new payments and writeoffs of that day.
-        events += [(r.refund_date, 3 if r.refund_date == p.payment_date else 0, f'{r.pk}:{p.pk}', 'refund', (r, p.pk, amount)) for r, amount in refund_events if r.status == 'active' and (as_of is None or r.refund_date <= as_of)]
-        if not refund_events and as_of is None: effective[p.pk] = max(p.amount - p.refunded_amount, ZERO)
+        events += [(r.refund_date, 3 if r.refund_date == p.payment_date else 0, r.pk, 'refund', r) for r in refunds if r.status == 'active' and (as_of is None or r.refund_date <= as_of)]
+        if not refunds and as_of is None: effective[p.pk] = max(p.amount - p.refunded_amount, ZERO)
     events.sort(key=lambda e: e[:3])
     allocations = {}
 
@@ -142,13 +137,13 @@ def calculate_balance(debt, *, as_of=None):
     # Replay only at refund boundaries, then once at the end.
     for event in events:
         if event[3] == 'refund':
-            r, payment_id, refund_amount = event[4]
+            r = event[4]
             current, credit, closed_at, operations, error = replay(processed)
             remember(operations)
             if error: break
-            effective[payment_id] = max(effective[payment_id] - refund_amount, ZERO)
+            effective[r.payment_id] = max(effective[r.payment_id] - r.amount, ZERO)
             current, credit, closed_at, operations, error = replay(processed)
-            refund_ledger.append({'date': r.refund_date, 'kind': 'refund', 'id': event[2], 'amount': -refund_amount, 'allocation': {}, 'outstanding': sum(current.values(), ZERO), 'overpayment': credit, 'surplus': ZERO})
+            refund_ledger.append({'date': r.refund_date, 'kind': 'refund', 'id': r.pk, 'amount': -r.amount, 'allocation': {}, 'outstanding': sum(current.values(), ZERO), 'overpayment': credit, 'surplus': ZERO})
             if error: break
         else: processed.append(event)
     if not error: current, credit, closed_at, operations, error = replay(processed)
@@ -158,7 +153,7 @@ def calculate_balance(debt, *, as_of=None):
                            for o in operations if o['kind'] == 'payment'}
     remember(operations)
     operations = list(historical.values()) + refund_ledger
-    event_order = {(kind, identifier): (day, priority, identifier)
+    event_order = {(kind, item.pk): (day, priority, identifier)
                    for day, priority, identifier, kind, item in events}
     operations.sort(key=lambda o: event_order[o['kind'], o['id']])
     paid = sum(effective.values(), ZERO)

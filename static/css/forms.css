@@ -2,6 +2,7 @@
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4) var(--space-5); }
 .form-field { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
 .form-field.is-hidden { display: none; }
+.form-field[data-partial-writeoff][hidden] { display: none; }
 .multi-select { position: relative; }
 .multi-select__trigger { display: flex; align-items: center; justify-content: space-between; text-align: left; cursor: pointer; }
 .multi-select__trigger::after { content: ''; width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg) translateY(-2px); }
@@ -11,6 +12,10 @@
 .multi-select__option:hover { background: var(--bg-hover); }
 .multi-select__option input { margin-top: 2px; accent-color: var(--primary); }
 .searchable-select { position: relative; }
+.searchable-select > .form-control { padding-right: 32px; }
+.searchable-select::after { content: ''; position: absolute; right: 14px; top: 15px; width: 7px; height: 7px; border-right: 1px solid currentColor; border-bottom: 1px solid currentColor; transform: rotate(45deg); pointer-events: none; color: var(--text-muted); }
+.multi-select__trigger:disabled { background: var(--bg-subtle); color: var(--text-muted); cursor: default; }
+.multi-select__option[hidden], .searchable-select__option[hidden], .multi-select__menu[hidden], .searchable-select__menu[hidden] { display: none; }
 .searchable-select__menu { position: absolute; z-index: 30; inset: calc(100% + 4px) 0 auto; max-height: 230px; overflow: auto; padding: 5px; border: 1px solid var(--border-strong); border-radius: var(--radius); background: var(--bg-panel); box-shadow: var(--shadow-float); }
 .searchable-select__option { display: block; width: 100%; padding: 8px; border: 0; border-radius: 3px; background: transparent; color: var(--text-primary); text-align: left; font-size: var(--text-small); cursor: pointer; }
 .searchable-select__option:hover { background: var(--bg-hover); }
