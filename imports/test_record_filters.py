@@ -4,7 +4,7 @@ from django.contrib.auth.models import User, Permission
 from django.test import TestCase
 from django.urls import reverse
 
-from .models import Debt, Debtor, Counterparty, CollectionAgency, Payment, ImportType
+from .models import Debt, Debtor, Counterparty, CollectionAgency, Payment, ImportType, Expense, WriteOff, PaymentRefund
 
 
 class RecordFilterTests(TestCase):
@@ -21,7 +21,16 @@ class RecordFilterTests(TestCase):
             contract_number='OTHER-002', debtor=Debtor.objects.create(full_name='Петров', iin='900101300222'),
             purchase_principal=100, purchase_total_debt=100, dbz_start_date=date(2026, 9, 1))
         cls.payment = Payment.objects.create(debt=cls.debt, amount=100, status='individual', payment_date=date(2026, 10, 1))
-        Payment.objects.create(debt=cls.other, amount=1, status='chsi', payment_date=date(2026, 9, 1))
+        other_payment = Payment.objects.create(debt=cls.other, amount=1, status='chsi', payment_date=date(2026, 9, 1))
+        cls.expense = Expense.objects.create(debt=cls.debt, expense_date=date(2026, 10, 1))
+        Expense.objects.create(debt=cls.other, expense_date=date(2026, 9, 1), operation_status='cancelled')
+        cls.writeoff = WriteOff.objects.create(debt=cls.debt, kind='partial', category='purchase_principal',
+            amount=1, writeoff_date=date(2026, 10, 1), created_by=cls.user, operation_status='cancelled')
+        WriteOff.objects.create(debt=cls.other, kind='full', amount=1, writeoff_date=date(2026, 9, 1), created_by=cls.user)
+        cls.refund = PaymentRefund.objects.create(payment=cls.payment, amount=1, refund_date=date(2026, 10, 1),
+            reason='Test', payment_category='individual', status='cancelled', created_by=cls.user)
+        PaymentRefund.objects.create(payment=other_payment, amount=1, refund_date=date(2026, 9, 1),
+            reason='Test', payment_category='chsi', created_by=cls.user)
 
     def setUp(self):
         self.client.force_login(self.user)
@@ -71,3 +80,30 @@ class RecordFilterTests(TestCase):
         self.client.force_login(viewer)
         for route in ('debts', 'payments'):
             self.assertNotContains(self.client.get(reverse(f'imports:{route}')), '?import_type=')
+
+    def test_expense_writeoff_refund_filters_and_creation_permissions(self):
+        for route, record, specific, permission, create_route in (
+            ('expenses', self.expense, {'status': 'active'}, 'add_expense', 'expense_new'),
+            ('writeoffs', self.writeoff, {'status': 'cancelled', 'kind': 'partial', 'category': 'purchase_principal'}, 'add_writeoff', 'writeoff_new'),
+            ('refunds', self.refund, {'status': 'cancelled', 'category': 'individual'}, 'add_paymentrefund', 'refund_new'),
+        ):
+            for params in [
+                {'q': 'Иванов'}, {'counterparty': self.party.pk}, {'collection_agency': self.agency.pk},
+                {'date_from': '2026-10-01', 'date_to': '2026-10-01'}, specific,
+                {'q': 'FILTER', 'counterparty': self.party.pk, 'date_from': '2026-10-01', **specific},
+            ]:
+                with self.subTest(route=route, params=params):
+                    response = self.client.get(reverse(f'imports:{route}'), params)
+                    self.assertEqual([item.pk for item in response.context['page_obj']], [record.pk])
+                    self.assertTrue(response.context['filters_active'])
+            response = self.client.get(reverse(f'imports:{route}'))
+            self.assertContains(response, f'href="{reverse("imports:" + create_route)}" data-form-modal')
+            if route != 'expenses':
+                response = self.client.get(reverse(f'imports:{route}'), {'author': self.user.pk})
+                self.assertEqual(response.context['page_obj'].paginator.count, 2)
+            viewer = User.objects.create_user('viewer-' + route)
+            view_permission = 'view_paymentrefund' if route == 'refunds' else 'view_' + route[:-1]
+            viewer.user_permissions.add(Permission.objects.get(codename=view_permission, content_type__app_label='imports'))
+            self.client.force_login(viewer)
+            self.assertNotContains(self.client.get(reverse(f'imports:{route}')), reverse('imports:' + create_route))
+            self.client.force_login(self.user)

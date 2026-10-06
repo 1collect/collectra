@@ -15,7 +15,7 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET
 
 from .forms import (
-    ImportFilterForm, DebtFilterForm, PaymentFilterForm, CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
+    ImportFilterForm, DebtFilterForm, PaymentFilterForm, ExpenseFilterForm, WriteOffFilterForm, RefundFilterForm, CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
     ImportUploadForm, PaymentChangeForm, PaymentRefundForm, WriteOffForm,
     ExpenseCreateForm,
 )
@@ -290,6 +290,7 @@ def debt_list(request):
     debts = filter_register_records(debts, filters, debt_prefix='', date_field='dbz_start_date')
     context = record_page_context(request, debts, label='Страницы договоров')
     context.update(register_filter_context(request, filters))
+    context['add_url'] = reverse('imports:new') + '?import_type=contracts' if request.user.has_perm('imports.add_import') else None
     page_obj = context['page_obj']
     page_obj.object_list = list(page_obj.object_list.prefetch_related('payments__refunds', 'expenses', 'writeoffs'))
     for debt in page_obj.object_list:
@@ -336,7 +337,7 @@ def register_filter_context(request, filters):
             'filters_active': any(request.GET.get(name) for name in filters.fields)}
 
 
-def filter_register_records(records, filters, *, debt_prefix, date_field):
+def filter_register_records(records, filters, *, debt_prefix, date_field, status_field='status', extra_lookups=None):
     filters.is_valid()
     data = filters.cleaned_data
     query = data.get('q')
@@ -352,8 +353,11 @@ def filter_register_records(records, filters, *, debt_prefix, date_field):
         if data.get(name):
             records = records.filter(**{date_field + lookup: data[name]})
     if data.get('status'):
-        records = (records.filter(status=data['status']) if debt_prefix else
+        records = (records.filter(**{status_field: data['status']}) if debt_prefix else
                    filter_by_current_status(records, data['status']))
+    for name, lookup in (extra_lookups or {}).items():
+        if data.get(name):
+            records = records.filter(**{lookup: data[name]})
     return records
 
 
@@ -364,12 +368,17 @@ def _financial_list(request, *, model, title, kind):
     if not request.user.has_perm(permission):
         raise PermissionDenied
     records = model.objects.select_related('debt', 'debt__debtor', 'import_item__import_record')
-    filters = PaymentFilterForm(request.GET) if kind == 'payment' else None
-    if filters:
-        records = filter_register_records(records, filters, debt_prefix='debt__', date_field='payment_date')
+    filters = (PaymentFilterForm if kind == 'payment' else ExpenseFilterForm)(request.GET)
+    records = filter_register_records(records, filters, debt_prefix='debt__',
+                                      date_field='payment_date' if kind == 'payment' else 'expense_date',
+                                      status_field='status' if kind == 'payment' else 'operation_status')
     context = record_page_context(request, records, label=f'Страницы: {title.lower()}')
-    if filters:
-        context.update(register_filter_context(request, filters))
+    context.update(register_filter_context(request, filters))
+    if kind == 'payment':
+        context['add_url'] = reverse('imports:new') + '?import_type=payments' if request.user.has_perm('imports.add_import') else None
+    else:
+        context['add_url'] = reverse('imports:expense_new') if request.user.has_perm('imports.add_expense') else None
+        context['add_modal'] = True
     return render(request, 'imports/financial_list.html', context | {
         'title': title, 'kind': kind,
     })
@@ -408,8 +417,15 @@ def expense_list(request):
 @permission_required('imports.view_writeoff')
 def writeoff_list(request):
     records = WriteOff.objects.select_related('debt', 'debt__debtor', 'created_by', 'import_item__import_record')
-    return render(request, 'imports/writeoff_list.html',
-                  record_page_context(request, records, label='Страницы списаний'))
+    filters = WriteOffFilterForm(request.GET)
+    records = filter_register_records(records, filters, debt_prefix='debt__', date_field='writeoff_date',
+                                      status_field='operation_status',
+                                      extra_lookups={'kind': 'kind', 'category': 'category', 'author': 'created_by'})
+    context = record_page_context(request, records, label='Страницы списаний')
+    context.update(register_filter_context(request, filters))
+    context.update(title='Списания', add_modal=True,
+                   add_url=reverse('imports:writeoff_new') if request.user.has_perm('imports.add_writeoff') else None)
+    return render(request, 'imports/writeoff_list.html', context)
 
 
 @permission_required('imports.add_writeoff')
@@ -582,8 +598,14 @@ def refund_list(request):
         'created_by',
         'import_item__import_record', 'payment__import_item__import_record',
     )
-    return render(request, 'imports/refund_list.html',
-                  record_page_context(request, refunds, label='Страницы возвратов'))
+    filters = RefundFilterForm(request.GET)
+    refunds = filter_register_records(refunds, filters, debt_prefix='payment__debt__', date_field='refund_date',
+                                      extra_lookups={'category': 'payment_category', 'author': 'created_by'})
+    context = record_page_context(request, refunds, label='Страницы возвратов')
+    context.update(register_filter_context(request, filters))
+    context.update(title='Возвраты платежей', add_modal=True,
+                   add_url=reverse('imports:refund_new') if request.user.has_perm('imports.add_paymentrefund') else None)
+    return render(request, 'imports/refund_list.html', context)
 
 
 @permission_required('imports.add_paymentrefund')

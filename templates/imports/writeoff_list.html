@@ -5,12 +5,9 @@
 {% block page_name %}writeoffs{% endblock %}
 {% block heading %}Списания{% endblock %}
 {% block content %}
-<div class="page-header">
-    <div><div class="page-eyebrow">Данные / Финансы</div><h1>Списания</h1></div>
-    {% if perms.imports.add_writeoff %}<a data-form-modal aria-haspopup="dialog" class="btn btn-primary" href="{% url 'imports:writeoff_new' %}">Добавить списание</a>{% endif %}
-</div>
-<section class="panel data-register">
-    <div class="panel-header"><h2>Реестр списаний <span class="badge">{{ page_obj.paginator.count }}</span></h2>{% include 'imports/partials/record_page_size.html' %}</div>
+<section class="panel data-register data-register--filters">
+    {% include 'imports/partials/record_header.html' %}
+    {% include 'imports/partials/record_filters.html' %}
     <div class="p-0 table-container" tabindex="0" role="region" aria-label="{{ title|default:pagination_label }}">
         <table class="table table-bordered table-compact">
             <thead><tr><th scope="col">Договор</th><th scope="col">Тип списания</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма</th><th scope="col">Дата списания</th><th scope="col">Создал</th><th scope="col">Действия</th></tr></thead>
@@ -31,4 +28,4 @@
 </section>
 {% endblock %}
 
-{% block scripts %}<script defer src="{% static 'js/table-pagination.js' %}?v=20261006-1"></script>{% endblock %}
+{% block scripts %}<script defer src="{% static 'js/table-pagination.js' %}?v=20261006-2"></script>{% endblock %}

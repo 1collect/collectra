@@ -138,7 +138,7 @@ class WriteOffTests(TestCase):
     def test_list_search_and_permission_checks(self):
         self.writeoff()
         self.assertContains(self.client.get(reverse('imports:writeoffs')), 'DBZ-WRITEOFF')
-        self.assertContains(self.client.get(reverse('imports:writeoffs'), {'q': 'missing'}), 'Списания не найдены')
+        self.assertContains(self.client.get(reverse('imports:writeoffs'), {'q': 'missing'}), 'Ничего не найдено')
         other = User.objects.create_user('no-writeoff-permissions')
         self.client.force_login(other)
         self.assertEqual(self.client.get(reverse('imports:writeoffs')).status_code, 403)

@@ -5,16 +5,9 @@
 {% block page_name %}{{ kind }}s{% endblock %}
 {% block heading %}{{ title }}{% endblock %}
 {% block content %}
-{% if kind != 'payment' %}<div class="page-header"><div><div class="page-eyebrow">Данные / Финансы</div><h1>{{ title }}</h1></div>
-    {% if kind == 'expense' and perms.imports.add_expense %}<a data-form-modal aria-haspopup="dialog" class="btn btn-primary" href="{% url 'imports:expense_new' %}">Создать расход</a>{% endif %}
-</div>{% endif %}
-<section class="panel data-register{% if kind == 'payment' %} data-register--filters{% endif %}">
-    {% if kind == 'payment' %}
-    {% include 'imports/partials/record_header.html' with import_code='payments' %}
+<section class="panel data-register data-register--filters">
+    {% include 'imports/partials/record_header.html' %}
     {% include 'imports/partials/record_filters.html' %}
-    {% else %}
-    <div class="panel-header"><h2>Реестр <span class="badge">{{ page_obj.paginator.count }}</span></h2>{% include 'imports/partials/record_page_size.html' %}</div>
-    {% endif %}
     <div class="p-0 table-container" tabindex="0" role="region" aria-label="{{ title|default:pagination_label }}"><table class="table table-bordered table-compact">
         {% if kind == 'payment' %}
         <thead><tr><th scope="col">Договор</th><th scope="col" class="cell-number">Сумма</th><th scope="col">Категория</th><th scope="col">Дата</th><th scope="col" class="cell-number">Возвращено</th><th scope="col" class="cell-actions">Действия</th></tr></thead>
