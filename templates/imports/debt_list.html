@@ -5,13 +5,11 @@
 {% block page_name %}debts{% endblock %}
 {% block heading %}Договоры{% endblock %}
 {% block content %}
-<div class="page-header">
-    <div><div class="page-eyebrow">Данные / Задолженности</div><h1>Договоры</h1></div>
-</div>
-<section class="panel data-register">
-    <div class="panel-header"><h2>Реестр договоров <span class="badge">{{ page_obj.paginator.count }}</span></h2>{% include 'imports/partials/record_page_size.html' %}</div>
+<section class="panel data-register data-register--filters">
+    {% include 'imports/partials/record_header.html' with title='Договоры' import_code='contracts' %}
+    {% include 'imports/partials/record_filters.html' %}
     <div data-live-balances>{% include 'imports/partials/debt_register.html' %}</div>
 </section>
 {% endblock %}
 
-{% block scripts %}<script defer src="{% static 'js/balances.js' %}"></script><script defer src="{% static 'js/table-pagination.js' %}?v=20261006-1"></script>{% endblock %}
+{% block scripts %}<script defer src="{% static 'js/balances.js' %}"></script><script defer src="{% static 'js/table-pagination.js' %}?v=20261006-2"></script>{% endblock %}

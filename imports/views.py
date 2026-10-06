@@ -15,11 +15,11 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET
 
 from .forms import (
-    ImportFilterForm, CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
+    ImportFilterForm, DebtFilterForm, PaymentFilterForm, CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
     ImportUploadForm, PaymentChangeForm, PaymentRefundForm, WriteOffForm,
     ExpenseCreateForm,
 )
-from .balances import apply_balance, calculate_balance, CATEGORY_LABELS, PURCHASE_FIELDS
+from .balances import apply_balance, calculate_balance, filter_by_current_status, CATEGORY_LABELS, PURCHASE_FIELDS
 from .models import (
     CollectionAgency, Counterparty, Debt, Expense, FinancialChangeRequest, Import, ImportItem,
     Payment, PaymentRefund, WriteOff,
@@ -155,6 +155,10 @@ def import_download(request, import_id):
 @permission_required('imports.add_import')
 def import_upload(request):
     form = ImportUploadForm(request.POST or None, request.FILES or None, user=request.user)
+    if request.method == 'GET':
+        selected_type = form.fields['import_type'].queryset.filter(code=request.GET.get('import_type')).first()
+        if selected_type:
+            form.initial['import_type'] = selected_type.pk
     if request.method == 'POST' and form.is_valid():
         uploaded_file = form.cleaned_data['file']
         from .lifecycle import reserve_import
@@ -282,7 +286,10 @@ def debt_list(request):
         'counterparty',
         'import_item__import_record',
     ).order_by('contract_number')
+    filters = DebtFilterForm(request.GET)
+    debts = filter_register_records(debts, filters, debt_prefix='', date_field='dbz_start_date')
     context = record_page_context(request, debts, label='Страницы договоров')
+    context.update(register_filter_context(request, filters))
     page_obj = context['page_obj']
     page_obj.object_list = list(page_obj.object_list.prefetch_related('payments__refunds', 'expenses', 'writeoffs'))
     for debt in page_obj.object_list:
@@ -324,6 +331,32 @@ def debt_detail(request, debt_id):
     return response
 
 
+def register_filter_context(request, filters):
+    return {'record_filters': filters,
+            'filters_active': any(request.GET.get(name) for name in filters.fields)}
+
+
+def filter_register_records(records, filters, *, debt_prefix, date_field):
+    filters.is_valid()
+    data = filters.cleaned_data
+    query = data.get('q')
+    if query:
+        records = records.filter(
+            Q(**{debt_prefix + 'contract_number__icontains': query}) |
+            Q(**{debt_prefix + 'debtor__full_name__icontains': query}) |
+            Q(**{debt_prefix + 'debtor__iin__icontains': query}))
+    for name in ('counterparty', 'collection_agency'):
+        if data.get(name):
+            records = records.filter(**{debt_prefix + name: data[name]})
+    for name, lookup in (('date_from', '__gte'), ('date_to', '__lte')):
+        if data.get(name):
+            records = records.filter(**{date_field + lookup: data[name]})
+    if data.get('status'):
+        records = (records.filter(status=data['status']) if debt_prefix else
+                   filter_by_current_status(records, data['status']))
+    return records
+
+
 def _financial_list(request, *, model, title, kind):
     permission = f'imports.view_{model._meta.model_name}'
     if not request.user.is_authenticated:
@@ -331,7 +364,12 @@ def _financial_list(request, *, model, title, kind):
     if not request.user.has_perm(permission):
         raise PermissionDenied
     records = model.objects.select_related('debt', 'debt__debtor', 'import_item__import_record')
+    filters = PaymentFilterForm(request.GET) if kind == 'payment' else None
+    if filters:
+        records = filter_register_records(records, filters, debt_prefix='debt__', date_field='payment_date')
     context = record_page_context(request, records, label=f'Страницы: {title.lower()}')
+    if filters:
+        context.update(register_filter_context(request, filters))
     return render(request, 'imports/financial_list.html', context | {
         'title': title, 'kind': kind,
     })

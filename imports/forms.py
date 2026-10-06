@@ -28,6 +28,34 @@ class ImportFilterForm(forms.Form):
         return data
 
 
+class DebtFilterForm(ImportFilterForm):
+    import_type = None
+    author = None
+    q = forms.CharField(label='ДБЗ, ФИО или ИИН', required=False)
+    counterparty = forms.ModelChoiceField(label='Контрагент', queryset=Counterparty.objects.all(), required=False, empty_label='Все контрагенты')
+    collection_agency = forms.ModelChoiceField(label='Коллекторское агентство', queryset=CollectionAgency.objects.all(), required=False, empty_label='Все агентства')
+    status = forms.ChoiceField(label='Статус', choices=[('', 'Все статусы'), *Debt.Status.choices], required=False)
+
+    def __init__(self, *args, **kwargs):
+        # The import-specific author field is intentionally absent here.
+        forms.Form.__init__(self, *args, auto_id='record-filter-%s', **kwargs)
+        self.order_fields(['q', 'counterparty', 'collection_agency', 'status', 'date_from', 'date_to'])
+        for field in self.fields.values():
+            field.widget.attrs['class'] = 'form-control'
+        self.fields['q'].widget.attrs['placeholder'] = 'Поиск по договору или должнику'
+        self.fields['date_from'].label = 'Дата ДБЗ с'
+        self.fields['date_to'].label = 'Дата ДБЗ по'
+
+
+class PaymentFilterForm(DebtFilterForm):
+    status = forms.ChoiceField(label='Категория', choices=[('', 'Все категории'), *Payment.Status.choices], required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['date_from'].label = 'Дата платежа с'
+        self.fields['date_to'].label = 'Дата платежа по'
+
+
 class WriteOffForm(forms.ModelForm):
     reason = forms.CharField(label='Основание списания', widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 2}))
     amount = forms.DecimalField(

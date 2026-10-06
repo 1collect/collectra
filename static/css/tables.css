@@ -66,7 +66,7 @@ body[data-page="imports"] .content, .content.content--register { height: calc(va
 .data-register .panel-header h2 { flex: 1; }
 .data-register > [data-live-balances] { flex: 1; min-height: 0; display: flex; flex-direction: column; }
 .data-register .table-container { flex: 1; min-height: 0; overscroll-behavior: contain; }
-.import-history > .import-filter-panel { flex-shrink: 0; max-height: 50%; overflow-y: auto; }
+:is(.import-history, .data-register) > .import-filter-panel { flex-shrink: 0; max-height: 50%; overflow-y: auto; }
 .import-history > .import-table-container { flex: 1; min-height: 0; overscroll-behavior: contain; }
 .import-header-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; margin-left: auto; }
 .import-table-settings { display: flex; align-items: center; gap: 8px; }
@@ -76,23 +76,23 @@ body[data-page="imports"] .content, .content.content--register { height: calc(va
 .import-filter-indicator { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--primary); }
 .import-filter-toggle .import-filter-chevron { width: 12px; height: 12px; transition: transform 240ms ease; }
 .import-filter-toggle[aria-expanded="true"] .import-filter-chevron { transform: rotate(180deg); }
-.import-history .panel-header h1 { font-size: 18px; }
-@media (max-width: 600px) { .import-history .panel-header h1 { flex-basis: 100%; } }
+:is(.import-history, .data-register--filters) .panel-header h1 { font-size: 18px; }
+@media (max-width: 600px) { :is(.import-history, .data-register--filters) .panel-header h1 { flex-basis: 100%; } }
 :is(.import-history, .data-register) .rows-control { margin: 0; align-self: center; }
 :is(.import-history, .data-register) .rows-control select { appearance: none; width: auto; min-width: 108px; height: var(--control-height); font-size: var(--text-small); line-height: normal; padding: 0 28px 0 10px; text-align: left; text-align-last: left; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23334155' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 8px center; }
 :is(.import-history, .data-register) .rows-control select option { text-align: left; }
 .import-filter-panel { display: grid; grid-template-rows: 0fr; transition: grid-template-rows 240ms ease; }
 .import-filter-panel.is-open { grid-template-rows: 1fr; }
 .import-filter-clip { min-height: 0; overflow: hidden; }
-.import-history .import-filter-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); gap: 24px; padding: 16px 16px 32px; margin: 0; background: var(--bg-panel); border-bottom-color: var(--border-strong); }
+:is(.import-history, .data-register) .import-filter-grid { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 1fr); gap: 24px; padding: 16px 16px 32px; margin: 0; background: var(--bg-panel); border-bottom-color: var(--border-strong); }
 .import-filter-fields { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1.1fr); gap: 16px; min-width: 0; }
-.import-history .import-filter-grid .form-field { width: auto; }
+:is(.import-history, .data-register) .import-filter-grid .form-field { width: auto; }
 .import-filter-date-start { grid-column: 1; }
 .import-filter-actions { align-self: end; justify-self: end; }
-@media (max-width: 1100px) { .import-history .import-filter-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
+@media (max-width: 1100px) { :is(.import-history, .data-register) .import-filter-grid { grid-template-columns: minmax(0, 1fr); gap: 12px; } }
 @media (max-width: 600px) {
-  .import-history .panel-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
-  .import-history .panel-header h1 { grid-column: 1; grid-row: 1; }
+  :is(.import-history, .data-register--filters) .panel-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; }
+  :is(.import-history, .data-register--filters) .panel-header h1 { grid-column: 1; grid-row: 1; }
   .import-header-actions { display: contents; }
   .import-header-actions > .btn-primary { grid-column: 2; grid-row: 1; }
   .import-table-settings { grid-column: 1 / -1; grid-row: 2; justify-self: end; }

@@ -58,10 +58,10 @@ class RecordPaginationTests(TestCase):
         for route in self.routes:
             with self.subTest(route=route):
                 url = reverse(f'imports:{route}')
-                first = self.client.get(url, {'per_page': 10, 'q': 'test & value'})
-                second = self.client.get(url, {'per_page': 10, 'page': 5, 'q': 'test & value'})
-                self.assertContains(first, 'q=test+%26+value&amp;per_page=10&amp;page=2')
-                self.assertContains(first, 'name="q" value="test &amp; value"')
+                first = self.client.get(url, {'per_page': 10, 'tag': 'test & value'})
+                second = self.client.get(url, {'per_page': 10, 'page': 5, 'tag': 'test & value'})
+                self.assertContains(first, 'tag=test+%26+value&amp;per_page=10&amp;page=2')
+                self.assertContains(first, 'name="tag" value="test &amp; value"')
                 self.assertContains(second, 'Записи с 41 до 43 из 43')
                 self.assertContains(second, 'aria-current="page" aria-label="Страница 5"')
                 self.assertContains(second, 'disabled aria-label="Следующая страница"')
