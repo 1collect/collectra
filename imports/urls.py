@@ -8,6 +8,7 @@ app_name = 'imports'
 
 urlpatterns = [
     path('imports/templates/', views.import_templates, name='templates'),
+    path('imports/generator/', views.import_generator, name='generator'),
     path('imports/templates/<str:code>/', project.import_template, name='import_template'),
     path('recalculate/', project.full_recalculation, name='recalculate'),
     path('payments/<int:pk>/distribution/', project.payment_distribution, name='payment_distribution'),

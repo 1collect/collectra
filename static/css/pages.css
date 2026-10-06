@@ -40,6 +40,7 @@
 .contract-disclosure summary { padding: var(--space-3) 0; }
 .contract-table-toolbar { display: flex; justify-content: space-between; align-items: center; gap: var(--space-3); padding: var(--space-3) var(--panel-padding); }
 .contract-table-toolbar .rows-control select { width: auto; height: var(--control-height); font-size: var(--text-small); }
+.contract-table-toolbar .rows-control { margin-left: auto; }
 .contract-operations [data-operation-row] { cursor: pointer; }
 .contract-operations tbody tr[data-operation-row]:nth-child(4n+3) { --table-row-background: var(--bg-table-stripe); }
 .contract-operations tbody tr[data-operation-row]:hover { --table-row-background: var(--bg-table-hover); }

@@ -1,0 +1,23 @@
+{% extends 'base.html' %}
+{% block title %}Генератор данных{% endblock %}
+{% block page_name %}import-generator{% endblock %}
+{% block content %}
+<div class="page-header"><div><div class="page-eyebrow">Импорт данных / Тестирование</div><h1>Генератор данных</h1></div></div>
+<section class="panel" style="max-width: 760px">
+    <div class="panel-header"><div><h2>Сформировать XLSX</h2><p class="text-muted">Всегда формируется одна строка для одного указанного ДБЗ.</p></div></div>
+    {% if error %}<div class="alert alert-danger mb-3">{{ error }}</div>{% endif %}
+    <form method="post" class="form-grid">
+        {% csrf_token %}
+        <div class="form-field"><label for="id_kind">Тип данных</label><select id="id_kind" name="kind">{% for value, label, description in categories %}<option value="{{ value }}"{% if kind == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+        <div class="form-field"><label for="id_dbz">ДБЗ</label><input id="id_dbz" name="dbz" type="text" value="{{ dbz }}" placeholder="Например, DBZ-000123" autocomplete="off" required><div class="form-help">Для расходов, платежей и списаний ДБЗ должен существовать в системе.</div></div>
+        <div class="form-field"><label for="id_count">Количество операций</label><input id="id_count" name="count" type="number" min="1" max="10000" value="{{ count }}" required><div class="form-help">Все строки будут созданы для указанного ДБЗ.</div></div>
+        <div class="form-field"><label for="id_minimum">Минимальная сумма</label><input id="id_minimum" name="minimum" inputmode="decimal" value="{{ minimum }}" required></div>
+        <div class="form-field"><label for="id_maximum">Максимальная сумма</label><input id="id_maximum" name="maximum" inputmode="decimal" value="{{ maximum }}" required></div>
+        <div class="form-actions"><button class="btn btn-primary" type="submit"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 3v12m-5-5 5 5 5-5M5 17v4h14v-4"></path></svg>Скачать XLSX</button><a class="btn" href="{% url 'imports:new' %}">Перейти к импорту</a></div>
+    </form>
+</section>
+<section class="panel" style="max-width: 760px">
+    <div class="panel-header"><h2>Доступные генераторы</h2></div>
+    <div class="p-3"><ul class="list-reset">{% for value, label, description in categories %}<li class="mb-2"><strong>{{ label }}</strong><br><span class="text-muted">{{ description }}</span></li>{% endfor %}</ul></div>
+</section>
+{% endblock %}

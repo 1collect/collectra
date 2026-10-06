@@ -1,4 +1,6 @@
 from datetime import date
+from decimal import Decimal
+import random
 
 from django.core.paginator import Paginator
 from django.contrib import messages
@@ -138,6 +140,85 @@ def import_templates(request):
         'templates': [{'name': kind.name, 'code': kind.code, 'description': descriptions.get(kind.code, kind.description)}
                       for kind in types],
     })
+
+
+@permission_required('imports.add_import')
+def import_generator(request):
+    """Create valid-looking XLSX fixtures for testing the import pipeline."""
+    from contract_generator.schema import CONTRACT_BASE_COLUMNS
+    from .reports import export_rows
+    from .services import EXPENSE_IMPORT_COLUMNS, PAYMENT_IMPORT_COLUMNS, WRITEOFF_IMPORT_COLUMNS
+
+    kind = request.POST.get('kind', 'expenses')
+    context = {
+        'kind': kind,
+        'dbz': request.POST.get('dbz', ''),
+        'count': request.POST.get('count', '10'),
+        'minimum': request.POST.get('minimum', '100'),
+        'maximum': request.POST.get('maximum', '5000'),
+        'categories': [
+            ('expenses', 'Расходы', 'Существующие ДБЗ, случайная сумма в выбранной категории.'),
+            ('payments', 'Платежи', 'Существующие ДБЗ, случайная сумма и случайный статус.'),
+            ('writeoffs', 'Списания', 'Существующие ДБЗ, строки частичного списания.'),
+            ('contracts', 'Договоры', 'Новые тестовые ДБЗ с уникальными ИИН и суммами.'),
+        ],
+    }
+    if request.method != 'POST':
+        return render(request, 'imports/import_generator.html', context)
+
+    try:
+        count = int(context['count'])
+        minimum = Decimal(str(context['minimum']).replace(',', '.'))
+        maximum = Decimal(str(context['maximum']).replace(',', '.'))
+    except (TypeError, ValueError, ArithmeticError):
+        context['error'] = 'Укажите количество операций и корректный диапазон сумм.'
+        return render(request, 'imports/import_generator.html', context)
+    if kind not in {item[0] for item in context['categories']}:
+        context['error'] = 'Выберите тип данных.'
+        return render(request, 'imports/import_generator.html', context)
+    dbz = str(context['dbz']).strip()
+    if not dbz:
+        context['error'] = 'Укажите ДБЗ.'
+        return render(request, 'imports/import_generator.html', context)
+    if count < 1 or count > 10000:
+        context['error'] = 'Количество операций должно быть от 1 до 10 000.'
+        return render(request, 'imports/import_generator.html', context)
+    if minimum < 0 or maximum < minimum:
+        context['error'] = 'Максимальная сумма должна быть не меньше минимальной, а суммы — неотрицательными.'
+        return render(request, 'imports/import_generator.html', context)
+    if kind != 'contracts' and not Debt.objects.filter(
+        contract_number=dbz,
+    ).exclude(status=Debt.Status.CANCELLED).exists():
+        context['error'] = f'ДБЗ «{dbz}» не найден или отменён.'
+        return render(request, 'imports/import_generator.html', context)
+
+    rng = random.SystemRandom()
+
+    def amount():
+        return (minimum + (maximum - minimum) * Decimal(str(rng.random()))).quantize(Decimal('0.01'))
+
+    if kind == 'contracts':
+        columns = list(CONTRACT_BASE_COLUMNS)
+        principal = amount()
+        rows = [[
+            dbz, f'{900000000000 + rng.randrange(100000):012d}', 'Тестовый должник',
+            principal, 0, 0, principal, 0, 0, 0, 0, principal,
+        ]]
+    else:
+        if kind == 'expenses':
+            columns = list(EXPENSE_IMPORT_COLUMNS)
+            rows = [[dbz, amount(), 0, 0, 0, 0] for _ in range(count)]
+        elif kind == 'payments':
+            columns = list(PAYMENT_IMPORT_COLUMNS)
+            statuses = ('ЧСИ', 'Физическое лицо', 'Удержание')
+            rows = [[dbz, amount(), rng.choice(statuses), timezone.localdate()] for _ in range(count)]
+        else:
+            columns = list(WRITEOFF_IMPORT_COLUMNS)
+            rows = [[dbz, 'Полное списание', '', '', timezone.localdate(), '', 'Тестовое списание'] for _ in range(count)]
+
+    response = export_rows(rows, 'xlsx', f'Генератор: {kind}', headers=columns)
+    response['Content-Disposition'] = f'attachment; filename="generated-{kind}.xlsx"'
+    return response
 
 
 @permission_required('imports.view_import')
@@ -290,6 +371,26 @@ def debt_list(request):
     debts = filter_register_records(debts, filters, debt_prefix='', date_field='dbz_start_date')
     context = record_page_context(request, debts, label='Страницы договоров')
     context.update(register_filter_context(request, filters))
+    context['report_date'] = timezone.localdate()
+    context['accrued_expense_columns'] = [
+        ('state_duty', 'Гос.пошлина'),
+        ('representative_expenses', 'Представительские расходы'),
+        ('notary_expenses', 'Нотариальные расходы'),
+        ('postal_expenses', 'Почтовые расходы'),
+        ('claim_security', 'Обеспечение иска'),
+        ('additional_expenses', 'Дополнительные расходы'),
+    ]
+    context['payment_columns'] = [
+        ('principal', 'Основной долг'),
+        ('interest', 'Вознаграждение'),
+        ('penalties', 'Пеня/Штрафы'),
+        ('receivable', 'Дебиторская задолженность (остаток по выкупу)'),
+        ('state_duty', 'Гос.пошлина (ПКБ)'),
+        ('representative_expenses', 'Представительские расходы (ПКБ)'),
+        ('notary_expenses', 'Нотариальные расходы (ПКБ)'),
+        ('postal_expenses', 'Почтовые расходы (ПКБ)'),
+        ('claim_security', 'Обеспечение иска (ПКБ)'),
+    ]
     page_obj = context['page_obj']
     page_obj.object_list = list(page_obj.object_list.prefetch_related('payments__refunds', 'expenses', 'writeoffs'))
     today = timezone.localdate()
@@ -301,6 +402,20 @@ def debt_list(request):
             field: sum((getattr(expense, field) for expense in expenses), ZERO)
             for field in OWN_FIELDS
         }
+        debt.accrued_expense_rows = [
+            (field, label, debt.accrued_expenses[field])
+            for field, label in context['accrued_expense_columns']
+        ]
+        # The expanded payment block shows current calculated balances,
+        # not the historical allocation totals of individual payments.
+        payment_values = {
+            field: debt.current.get(field, ZERO)
+            for field, _ in context['payment_columns']
+        }
+        debt.payment_breakdown_rows = [
+            (field, label, payment_values.get(field, ZERO))
+            for field, label in context['payment_columns']
+        ]
         debt.total_debt_with_expenses = debt.purchase_total_debt + sum(debt.accrued_expenses.values(), ZERO)
 
     template = 'imports/partials/debt_register.html' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'imports/debt_list.html'

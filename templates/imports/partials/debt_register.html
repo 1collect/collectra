@@ -19,7 +19,22 @@
             <th scope="col" class="cell-number" data-purchase-column aria-hidden="true"><span class="purchase-column-content">Представительские расходы (выкуп)</span></th>
             <th scope="col" class="cell-number" data-purchase-column aria-hidden="true"><span class="purchase-column-content">Нотариальные расходы (выкуп)</span></th>
             <th scope="col" class="cell-number" data-purchase-column aria-hidden="true"><span class="purchase-column-content">Почтовые расходы (выкуп)</span></th>
-            <th scope="col" class="cell-number accrued-total-column" title="Сумма выкупа плюс все действующие расходы до сегодняшней даты">Общая сумма задолженности</th>
+            <th scope="col" class="cell-number accrued-total-column" title="Сумма выкупа плюс все действующие расходы до сегодняшней даты">
+                <button type="button" class="purchase-breakdown-toggle" data-accrued-toggle aria-expanded="false" aria-label="Показать состав общей суммы задолженности">
+                    <span>Общая сумма задолженности</span>
+                    <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+            </th>
+            {% for field, label in accrued_expense_columns %}<th scope="col" class="cell-number accrued-expense-column" data-accrued-column aria-hidden="true"><span class="accrued-column-content">{{ label }}</span></th>{% endfor %}
+            <th scope="col" class="cell-number payment-total-column">
+                <button type="button" class="purchase-breakdown-toggle" data-payment-toggle aria-expanded="false" aria-label="Показать состав суммы платежей">
+                    <span>Сумма платежей</span>
+                    <svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"></path></svg>
+                </button>
+            </th>
+            {% for field, label in payment_columns %}<th scope="col" class="cell-number payment-breakdown-column" data-payment-column aria-hidden="true"><span class="payment-column-content">{{ label }}</span></th>{% endfor %}
+            <th scope="col" class="cell-number">Остаток задолженности на {{ report_date|date:'d.m.Y' }}</th>
+            <th scope="col" class="cell-number">Переплата</th>
             <th scope="col" class="fixed-actions-column">Действия</th>
         </tr></thead>
         <tbody>{% for debt in page_obj %}
@@ -38,9 +53,14 @@
                 <td class="cell-number" data-purchase-column aria-hidden="true"><span class="purchase-column-content">{{ debt.purchase_notary_expenses|floatformat:2 }}</span></td>
                 <td class="cell-number" data-purchase-column aria-hidden="true"><span class="purchase-column-content">{{ debt.purchase_postal_expenses|floatformat:2 }}</span></td>
                 <td class="cell-number accrued-total-column"><strong>{{ debt.total_debt_with_expenses|floatformat:2 }}</strong></td>
+                {% for field, label, value in debt.accrued_expense_rows %}<td class="cell-number accrued-expense-column" data-accrued-column aria-hidden="true"><span class="accrued-column-content">{{ value|floatformat:2 }}</span></td>{% endfor %}
+                <td class="cell-number payment-total-column">{{ debt.paid_amount|floatformat:2 }}</td>
+                {% for field, label, value in debt.payment_breakdown_rows %}<td class="cell-number payment-breakdown-column" data-payment-column aria-hidden="true"><span class="payment-column-content">{{ value|floatformat:2 }}</span></td>{% endfor %}
+                <td class="cell-number"><strong>{{ debt.outstanding_amount|floatformat:2 }}</strong></td>
+                <td class="cell-number">{{ debt.overpayment_amount|floatformat:2 }}</td>
                 <td class="fixed-actions-column"><a class="btn btn-sm" href="{% url 'imports:debt_detail' debt.pk %}">Открыть</a></td>
             </tr>
-        {% empty %}<tr><td colspan="15"><div class="empty-state"><h3>Ничего не найдено</h3></div></td></tr>{% endfor %}</tbody>
+        {% empty %}<tr><td colspan="33"><div class="empty-state"><h3>Ничего не найдено</h3></div></td></tr>{% endfor %}</tbody>
     </table>
 </div>
 <div class="table-footer" data-record-total="{{ page_obj.paginator.count }}">{% include 'imports/partials/record_pagination.html' %}</div>

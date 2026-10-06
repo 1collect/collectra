@@ -28,12 +28,30 @@
 .debt-register .purchase-column-content { display: block; width: 96px; overflow-wrap: anywhere; }
 .table.debt-register tbody td { height: 36px; padding-top: 4px; padding-bottom: 4px; }
 .table.debt-register.is-purchase-expanded [data-purchase-column] { display: table-cell; }
+.table.debt-register [data-accrued-column] { display: none; min-width: 0; max-width: none; padding: 6px; font-size: .75rem; }
+.table.debt-register.is-accrued-expanded [data-accrued-column] { display: table-cell; }
+.debt-register .accrued-column-content { display: block; width: 96px; overflow-wrap: anywhere; }
+.table.debt-register thead [data-accrued-column] { background: var(--bg-purchase-heading); }
+.table.debt-register tbody [data-accrued-column] { background: var(--bg-purchase-cell); }
+.table.debt-register tbody tr:nth-child(even) [data-accrued-column] { background: var(--bg-purchase-stripe); }
+.table.debt-register tbody tr:hover [data-accrued-column] { background: var(--bg-purchase-hover); }
+.table.debt-register tbody tr:is(.is-selected, :target) [data-accrued-column] { background: var(--primary-soft); }
 .table.debt-register thead [data-purchase-column] { background: var(--bg-purchase-heading); }
 .table.debt-register tbody [data-purchase-column] { background: var(--bg-purchase-cell); }
 .table.debt-register tbody tr:nth-child(even) [data-purchase-column] { background: var(--bg-purchase-stripe); }
 .table.debt-register tbody tr:hover [data-purchase-column] { background: var(--bg-purchase-hover); }
 .table.debt-register tbody tr:is(.is-selected, :target) [data-purchase-column] { background: var(--primary-soft); }
-.table.debt-register .purchase-total-column { min-width: 16rem; max-width: none; }
+.table.debt-register .purchase-total-column { width: 11rem; min-width: 11rem; max-width: 11rem; }
+.table.debt-register .accrued-total-column { width: 11rem; min-width: 11rem; max-width: 11rem; }
+.table.debt-register .payment-total-column { width: 9rem; min-width: 9rem; max-width: 9rem; }
+.table.debt-register [data-payment-column] { display: none; min-width: 0; max-width: none; padding: 6px; font-size: .75rem; }
+.table.debt-register.is-payment-expanded [data-payment-column] { display: table-cell; }
+.debt-register .payment-column-content { display: block; width: 96px; overflow-wrap: anywhere; }
+.table.debt-register thead [data-payment-column] { background: var(--bg-purchase-heading); }
+.table.debt-register tbody [data-payment-column] { background: var(--bg-purchase-cell); }
+.table.debt-register tbody tr:nth-child(even) [data-payment-column] { background: var(--bg-purchase-stripe); }
+.table.debt-register tbody tr:hover [data-payment-column] { background: var(--bg-purchase-hover); }
+.table.debt-register tbody tr:is(.is-selected, :target) [data-payment-column] { background: var(--primary-soft); }
 .purchase-breakdown-toggle { display: flex; align-items: center; gap: var(--space-2); width: 100%; min-height: var(--control-compact); padding: 0; font: inherit; font-weight: inherit; color: inherit; text-align: left; background: transparent; cursor: pointer; }
 .purchase-breakdown-toggle .icon { flex-shrink: 0; margin-left: auto; width: 16px; height: 16px; transition: transform 280ms ease; }
 .purchase-breakdown-toggle:hover { color: var(--primary); }
