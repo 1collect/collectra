@@ -5,7 +5,7 @@
 {% block content %}
 <section class="panel directory-list">
     <div class="panel-header">
-        <div class="flex-1"><div class="page-eyebrow">Справочники</div><h1>Коллекторские агентства <span class="badge">{{ agencies|length }}</span></h1></div>
+        <h1 class="flex-1">Коллекторские агентства</h1>
         {% if perms.imports.add_collectionagency %}<a data-form-modal data-form-modal-compact aria-haspopup="dialog" class="btn btn-primary" href="{% url 'imports:collection_agency_new' %}"><svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Добавить</a>{% endif %}
     </div>
     <div class="p-0 table-container"><table class="table table-bordered table-compact">
