@@ -70,9 +70,9 @@ class RecordFilterTests(TestCase):
             response = self.client.get(reverse(f'imports:{route}'), {'q': 'missing'})
             self.assertContains(response, 'Ничего не найдено')
 
-    def test_add_buttons_open_correct_import_type_and_require_upload_permission(self):
+    def test_contract_and_payment_headers_have_no_add_button(self):
         for route, code in [('debts', 'contracts'), ('payments', 'payments')]:
-            self.assertContains(self.client.get(reverse(f'imports:{route}')), f'?import_type={code}')
+            self.assertNotContains(self.client.get(reverse(f'imports:{route}')), f'?import_type={code}')
             response = self.client.get(reverse('imports:new'), {'import_type': code})
             self.assertEqual(response.context['upload_form'].initial['import_type'], ImportType.objects.get(code=code).pk)
         viewer = User.objects.create_user('filters-viewer')

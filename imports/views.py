@@ -290,7 +290,6 @@ def debt_list(request):
     debts = filter_register_records(debts, filters, debt_prefix='', date_field='dbz_start_date')
     context = record_page_context(request, debts, label='Страницы договоров')
     context.update(register_filter_context(request, filters))
-    context['add_url'] = reverse('imports:new') + '?import_type=contracts' if request.user.has_perm('imports.add_import') else None
     page_obj = context['page_obj']
     page_obj.object_list = list(page_obj.object_list.prefetch_related('payments__refunds', 'expenses', 'writeoffs'))
     for debt in page_obj.object_list:
@@ -374,9 +373,7 @@ def _financial_list(request, *, model, title, kind):
                                       status_field='status' if kind == 'payment' else 'operation_status')
     context = record_page_context(request, records, label=f'Страницы: {title.lower()}')
     context.update(register_filter_context(request, filters))
-    if kind == 'payment':
-        context['add_url'] = reverse('imports:new') + '?import_type=payments' if request.user.has_perm('imports.add_import') else None
-    else:
+    if kind == 'expense':
         context['add_url'] = reverse('imports:expense_new') if request.user.has_perm('imports.add_expense') else None
         context['add_modal'] = True
     return render(request, 'imports/financial_list.html', context | {
