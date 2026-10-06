@@ -4,7 +4,7 @@
             <tbody>
             {% for debt in page_obj %}
                 <tr><td class="font-mono row-number-column">{{ page_obj.start_index|add:forloop.counter|add:"-1" }}</td>
-                    <td class="record-key"><span class="font-mono">{{ debt.contract_number }}</span>{% include 'imports/partials/import_source.html' with record=debt %}</td>
+                    <td class="record-key"><span class="font-mono">{{ debt.contract_number }}</span></td>
                     <td class="cell-text">{{ debt.debtor.full_name }}</td>
                     <td class="font-mono">{{ debt.debtor.iin }}</td>
                     <td class="cell-number">{{ debt.current.principal|floatformat:2 }}</td>

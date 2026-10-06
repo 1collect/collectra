@@ -13,7 +13,7 @@
             <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col">Договор</th><th scope="col">Тип списания</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма</th><th scope="col">Дата списания</th><th scope="col">Создал</th><th scope="col">Действия</th></tr></thead>
             <tbody>{% for item in page_obj %}
                 <tr><td class="font-mono row-number-column">{{ page_obj.start_index|add:forloop.counter|add:"-1" }}</td>
-                    <td class="cell-text"><strong class="font-mono">{{ item.debt.contract_number }}</strong><br><span class="text-muted">{{ item.debt.debtor.full_name }}</span>{% include 'imports/partials/import_source.html' with record=item %}</td>
+                    <td class="cell-text"><strong class="font-mono">{{ item.debt.contract_number }}</strong><br><span class="text-muted">{{ item.debt.debtor.full_name }}</span></td>
                     <td>{{ item.get_kind_display }}</td>
                     <td>{% if item.kind == 'full' %}Весь остаток задолженности{% else %}{{ item.get_category_display }}{% endif %}</td>
                     <td class="cell-number">{{ item.amount|floatformat:2 }}</td>
