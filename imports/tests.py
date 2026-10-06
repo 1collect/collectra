@@ -90,11 +90,11 @@ class DebtListTests(TestCase):
         self.assertContains(response, 'DBZ-ACTIVE')
         self.assertContains(response, 'DBZ-REPAID')
 
-    def test_removed_filters_do_not_change_contract_list(self):
+    def test_contract_filters_apply_search_and_status(self):
         response = self.client.get(reverse('imports:debts'), {'q': 'Иванов', 'status': Debt.Status.ACTIVE})
         self.assertContains(response, 'DBZ-ACTIVE')
-        self.assertContains(response, 'DBZ-REPAID')
-        self.assertNotContains(response, 'debt-search')
+        self.assertNotContains(response, 'DBZ-REPAID')
+        self.assertContains(response, 'id="record-filter-q"')
 
     def test_user_without_permission_gets_403(self):
         other_user = User.objects.create_user('no-access', password='test-password')

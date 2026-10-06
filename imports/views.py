@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
 from django.db import transaction
-from django.http import FileResponse, JsonResponse, QueryDict
+from django.http import FileResponse, Http404, JsonResponse, QueryDict
 from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -303,8 +303,10 @@ def debt_list(request):
 
 @permission_required('imports.view_debt')
 def debt_detail(request, debt_id):
+    from .debt_workspace import workspace_context, prepare_history_event
+
     debt = get_object_or_404(
-        Debt.objects.select_related('debtor', 'import_item__import_record').prefetch_related('payments__refunds', 'expenses', 'writeoffs'),
+        Debt.objects.select_related('debtor', 'original_creditor', 'cession__creditor', 'counterparty', 'collection_agency').prefetch_related('payments__refunds', 'expenses', 'writeoffs'),
         pk=debt_id,
     )
     balance = calculate_balance(debt)
@@ -318,15 +320,15 @@ def debt_detail(request, debt_id):
     } for field, label in labels.items()]
     source_rows = [{'label': Debt._meta.get_field(field).verbose_name, 'amount': getattr(debt, field)}
                    for field in PURCHASE_FIELDS]
-    for operation in balance['operations']:
-        operation['label'] = {'payment': 'Платёж', 'writeoff': 'Списание', 'expense': 'Расход', 'refund': 'Возврат'}[operation['kind']]
-        operation['parts'] = [{'label': labels[field], 'amount': value}
-                              for field, value in operation['allocation'].items() if value]
     template = 'imports/partials/debt_balance.html' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'imports/debt_detail.html'
-    response = render(request, template, {
-        'debt': debt, 'categories': categories, 'source_rows': source_rows,
-        'operations_page': Paginator(balance['operations'], 25).get_page(request.GET.get('page')),
-    })
+    workspace = workspace_context(request, debt, balance)
+    context = record_page_context(request, workspace['operation_rows'], label='Страницы операций договора')
+    context.update(workspace)
+    context.update(debt=debt, categories=categories, source_rows=source_rows)
+    if workspace['active_tab'] == 'history':
+        for event in context['page_obj']:
+            prepare_history_event(event)
+    response = render(request, template, context)
     response['Cache-Control'] = 'no-store'
     return response
 
@@ -385,18 +387,41 @@ def payment_list(request):
     return _financial_list(request, model=Payment, title='Платежи', kind='payment')
 
 
+def scope_operation_form(request, form):
+    """Keep operations started from a contract in that contract's context."""
+    if not request.GET.get('debt'):
+        return
+    try:
+        debt_id = int(request.GET['debt'])
+    except (ValueError, TypeError):
+        raise Http404('Договор не найден')
+    debt = get_object_or_404(Debt, pk=debt_id)
+    if 'debt' in form.fields:
+        form.fields['debt'].queryset = Debt.objects.filter(pk=debt.pk)
+        form.initial['debt'] = debt.pk
+    elif 'payment' in form.fields:
+        form.fields['payment'].queryset = form.fields['payment'].queryset.filter(debt=debt)
+
+
+def operation_created_redirect(request, debt_id, tab):
+    if request.GET.get('debt') and request.user.has_perm('imports.view_debt'):
+        return redirect(reverse('imports:debt_detail', args=[debt_id]) + '?tab=' + tab)
+    return redirect('imports:' + tab)
+
+
 def _expense_create(request):
     form = ExpenseCreateForm(
         request.POST if request.method == 'POST' else None,
         initial={'expense_date': timezone.localdate()},
     )
+    scope_operation_form(request, form)
     if request.method == 'POST' and form.is_valid():
         with transaction.atomic():
             Debt.objects.select_for_update().get(pk=form.cleaned_data['debt'].pk)
             record = form.save()
             recalculate_debt(record.debt_id)
         messages.success(request, 'Расход создан.')
-        return redirect('imports:expenses')
+        return operation_created_redirect(request, record.debt_id, 'expenses')
     return render(request, 'imports/financial_create.html', {
         'form': form, 'kind': 'expense', 'title': 'Новый расход',
     })
@@ -429,6 +454,7 @@ def writeoff_list(request):
 def writeoff_create(request):
     form = WriteOffForm(request.POST if request.method == 'POST' else None,
                         initial={'writeoff_date': timezone.localdate(), 'kind': WriteOff.Kind.FULL})
+    scope_operation_form(request, form)
     if request.method == 'POST' and form.is_valid():
         try:
             create_writeoff(
@@ -442,7 +468,7 @@ def writeoff_create(request):
             form.add_error(None, str(error))
         else:
             messages.success(request, 'Списание сохранено. Остаток долга пересчитан.')
-            return redirect('imports:writeoffs')
+            return operation_created_redirect(request, form.cleaned_data['debt'].pk, 'writeoffs')
     return render(request, 'imports/writeoff_form.html', {'form': form})
 
 
@@ -612,6 +638,7 @@ def refund_create(request):
         initial['payment'] = request.GET.get('payment')
         initial['refund_date'] = timezone.localdate()
     form = PaymentRefundForm(request.POST or None, initial=initial)
+    scope_operation_form(request, form)
     if request.method == 'POST' and form.is_valid():
         try:
             create_payment_refund(
@@ -625,7 +652,7 @@ def refund_create(request):
             form.add_error('amount', str(error))
         else:
             messages.success(request, 'Возврат платежа сохранён, договор пересчитан.')
-            return redirect('imports:refunds')
+            return operation_created_redirect(request, form.cleaned_data['payment'].debt_id, 'refunds')
     return render(request, 'imports/refund_form.html', {'form': form})
 
 
