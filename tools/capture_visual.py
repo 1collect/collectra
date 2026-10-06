@@ -15,18 +15,18 @@ routes = {
     'users': '/users/', 'roles': '/users/roles/', 'groups': '/users/groups/',
     'permissions': '/users/permissions/', 'user-edit': '/users/1/edit/',
     'role-form': '/users/roles/new/', 'group-form': '/users/groups/new/',
-    'contracts': '/imports/contracts/', 'payments': '/imports/payments/',
-    'expenses': '/imports/expenses/', 'counterparties': '/imports/counterparties/',
-    'counterparty-form': '/imports/counterparties/new/',
-    'counterparty-delete': '/imports/counterparties/1/delete/',
-    'refunds': '/imports/refunds/', 'refund-form': '/imports/refunds/new/',
+    'contracts': '/contracts/', 'payments': '/payments/',
+    'expenses': '/expenses/', 'counterparties': '/counterparties/',
+    'counterparty-form': '/counterparties/new/',
+    'counterparty-delete': '/counterparties/1/delete/',
+    'refunds': '/refunds/', 'refund-form': '/refunds/new/',
     'imports': '/imports/', 'import-detail': '/imports/2/items/',
-    'payment-edit': '/imports/payments/1/edit/', 'expense-edit': '/imports/expenses/1/edit/',
-    'history': '/imports/payments/1/history/', 'empty-contracts': '/imports/contracts/?q=not-found',
-    'empty-payments': '/imports/payments/?q=not-found',
-    'counterparty-edit': '/imports/counterparties/1/edit/',
+    'payment-edit': '/payments/1/edit/', 'expense-edit': '/expenses/1/edit/',
+    'history': '/payments/1/history/', 'empty-contracts': '/contracts/?q=not-found',
+    'empty-payments': '/payments/?q=not-found',
+    'counterparty-edit': '/counterparties/1/edit/',
     'role-edit': '/users/roles/1/edit/', 'group-edit': '/users/groups/1/edit/',
-    'empty-history': '/imports/payments/2/history/',
+    'empty-history': '/payments/2/history/',
 }
 if args.quick:
     routes = {key: routes[key] for key in ['users', 'contracts', 'payments', 'imports', 'import-detail', 'refund-form', 'role-form', 'groups']}
@@ -61,7 +61,7 @@ with sync_playwright() as p:
             if response.status >= 400:
                 raise RuntimeError(f'{route}: HTTP {response.status}')
             capture(name + '-' + size)
-        for name, route in [('contracts-scroll', '/imports/contracts/'), ('imports-scroll', '/imports/')]:
+        for name, route in [('contracts-scroll', '/contracts/'), ('imports-scroll', '/imports/')]:
             page.goto(base + route)
             page.locator('.table-container').evaluate('(el) => {el.scrollLeft = el.scrollWidth}')
             capture(name + '-' + size)
@@ -86,7 +86,7 @@ with sync_playwright() as p:
         page.locator('#import-upload-modal button[type=submit]').click()
         page.wait_for_load_state()
         capture('upload-errors-' + size)
-        page.goto(base + '/imports/refunds/new/')
+        page.goto(base + '/refunds/new/')
         page.locator('main button[type=submit]').click()
         capture('refund-errors-' + size)
     context.close()

@@ -1,0 +1,10 @@
+<div class="panel-header">
+    <h1 class="flex-1">{{ title }} <span class="badge badge-neutral" data-record-count title="Количество записей">{{ page_obj.paginator.count }}</span></h1>
+    <div class="import-header-actions">
+        <div class="import-table-settings{% if add_url %} import-table-settings-separated{% endif %}">
+            <button class="btn import-filter-toggle{% if filters_active %} btn-outline-primary{% endif %}" type="button" data-record-filter-toggle aria-label="Фильтры{% if filters_active %}: есть активные{% endif %}" aria-controls="record-filter-panel" aria-expanded="{% if filters_active %}true{% else %}false{% endif %}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M4 7h16M4 17h16"></path><circle cx="9" cy="7" r="3"></circle><circle cx="15" cy="17" r="3"></circle></svg><span>Фильтры</span>{% if filters_active %}<span class="import-filter-indicator" aria-hidden="true"></span>{% endif %}<svg class="icon import-filter-chevron" aria-hidden="true" viewBox="0 0 24 24"><path d="m6 9 6 6 6-6"></path></svg></button>
+            {% include 'imports/partials/record_page_size.html' %}
+        </div>
+        {% if add_url %}<a class="btn btn-primary" href="{{ add_url }}"{% if add_modal %} data-form-modal aria-haspopup="dialog"{% endif %}><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"></path></svg>Добавить</a>{% endif %}
+    </div>
+</div>

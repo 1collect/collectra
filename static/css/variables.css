@@ -25,6 +25,8 @@
   --bg-panel: #ffffff;
   --bg-subtle: #eef4ff;
   --bg-hover: #e6efff;
+  --bg-table-stripe: #fafbfc;
+  --bg-table-hover: #eef1f5;
   --bg-sidebar: #182231;
   --sidebar-text: #d5e2f5;
   --sidebar-muted: #b9cceb;
@@ -63,6 +65,8 @@
   --bg-panel: #19222f;
   --bg-subtle: #1e2938;
   --bg-hover: #273449;
+  --bg-table-stripe: #202a37;
+  --bg-table-hover: #273240;
   --bg-sidebar: #101722;
   --sidebar-text: #b8c5d8;
   --sidebar-muted: #8596af;

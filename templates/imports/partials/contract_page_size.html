@@ -1,0 +1,9 @@
+<form method="get" class="rows-control">
+    <input type="hidden" name="tab" value="{{ active_tab }}">
+    <input type="hidden" name="scope" value="1">
+    {% for contract in selected_contracts %}<input type="hidden" name="contract" value="{{ contract.pk }}">{% endfor %}
+    {% if contract_search %}<input type="hidden" name="contract_search" value="{{ contract_search }}">{% endif %}
+    <label class="sr-only" for="contract-page-size">Количество строк</label>
+    <select id="contract-page-size" class="form-control" name="per_page" data-contract-page-size>{% for size in page_sizes %}<option value="{{ size }}"{% if size == page_size %} selected{% endif %}>{{ size }} строк</option>{% endfor %}</select>
+    <noscript><button class="btn btn-sm" type="submit">Показать</button></noscript>
+</form>

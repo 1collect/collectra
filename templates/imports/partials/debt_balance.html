@@ -1,33 +1,65 @@
-{% if debt.needs_manual_review %}<div class="alert alert-danger">Требуется проверка: {{ debt.recalculation_error_message }}</div>{% endif %}
-{% if debt.opening_difference %}<div class="alert alert-warning">Сумма компонентов выкупа отличается от загруженного итога на {{ debt.opening_difference|floatformat:'2g' }}. Для старых записей нераспределённая часть сохранена в основном долге. Проверьте исходные данные.</div>{% endif %}
-<section class="panel">
-    <div class="panel-header"><h2>Текущее состояние</h2></div>
-    <div class="import-preview__stats">
-        <div class="card stat-card"><span class="stat-label">Актуальный остаток</span><strong class="stat-value">{{ debt.outstanding_amount|floatformat:'2g' }}</strong></div>
-        <div class="card stat-card"><span class="stat-label">Оплачено с учётом возвратов</span><strong class="stat-value">{{ debt.paid_amount|floatformat:'2g' }}</strong></div>
-        <div class="card stat-card"><span class="stat-label">Списано</span><strong class="stat-value">{{ debt.written_off_amount|floatformat:'2g' }}</strong></div>
-        <div class="card stat-card"><span class="stat-label">Переплата</span><strong class="stat-value">{{ debt.overpayment_amount|floatformat:'2g' }}</strong></div>
-    </div>
-    <div class="panel-footer"><span>Дата закрытия: <strong>{{ debt.closed_at|date:'d.m.Y'|default:'—' }}</strong></span><span>Общая сумма задолженности: <strong>{{ debt.total_amount|floatformat:'2g' }}</strong></span><span>Выкуп и наши расходы: <strong>{{ debt.accrued_amount|floatformat:'2g' }}</strong></span></div>
-</section>
-<section class="panel">
-    <div class="panel-header"><h2>Исходные суммы и текущие остатки</h2></div>
-    <div class="panel-body"><p class="text-muted">Платежи погашают категории сверху вниз. Расходы по выкупу включены в дебиторскую задолженность. Наши расходы показаны отдельно.</p></div>
-    <div class="table-container" tabindex="0" role="region" aria-label="Расчёт по категориям"><table class="table table-bordered table-compact">
-        <thead><tr><th scope="col">Категория</th><th scope="col">Исходная сумма</th><th scope="col">Текущий остаток</th></tr></thead>
-        <tbody>{% for row in categories %}<tr><th scope="row">{{ row.label }}</th><td class="cell-number">{{ row.initial|floatformat:'2g' }}</td><td class="cell-number">{{ row.current|floatformat:'2g' }}</td></tr>{% endfor %}</tbody>
-        <tfoot><tr><th scope="row">Итого</th><td class="cell-number">{{ debt.accrued_amount|floatformat:'2g' }}</td><td class="cell-number"><strong>{{ debt.outstanding_amount|floatformat:'2g' }}</strong></td></tr></tfoot>
-    </table></div>
-</section>
-<section class="panel">
-    <div class="panel-header"><h2>Состав исходного выкупа</h2><span class="badge badge-neutral">Исходные значения</span></div>
-    <div class="table-container"><table class="table table-bordered table-compact"><thead><tr><th scope="col">Компонент</th><th scope="col">Сумма при загрузке</th></tr></thead><tbody>{% for row in source_rows %}<tr><th scope="row">{{ row.label }}</th><td class="cell-number">{{ row.amount|floatformat:'2g' }}</td></tr>{% endfor %}</tbody></table></div>
-</section>
-<section class="panel">
-    <div class="panel-header"><h2>Как рассчитан остаток</h2><span class="badge">{{ operations_page.paginator.count }} операций</span></div>
-    <div class="table-container" tabindex="0" role="region" aria-label="Распределение операций"><table class="table table-bordered table-compact">
-        <thead><tr><th scope="col">Дата</th><th scope="col">Операция</th><th scope="col">Действующая сумма</th><th scope="col">Распределение</th><th scope="col">Остаток после операции</th><th scope="col">Переплата</th></tr></thead>
-        <tbody>{% for item in operations_page %}<tr><td class="cell-date">{{ item.date|date:'d.m.Y' }}</td><td>{{ item.label }} #{{ item.id }}</td><td class="cell-number">{{ item.amount|floatformat:'2g' }}</td><td>{% for part in item.parts %}<div>{{ part.label }}: {{ part.amount|floatformat:'2g' }}</div>{% empty %}—{% endfor %}</td><td class="cell-number">{{ item.outstanding|floatformat:'2g' }}</td><td class="cell-number">{{ item.overpayment|floatformat:'2g' }}</td></tr>{% empty %}<tr><td colspan="6"><div class="empty-state">Ничего не найдено</div></td></tr>{% endfor %}</tbody>
-    </table></div>
-    {% if operations_page.paginator.num_pages > 1 %}<div class="table-footer"><span>Страница {{ operations_page.number }} из {{ operations_page.paginator.num_pages }}</span><nav class="pagination" aria-label="Страницы операций">{% if operations_page.has_previous %}<a class="page-btn" href="?page={{ operations_page.previous_page_number }}">Назад</a>{% endif %}{% if operations_page.has_next %}<a class="page-btn" href="?page={{ operations_page.next_page_number }}">Далее</a>{% endif %}</nav></div>{% endif %}
-</section>
+<div class="borrower-columns">
+    <aside class="panel borrower-contract-picker" aria-label="Выбор договоров">
+        <div class="panel-header"><h2>Договоры <span class="badge badge-neutral">{{ borrower_contracts|length }}</span></h2></div>
+        <form method="get" data-contract-selection>
+            <input type="hidden" name="scope" value="1">
+            <input type="hidden" name="tab" value="{{ active_tab }}">
+            <input type="hidden" name="per_page" value="{{ page_size }}">
+            <div class="contract-picker-tools">
+                <label class="sr-only" for="contract-search">Поиск договора</label>
+                <input id="contract-search" class="form-control" type="search" name="contract_search" value="{{ contract_search }}" placeholder="Номер ДБЗ" autocomplete="off" data-contract-search>
+                <div class="contract-picker-actions">
+                    <button class="btn btn-sm" type="button" data-contract-select-all>Выбрать все</button>
+                    <button class="btn btn-sm btn-ghost" type="button" data-contract-clear>Сбросить</button>
+                </div>
+            </div>
+            <div class="contract-picker-list">
+                {% for contract in borrower_contracts %}<label class="contract-picker-item{% if contract.workspace_selected %} is-checked{% endif %}" data-contract-option="{{ contract.contract_number }}">
+                    <input type="checkbox" name="contract" value="{{ contract.pk }}"{% if contract.workspace_selected %} checked{% endif %}>
+                    <span class="font-mono">{{ contract.contract_number }}</span>
+                </label>{% endfor %}
+                <p class="text-muted contract-picker-empty" data-contract-search-empty hidden>Договоры не найдены</p>
+            </div>
+            <div class="panel-footer"><span>Выбрано: {{ selected_contracts|length }} из {{ borrower_contracts|length }}</span><noscript><button class="btn btn-sm" type="submit">Показать</button></noscript></div>
+        </form>
+    </aside>
+    <section class="panel selected-contract">
+        <div class="panel-header contract-workspace-header">
+            <div><h2>{% if selected_debt %}ДБЗ {{ selected_debt.contract_number }}{% elif selected_contracts %}Выбрано договоров: {{ selected_contracts|length }}{% else %}Договоры не выбраны{% endif %}</h2>
+            {% if selected_debt %}<p class="text-muted">{{ selected_debt.original_creditor|default:selected_debt.counterparty|default:'Кредитор не указан' }}</p>{% endif %}</div>
+        </div>
+        {% if selected_contracts %}
+            {% for contract in selected_contracts %}
+                {% if contract.needs_manual_review %}<div class="alert alert-danger contract-alert">ДБЗ {{ contract.contract_number }}: {{ contract.recalculation_error_message }}</div>{% endif %}
+            {% endfor %}
+            <dl class="contract-summary">
+                <div class="contract-summary-primary"><dt>Остаток</dt><dd>{{ contract_totals.outstanding_amount|floatformat:'2g' }}</dd></div>
+                <div><dt>Оплачено</dt><dd>{{ contract_totals.paid_amount|floatformat:'2g' }}</dd></div>
+                <div><dt>Списано</dt><dd>{{ contract_totals.written_off_amount|floatformat:'2g' }}</dd></div>
+                <div><dt>Переплата</dt><dd>{{ contract_totals.overpayment_amount|floatformat:'2g' }}</dd></div>
+            </dl>
+        {% endif %}
+        <nav class="tabs-nav contract-tabs" aria-label="Разделы выбранных договоров">{% for tab in contract_tabs %}
+            <a class="tab" href="?{{ selection_query }}&amp;tab={{ tab.key }}&amp;per_page={{ page_size }}"{% if active_tab == tab.key %} aria-current="page"{% endif %}>{{ tab.label }}{% if tab.count != None %} <span class="contract-tab-count">{{ tab.count }}</span>{% endif %}</a>
+        {% endfor %}</nav>
+        <div class="contract-tab-content" id="contract-tab-content">
+            {% if not selected_contracts %}
+                <div class="empty-state"><h3>Выберите договоры</h3><p>Отметьте один или несколько ДБЗ в списке слева.</p></div>
+            {% elif active_tab == 'overview' %}
+                {% if selected_debt %}
+                    {% include 'imports/partials/contract_overview.html' with debt=selected_debt %}
+                {% else %}
+                    <div class="contract-table-toolbar"><span class="text-muted">Сводка по выбранным договорам</span></div>
+                    <div class="table-container"><table class="table table-bordered table-compact">
+                        <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col">ДБЗ</th><th scope="col">Кредитор</th><th scope="col" class="cell-number">Остаток</th></tr></thead>
+                        <tbody>{% for contract in selected_contracts %}<tr><td class="row-number-column">{{ forloop.counter }}</td><td class="font-mono"><a href="?scope=1&amp;contract={{ contract.pk }}&amp;tab=overview&amp;per_page={{ page_size }}">{{ contract.contract_number }}</a></td><td class="cell-text">{{ contract.original_creditor|default:contract.counterparty|default:'—' }}</td><td class="cell-number">{{ contract.outstanding_amount|floatformat:'2g' }}</td></tr>{% endfor %}</tbody>
+                    </table></div>
+                {% endif %}
+            {% elif active_tab == 'history' %}
+                {% include 'imports/partials/contract_history.html' %}
+            {% else %}
+                {% include 'imports/partials/contract_operations.html' %}
+            {% endif %}
+        </div>
+    </section>
+</div>

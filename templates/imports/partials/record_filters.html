@@ -1,0 +1,12 @@
+<div id="record-filter-panel" class="import-filter-panel{% if filters_active %} is-open{% endif %}"{% if not filters_active %} inert{% endif %}>
+    <div class="import-filter-clip">
+        <form class="table-advanced import-filter-grid" method="get" data-record-filters>
+            <input type="hidden" name="per_page" value="{{ page_size }}">
+            <div class="import-filter-fields">
+                {% for field in record_filters %}<div class="form-field"><label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% for error in field.errors %}<span class="field-error">{{ error }}</span>{% endfor %}</div>{% endfor %}
+            </div>
+            {% if filters_active %}<div class="import-filter-actions"><a class="btn btn-ghost" href="{{ request.path }}?per_page={{ page_size }}"><svg class="icon" aria-hidden="true" viewBox="0 0 24 24"><path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"></path></svg>Сбросить</a></div>{% endif %}
+            <noscript><button class="btn" type="submit">Применить</button></noscript>
+        </form>
+    </div>
+</div>

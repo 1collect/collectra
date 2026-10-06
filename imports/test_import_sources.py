@@ -124,12 +124,20 @@ class ImportSourceTests(TestCase):
         payment.refresh_from_db()
         self.assertEqual(payment.import_item, record.items.get())
 
-    def test_business_record_source_link_opens_import_summary(self):
+    def test_data_pages_hide_import_source(self):
         record = self.upload('payments', [['SOURCE-1', 20, 'ЧСИ', '02.10.2026']])
         payment = Payment.objects.get()
-        response = self.client.get(reverse('imports:payment_history', args=[payment.pk]))
-        self.assertContains(response, reverse('imports:preview', args=[record.pk]))
-        self.assertNotContains(response, '/items/')
+        self.debt.import_item = record.items.get()
+        self.debt.save(update_fields=['import_item'])
+        for name, args in (
+            ('debts', []), ('debt_detail', [self.debt.pk]),
+            ('payments', []), ('payment_history', [payment.pk]),
+            ('expenses', []), ('writeoffs', []), ('refunds', []),
+        ):
+            with self.subTest(page=name):
+                response = self.client.get(reverse('imports:' + name, args=args))
+                self.assertNotContains(response, reverse('imports:preview', args=[record.pk]))
+                self.assertNotContains(response, 'Источник платежа:')
         self.assertEqual(payment.import_item, record.items.get())
 
     def restore(self):

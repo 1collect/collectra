@@ -1,21 +1,20 @@
 {% extends 'base.html' %}
+{% load static %}
+{% block content_class %}content--register{% endblock %}
 {% block title %}Возвраты платежей{% endblock %}
 {% block page_name %}refunds{% endblock %}
 {% block heading %}Возвраты платежей{% endblock %}
 {% block content %}
-<div class="page-header">
-    <div><div class="page-eyebrow">Данные / Платежи</div><h1>Возвраты платежей</h1></div>
-    <a data-form-modal aria-haspopup="dialog" class="btn btn-primary" href="{% url 'imports:refund_new' %}">Создать возврат</a>
-</div>
-<section class="panel">
-    <div class="panel-header"><h2>История возвратов <span class="badge">{{ page_obj.paginator.count }}</span></h2></div>
-    <div class="p-0 table-container">
+<section class="panel data-register data-register--filters">
+    {% include 'imports/partials/record_header.html' %}
+    {% include 'imports/partials/record_filters.html' %}
+    <div class="p-0 table-container" tabindex="0" role="region" aria-label="{{ title|default:pagination_label }}">
         <table class="table table-bordered table-compact">
-            <thead><tr><th scope="col">Договор</th><th scope="col">Исходный платёж</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма возврата</th><th scope="col">Дата</th><th scope="col">Основание</th><th scope="col">Создал</th></tr></thead>
+            <thead><tr><th scope="col" class="row-number-column">№</th><th scope="col">Договор</th><th scope="col">Исходный платёж</th><th scope="col">Категория</th><th scope="col" class="cell-number">Сумма возврата</th><th scope="col">Дата</th><th scope="col">Основание</th><th scope="col">Создал</th></tr></thead>
             <tbody>
             {% for refund in page_obj %}
-                <tr>
-                    <td><strong class="font-mono">{{ refund.payment.debt.contract_number }}</strong>{% include 'imports/partials/import_source.html' with record=refund %}{% if not refund.import_item_id and refund.payment.import_item_id %}<div class="text-xs text-muted">Источник платежа:</div>{% include 'imports/partials/import_source.html' with record=refund.payment %}{% endif %}</td>
+                <tr><td class="font-mono row-number-column">{{ page_obj.start_index|add:forloop.counter|add:"-1" }}</td>
+                    <td><strong class="font-mono">{{ refund.payment.debt.contract_number }}</strong></td>
                     <td class="cell-number">{{ refund.payment.amount|floatformat:2 }} от {{ refund.payment.payment_date|date:'d.m.Y' }}<br><span class="text-muted">Действует: {{ refund.payment.effective_amount|floatformat:2 }}</span></td>
                     <td>{{ refund.get_payment_category_display }}</td>
                     <td class="cell-number"><strong>{{ refund.amount|floatformat:2 }}</strong></td>
@@ -23,10 +22,12 @@
                     <td class="cell-text">{{ refund.reason }}</td>
                     <td>{{ refund.created_by.get_full_name|default:refund.created_by.username }}{% if perms.imports.change_paymentrefund %}<a data-form-modal aria-haspopup="dialog" class="btn btn-sm" href="{% url 'imports:operation_edit' 'refund' refund.pk %}">Изменить</a><a class="btn btn-sm" href="{% url 'imports:operation_action' 'refund' refund.pk 'cancel' %}">Отменить</a>{% endif %}{% if perms.users.administer_system %}<a class="btn btn-sm" href="{% url 'imports:operation_action' 'refund' refund.pk 'delete' %}">Удалить</a>{% endif %}</td>
                 </tr>
-            {% empty %}<tr><td colspan="7"><div class="empty-state"><h3>Ничего не найдено</h3></div></td></tr>{% endfor %}
+            {% empty %}<tr><td colspan="8"><div class="empty-state"><h3>Ничего не найдено</h3></div></td></tr>{% endfor %}
             </tbody>
         </table>
     </div>
-    {% if page_obj.paginator.num_pages > 1 %}<div class="table-footer"><span>Страница {{ page_obj.number }} из {{ page_obj.paginator.num_pages }}</span><nav class="pagination" aria-label="Страницы возвратов">{% if page_obj.has_previous %}<a class="page-btn" href="?page={{ page_obj.previous_page_number }}">Назад</a>{% endif %}<span class="page-btn" aria-current="page">{{ page_obj.number }}</span>{% if page_obj.has_next %}<a class="page-btn" href="?page={{ page_obj.next_page_number }}">Далее</a>{% endif %}</nav></div>{% endif %}
+    <div class="table-footer">{% include 'imports/partials/record_pagination.html' %}</div>
 </section>
 {% endblock %}
+
+{% block scripts %}<script defer src="{% static 'js/table-pagination.js' %}?v=20261006-2"></script>{% endblock %}

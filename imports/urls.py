@@ -1,4 +1,5 @@
-from django.urls import path
+from django.http import HttpResponsePermanentRedirect
+from django.urls import path, reverse
 
 from . import views
 from . import project_views as project
@@ -6,17 +7,17 @@ from . import project_views as project
 app_name = 'imports'
 
 urlpatterns = [
-    path('templates/', views.import_templates, name='templates'),
-    path('templates/<str:code>/', project.import_template, name='import_template'),
+    path('imports/templates/', views.import_templates, name='templates'),
+    path('imports/templates/<str:code>/', project.import_template, name='import_template'),
     path('recalculate/', project.full_recalculation, name='recalculate'),
     path('payments/<int:pk>/distribution/', project.payment_distribution, name='payment_distribution'),
     path('operations/<str:kind>/<int:pk>/edit/', project.operation_edit, name='operation_edit'),
     path('operations/<str:kind>/<int:pk>/<str:action>/', project.operation_action, name='operation_action'),
-    path('', views.import_list, name='list'),
-    path('new/', views.import_upload, name='new'),
-    path('status/', views.import_status, name='status'),
-    path('<int:import_id>/preview/', views.import_preview, name='preview'),
-    path('<int:import_id>/download/', views.import_download, name='download'),
+    path('imports/', views.import_list, name='list'),
+    path('imports/new/', views.import_upload, name='new'),
+    path('imports/status/', views.import_status, name='status'),
+    path('imports/<int:import_id>/preview/', views.import_preview, name='preview'),
+    path('imports/<int:import_id>/download/', views.import_download, name='download'),
     path('contracts/', views.debt_list, name='debts'),
     path('contracts/<int:debt_id>/', views.debt_detail, name='debt_detail'),
     path('payments/', views.payment_list, name='payments'),
@@ -39,4 +40,20 @@ urlpatterns = [
     path('counterparties/new/', views.counterparty_edit, name='counterparty_new'),
     path('counterparties/<int:counterparty_id>/edit/', views.counterparty_edit, name='counterparty_edit'),
     path('counterparties/<int:counterparty_id>/delete/', views.counterparty_delete, name='counterparty_delete'),
+]
+
+
+def legacy_data_redirect(request, route_name, **kwargs):
+    target = reverse('imports:' + route_name, kwargs=kwargs)
+    query = request.META.get('QUERY_STRING', '')
+    if query:
+        target += '?' + query
+    return HttpResponsePermanentRedirect(target, preserve_request=True)
+
+
+# Keep existing links and submitted forms working at their former addresses.
+urlpatterns += [
+    path('imports/' + str(route.pattern), legacy_data_redirect, {'route_name': route.name})
+    for route in urlpatterns
+    if not str(route.pattern).startswith('imports/')
 ]

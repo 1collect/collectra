@@ -1,17 +1,32 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Расчёт договора {{ debt.contract_number }}{% endblock %}
+{% block title %}{{ debt.debtor.full_name }} · ДБЗ {{ debt.contract_number }}{% endblock %}
 {% block page_name %}debts{% endblock %}
-{% block heading %}Расчёт договора{% endblock %}
+{% block heading %}Карточка заёмщика{% endblock %}
+{% block content_class %}borrower-workspace{% endblock %}
 {% block content %}
-{% include 'imports/partials/import_source.html' with record=debt %}
-<div class="page-header"><div><div class="page-eyebrow">Данные / Договоры / Расчёт</div><h1>{{ debt.contract_number }}</h1><p class="text-muted">{{ debt.debtor.full_name }} · ИИН {{ debt.debtor.iin }}</p></div><a class="btn" href="{% url 'imports:debts' %}">Все договоры</a></div>
-<p class="text-muted">Исходные суммы сохраняются отдельно. Текущие остатки учитывают платежи, расходы, списания и возвраты. <span data-balance-status role="status">Автообновление включено.</span></p>
-<div class="stack" data-live-balances>{% include 'imports/partials/debt_balance.html' %}</div>
-<section class="panel"><div class="panel-body">
-<p>КА: {{ debt.collection_agency|default:'—' }} · Кредитор: {{ debt.original_creditor|default:'—' }} · Цессия: {{ debt.cession|default:'—' }}</p>
-<p>Реестр: {{ debt.registry_number }} от {{ debt.registry_date|date:'d.m.Y' }} · ДБЗ: {{ debt.dbz_start_date|date:'d.m.Y' }} — {{ debt.dbz_end_date|date:'d.m.Y' }} · Выдано: {{ debt.issued_credit_amount|floatformat:2 }} · Просрочка: {{ debt.overdue_days }} дней</p>
-<p>Заёмщик: {{ debt.debtor.birth_date|date:'d.m.Y' }} · {{ debt.debtor.gender }} · {{ debt.debtor.document_type }} · {{ debt.debtor.document_issuer }} · {{ debt.debtor.document_issue_date|date:'d.m.Y' }}<br>Адрес: {{ debt.debtor.residential_address }} · {{ debt.debtor.region }} · КАТО {{ debt.debtor.kato }}</p>
-</div></section>
+<section class="panel borrower-banner">
+<div class="page-header borrower-header">
+    <div><h1>{{ debt.debtor.full_name }}</h1><p>ИИН <span class="font-mono">{{ debt.debtor.iin }}</span></p></div>
+    <a class="btn" href="{% url 'imports:debts' %}">Все договоры</a>
+</div>
+<details class="borrower-personal-details">
+    <summary>Подробнее о заёмщике</summary>
+    <dl class="contract-fields">
+        <div><dt>Дата рождения</dt><dd>{{ debt.debtor.birth_date|date:'d.m.Y'|default:'—' }}</dd></div>
+        <div><dt>Пол</dt><dd>{{ debt.debtor.gender|default:'—' }}</dd></div>
+        <div><dt>Документ</dt><dd>{{ debt.debtor.document_type|default:'—' }}</dd></div>
+        <div><dt>Орган выдачи</dt><dd>{{ debt.debtor.document_issuer|default:'—' }}</dd></div>
+        <div><dt>Дата выдачи</dt><dd>{{ debt.debtor.document_issue_date|date:'d.m.Y'|default:'—' }}</dd></div>
+        <div><dt>Адрес</dt><dd>{{ debt.debtor.residential_address|default:'—' }}</dd></div>
+        <div><dt>Регион</dt><dd>{{ debt.debtor.region|default:'—' }}</dd></div>
+        <div><dt>КАТО</dt><dd>{{ debt.debtor.kato|default:'—' }}</dd></div>
+    </dl>
+</details>
+</section>
+<div data-live-balances>{% include 'imports/partials/debt_balance.html' %}</div>
 {% endblock %}
-{% block scripts %}<script defer src="{% static 'js/balances.js' %}"></script>{% endblock %}
+{% block scripts %}
+<script defer src="{% static 'js/debt-workspace.js' %}?v=20261006-2"></script>
+<script defer src="{% static 'js/balances.js' %}?v=20261006-3"></script>
+{% endblock %}

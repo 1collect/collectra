@@ -7,7 +7,7 @@ from django.core.exceptions import PermissionDenied, ValidationError
 from django.db.models.deletion import ProtectedError
 from django.db.models import Count, Q
 from django.db import transaction
-from django.http import FileResponse, JsonResponse, QueryDict
+from django.http import FileResponse, Http404, JsonResponse, QueryDict
 from django.template.loader import render_to_string
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -15,11 +15,11 @@ from django.urls import reverse
 from django.views.decorators.http import require_GET
 
 from .forms import (
-    ImportFilterForm, CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
+    ImportFilterForm, DebtFilterForm, PaymentFilterForm, ExpenseFilterForm, WriteOffFilterForm, RefundFilterForm, CollectionAgencyForm, CounterpartyForm, ExpenseChangeForm, FinancialChangeReviewForm,
     ImportUploadForm, PaymentChangeForm, PaymentRefundForm, WriteOffForm,
     ExpenseCreateForm,
 )
-from .balances import apply_balance, calculate_balance, CATEGORY_LABELS, PURCHASE_FIELDS
+from .balances import apply_balance, calculate_balance, filter_by_current_status, CATEGORY_LABELS, PURCHASE_FIELDS
 from .models import (
     CollectionAgency, Counterparty, Debt, Expense, FinancialChangeRequest, Import, ImportItem,
     Payment, PaymentRefund, WriteOff,
@@ -49,14 +49,35 @@ def list_query_string(request):
     return query.urlencode()
 
 
-def import_page_context(request):
+def selected_page_size(request):
     page_sizes = (10, 20, 50, 100)
     try:
-        page_size = int(request.GET.get('per_page', 10))
+        page_size = int(request.GET.get('per_page', 20))
     except (ValueError, TypeError):
-        page_size = 10
+        page_size = 20
     if page_size not in page_sizes:
-        page_size = 10
+        page_size = 20
+    return page_size, page_sizes
+
+
+def record_page_context(request, records, *, label):
+    page_size, page_sizes = selected_page_size(request)
+    page = Paginator(records, page_size).get_page(request.GET.get('page'))
+    query = request.GET.copy()
+    query.pop('page', None)
+    query.pop('per_page', None)
+    params = [(key, value) for key, values in query.lists() for value in values]
+    query['per_page'] = page_size
+    return {
+        'page_obj': page, 'page_size': page_size, 'page_sizes': page_sizes,
+        'pagination_query_string': query.urlencode(), 'pagination_params': params,
+        'pagination_label': label,
+        'page_numbers': list(page.paginator.get_elided_page_range(page.number, on_each_side=1, on_ends=1)),
+    }
+
+
+def import_page_context(request):
+    page_size, page_sizes = selected_page_size(request)
     records = Import.objects.select_related('import_type', 'created_by').order_by('-created_at', '-pk')
     filters = ImportFilterForm(request.GET)
     filters.is_valid()
@@ -134,6 +155,10 @@ def import_download(request, import_id):
 @permission_required('imports.add_import')
 def import_upload(request):
     form = ImportUploadForm(request.POST or None, request.FILES or None, user=request.user)
+    if request.method == 'GET':
+        selected_type = form.fields['import_type'].queryset.filter(code=request.GET.get('import_type')).first()
+        if selected_type:
+            form.initial['import_type'] = selected_type.pk
     if request.method == 'POST' and form.is_valid():
         uploaded_file = form.cleaned_data['file']
         from .lifecycle import reserve_import
@@ -261,47 +286,82 @@ def debt_list(request):
         'counterparty',
         'import_item__import_record',
     ).order_by('contract_number')
-    page_obj = Paginator(debts, 25).get_page(request.GET.get('page'))
+    filters = DebtFilterForm(request.GET)
+    debts = filter_register_records(debts, filters, debt_prefix='', date_field='dbz_start_date')
+    context = record_page_context(request, debts, label='Страницы договоров')
+    context.update(register_filter_context(request, filters))
+    page_obj = context['page_obj']
     page_obj.object_list = list(page_obj.object_list.prefetch_related('payments__refunds', 'expenses', 'writeoffs'))
     for debt in page_obj.object_list:
         apply_balance(debt, calculate_balance(debt))
 
     template = 'imports/partials/debt_register.html' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'imports/debt_list.html'
-    response = render(request, template, {
-        'page_obj': page_obj,
-    })
+    response = render(request, template, context)
     response['Cache-Control'] = 'no-store'
     return response
 
 
 @permission_required('imports.view_debt')
 def debt_detail(request, debt_id):
+    from .debt_workspace import workspace_context, prepare_history_event
+
     debt = get_object_or_404(
-        Debt.objects.select_related('debtor', 'import_item__import_record').prefetch_related('payments__refunds', 'expenses', 'writeoffs'),
+        Debt.objects.select_related('debtor', 'original_creditor', 'cession__creditor', 'counterparty', 'collection_agency').prefetch_related('payments__refunds', 'expenses', 'writeoffs'),
         pk=debt_id,
     )
     balance = calculate_balance(debt)
     apply_balance(debt, balance)
+    workspace = workspace_context(request, debt, balance)
+    selected_debt = workspace['selected_debt']
+    selected_balance = workspace['selected_balance']
     labels = dict(CATEGORY_LABELS)
-    if 'additional_expenses' in balance['current']: labels['additional_expenses'] = 'Дополнительные расходы (ранее внесённые)'
+    if selected_balance and 'additional_expenses' in selected_balance['current']: labels['additional_expenses'] = 'Дополнительные расходы (ранее внесённые)'
     categories = [{
         'label': label,
-        'initial': balance['opening'][field] + balance['own'].get(field, 0),
-        'current': balance['current'][field],
-    } for field, label in labels.items()]
-    source_rows = [{'label': Debt._meta.get_field(field).verbose_name, 'amount': getattr(debt, field)}
-                   for field in PURCHASE_FIELDS]
-    for operation in balance['operations']:
-        operation['label'] = {'payment': 'Платёж', 'writeoff': 'Списание', 'expense': 'Расход', 'refund': 'Возврат'}[operation['kind']]
-        operation['parts'] = [{'label': labels[field], 'amount': value}
-                              for field, value in operation['allocation'].items() if value]
+        'initial': selected_balance['opening'][field] + selected_balance['own'].get(field, 0),
+        'current': selected_balance['current'][field],
+    } for field, label in labels.items()] if selected_balance else []
+    source_rows = [{'label': Debt._meta.get_field(field).verbose_name, 'amount': getattr(selected_debt, field)}
+                   for field in PURCHASE_FIELDS] if selected_debt else []
     template = 'imports/partials/debt_balance.html' if request.headers.get('X-Requested-With') == 'XMLHttpRequest' else 'imports/debt_detail.html'
-    response = render(request, template, {
-        'debt': debt, 'categories': categories, 'source_rows': source_rows,
-        'operations_page': Paginator(balance['operations'], 25).get_page(request.GET.get('page')),
-    })
+    context = record_page_context(request, workspace['operation_rows'], label='Страницы операций договора')
+    context.update(workspace)
+    context.update(debt=debt, categories=categories, source_rows=source_rows)
+    if workspace['active_tab'] == 'history':
+        for event in context['page_obj']:
+            prepare_history_event(event)
+    response = render(request, template, context)
     response['Cache-Control'] = 'no-store'
     return response
+
+
+def register_filter_context(request, filters):
+    return {'record_filters': filters,
+            'filters_active': any(request.GET.get(name) for name in filters.fields)}
+
+
+def filter_register_records(records, filters, *, debt_prefix, date_field, status_field='status', extra_lookups=None):
+    filters.is_valid()
+    data = filters.cleaned_data
+    query = data.get('q')
+    if query:
+        records = records.filter(
+            Q(**{debt_prefix + 'contract_number__icontains': query}) |
+            Q(**{debt_prefix + 'debtor__full_name__icontains': query}) |
+            Q(**{debt_prefix + 'debtor__iin__icontains': query}))
+    for name in ('counterparty', 'collection_agency'):
+        if data.get(name):
+            records = records.filter(**{debt_prefix + name: data[name]})
+    for name, lookup in (('date_from', '__gte'), ('date_to', '__lte')):
+        if data.get(name):
+            records = records.filter(**{date_field + lookup: data[name]})
+    if data.get('status'):
+        records = (records.filter(**{status_field: data['status']}) if debt_prefix else
+                   filter_by_current_status(records, data['status']))
+    for name, lookup in (extra_lookups or {}).items():
+        if data.get(name):
+            records = records.filter(**{lookup: data[name]})
+    return records
 
 
 def _financial_list(request, *, model, title, kind):
@@ -311,9 +371,17 @@ def _financial_list(request, *, model, title, kind):
     if not request.user.has_perm(permission):
         raise PermissionDenied
     records = model.objects.select_related('debt', 'debt__debtor', 'import_item__import_record')
-    page_obj = Paginator(records, 25).get_page(request.GET.get('page'))
-    return render(request, 'imports/financial_list.html', {
-        'page_obj': page_obj, 'title': title, 'kind': kind,
+    filters = (PaymentFilterForm if kind == 'payment' else ExpenseFilterForm)(request.GET)
+    records = filter_register_records(records, filters, debt_prefix='debt__',
+                                      date_field='payment_date' if kind == 'payment' else 'expense_date',
+                                      status_field='status' if kind == 'payment' else 'operation_status')
+    context = record_page_context(request, records, label=f'Страницы: {title.lower()}')
+    context.update(register_filter_context(request, filters))
+    if kind == 'expense':
+        context['add_url'] = reverse('imports:expense_new') if request.user.has_perm('imports.add_expense') else None
+        context['add_modal'] = True
+    return render(request, 'imports/financial_list.html', context | {
+        'title': title, 'kind': kind,
     })
 
 
@@ -321,18 +389,41 @@ def payment_list(request):
     return _financial_list(request, model=Payment, title='Платежи', kind='payment')
 
 
+def scope_operation_form(request, form):
+    """Keep operations started from a contract in that contract's context."""
+    if not request.GET.get('debt'):
+        return
+    try:
+        debt_id = int(request.GET['debt'])
+    except (ValueError, TypeError):
+        raise Http404('Договор не найден')
+    debt = get_object_or_404(Debt, pk=debt_id)
+    if 'debt' in form.fields:
+        form.fields['debt'].queryset = Debt.objects.filter(pk=debt.pk)
+        form.initial['debt'] = debt.pk
+    elif 'payment' in form.fields:
+        form.fields['payment'].queryset = form.fields['payment'].queryset.filter(debt=debt)
+
+
+def operation_created_redirect(request, debt_id, tab):
+    if request.GET.get('debt') and request.user.has_perm('imports.view_debt'):
+        return redirect(reverse('imports:debt_detail', args=[debt_id]) + '?tab=' + tab)
+    return redirect('imports:' + tab)
+
+
 def _expense_create(request):
     form = ExpenseCreateForm(
         request.POST if request.method == 'POST' else None,
         initial={'expense_date': timezone.localdate()},
     )
+    scope_operation_form(request, form)
     if request.method == 'POST' and form.is_valid():
         with transaction.atomic():
             Debt.objects.select_for_update().get(pk=form.cleaned_data['debt'].pk)
             record = form.save()
             recalculate_debt(record.debt_id)
         messages.success(request, 'Расход создан.')
-        return redirect('imports:expenses')
+        return operation_created_redirect(request, record.debt_id, 'expenses')
     return render(request, 'imports/financial_create.html', {
         'form': form, 'kind': 'expense', 'title': 'Новый расход',
     })
@@ -350,15 +441,22 @@ def expense_list(request):
 @permission_required('imports.view_writeoff')
 def writeoff_list(request):
     records = WriteOff.objects.select_related('debt', 'debt__debtor', 'created_by', 'import_item__import_record')
-    return render(request, 'imports/writeoff_list.html', {
-        'page_obj': Paginator(records, 25).get_page(request.GET.get('page')),
-    })
+    filters = WriteOffFilterForm(request.GET)
+    records = filter_register_records(records, filters, debt_prefix='debt__', date_field='writeoff_date',
+                                      status_field='operation_status',
+                                      extra_lookups={'kind': 'kind', 'category': 'category', 'author': 'created_by'})
+    context = record_page_context(request, records, label='Страницы списаний')
+    context.update(register_filter_context(request, filters))
+    context.update(title='Списания', add_modal=True,
+                   add_url=reverse('imports:writeoff_new') if request.user.has_perm('imports.add_writeoff') else None)
+    return render(request, 'imports/writeoff_list.html', context)
 
 
 @permission_required('imports.add_writeoff')
 def writeoff_create(request):
     form = WriteOffForm(request.POST if request.method == 'POST' else None,
                         initial={'writeoff_date': timezone.localdate(), 'kind': WriteOff.Kind.FULL})
+    scope_operation_form(request, form)
     if request.method == 'POST' and form.is_valid():
         try:
             create_writeoff(
@@ -372,7 +470,7 @@ def writeoff_create(request):
             form.add_error(None, str(error))
         else:
             messages.success(request, 'Списание сохранено. Остаток долга пересчитан.')
-            return redirect('imports:writeoffs')
+            return operation_created_redirect(request, form.cleaned_data['debt'].pk, 'writeoffs')
     return render(request, 'imports/writeoff_form.html', {'form': form})
 
 
@@ -525,10 +623,14 @@ def refund_list(request):
         'created_by',
         'import_item__import_record', 'payment__import_item__import_record',
     )
-    page_obj = Paginator(refunds, 25).get_page(request.GET.get('page'))
-    return render(request, 'imports/refund_list.html', {
-        'page_obj': page_obj,
-    })
+    filters = RefundFilterForm(request.GET)
+    refunds = filter_register_records(refunds, filters, debt_prefix='payment__debt__', date_field='refund_date',
+                                      extra_lookups={'category': 'payment_category', 'author': 'created_by'})
+    context = record_page_context(request, refunds, label='Страницы возвратов')
+    context.update(register_filter_context(request, filters))
+    context.update(title='Возвраты платежей', add_modal=True,
+                   add_url=reverse('imports:refund_new') if request.user.has_perm('imports.add_paymentrefund') else None)
+    return render(request, 'imports/refund_list.html', context)
 
 
 @permission_required('imports.add_paymentrefund')
@@ -538,6 +640,7 @@ def refund_create(request):
         initial['payment'] = request.GET.get('payment')
         initial['refund_date'] = timezone.localdate()
     form = PaymentRefundForm(request.POST or None, initial=initial)
+    scope_operation_form(request, form)
     if request.method == 'POST' and form.is_valid():
         try:
             create_payment_refund(
@@ -551,7 +654,7 @@ def refund_create(request):
             form.add_error('amount', str(error))
         else:
             messages.success(request, 'Возврат платежа сохранён, договор пересчитан.')
-            return redirect('imports:refunds')
+            return operation_created_redirect(request, form.cleaned_data['payment'].debt_id, 'refunds')
     return render(request, 'imports/refund_form.html', {'form': form})
 
 
