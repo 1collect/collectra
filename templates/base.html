@@ -62,12 +62,6 @@
                 <span>Роли</span>
             </a>
             {% endif %}
-            {% if perms.users.view_permissiongroup %}
-            <a class="nav-link {% if request.resolver_match.view_name == 'users:groups' %}active{% endif %}" href="{% url 'users:groups' %}" title="Группы прав">
-                <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><circle cx="8" cy="8" r="3"></circle><circle cx="16" cy="8" r="3"></circle><path d="M2 20v-2a6 6 0 0 1 12 0v2m0-6a6 6 0 0 1 8 6"></path></svg>
-                <span>Группы прав</span>
-            </a>
-            {% endif %}
             {% if perms.auth.view_permission %}
             <a class="nav-link {% if request.resolver_match.view_name == 'users:permissions' %}active{% endif %}" href="{% url 'users:permissions' %}" title="Права доступа">
                 <svg aria-hidden="true" class="icon" focusable="false" viewBox="0 0 24 24"><rect height="11" rx="2" width="16" x="4" y="10"></rect><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"></path></svg>

@@ -20,19 +20,26 @@ class ReadOnlyAccessCatalogTests(TestCase):
         self.permission = Permission.objects.get(codename='view_role')
         self.group.permissions.add(self.permission)
 
-    def test_application_groups_are_view_only(self):
-        response = self.client.get(reverse('users:groups'))
-        self.assertContains(response, 'Системные права')
-        self.assertNotContains(response, 'Создать группу')
-        self.assertNotContains(response, 'Настроить группу')
-        for url in ('/users/groups/new/', f'/users/groups/{self.group.pk}/edit/'):
+    def test_application_group_pages_are_removed(self):
+        response = self.client.get(reverse('users:roles'))
+        self.assertNotContains(response, '/users/groups/')
+        for url in ('/users/groups/', '/users/groups/new/', f'/users/groups/{self.group.pk}/edit/'):
             self.assertEqual(self.client.get(url).status_code, 404)
             self.assertEqual(self.client.post(url, {'name': 'Изменено'}).status_code, 404)
-        for name in ('users:group_new', 'users:group_edit'):
+        for name in ('users:groups', 'users:group_new', 'users:group_edit'):
             with self.assertRaises(NoReverseMatch):
                 reverse(name)
         self.group.refresh_from_db()
         self.assertEqual(self.group.name, 'Системные права')
+
+    def test_dashboard_skips_removed_groups_page(self):
+        user = User.objects.create_user('catalog-viewer')
+        user.user_permissions.add(
+            Permission.objects.get(codename='view_permissiongroup'),
+            Permission.objects.get(codename='view_permission'),
+        )
+        self.client.force_login(user)
+        self.assertRedirects(self.client.get(reverse('dashboard')), reverse('users:permissions'))
 
     def test_admin_cannot_add_change_delete_even_as_superuser(self):
         django_group = Group.objects.create(name='Системная группа')

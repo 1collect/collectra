@@ -1,44 +1,38 @@
 services:
   web:
-    build: .
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    build:
+      context: ${APP_BUILD_CONTEXT:?Set APP_BUILD_CONTEXT in .env}
+    command: sh -c "python manage.py migrate && python manage.py runserver $${APP_BIND_HOST}:$${APP_CONTAINER_PORT}"
     volumes:
-      - .:/app
+      - ${APP_SOURCE_PATH:?Set APP_SOURCE_PATH in .env}:/app
     ports:
-      - "8765:8000"
-    environment: &app_environment
-      DJANGO_DEBUG: "1"
-      DJANGO_SECRET_KEY: dev-secret-key
-      POSTGRES_DB: payments
-      POSTGRES_USER: payments
-      POSTGRES_PASSWORD: payments
-      POSTGRES_HOST: db
-      POSTGRES_PORT: "5432"
+      - "${APP_HOST_PORT:?Set APP_HOST_PORT in .env}:${APP_CONTAINER_PORT:?Set APP_CONTAINER_PORT in .env}"
+    env_file: &app_env_file
+      - .env
     depends_on:
       db:
         condition: service_healthy
 
   db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_DB: payments
-      POSTGRES_USER: payments
-      POSTGRES_PASSWORD: payments
+    image: ${POSTGRES_IMAGE:?Set POSTGRES_IMAGE in .env}
+    env_file:
+      - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U payments -d payments"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: ${POSTGRES_HEALTHCHECK_INTERVAL:?Set POSTGRES_HEALTHCHECK_INTERVAL in .env}
+      timeout: ${POSTGRES_HEALTHCHECK_TIMEOUT:?Set POSTGRES_HEALTHCHECK_TIMEOUT in .env}
+      retries: ${POSTGRES_HEALTHCHECK_RETRIES:?Set POSTGRES_HEALTHCHECK_RETRIES in .env}
 
   import-worker:
-    build: .
+    build:
+      context: ${APP_BUILD_CONTEXT:?Set APP_BUILD_CONTEXT in .env}
     command: python manage.py import_worker
-    restart: unless-stopped
+    restart: ${WORKER_RESTART_POLICY:?Set WORKER_RESTART_POLICY in .env}
     volumes:
-      - .:/app
-    environment: *app_environment
+      - ${APP_SOURCE_PATH:?Set APP_SOURCE_PATH in .env}:/app
+    env_file: *app_env_file
     depends_on:
       db:
         condition: service_healthy
@@ -46,12 +40,13 @@ services:
         condition: service_started
 
   export-worker:
-    build: .
+    build:
+      context: ${APP_BUILD_CONTEXT:?Set APP_BUILD_CONTEXT in .env}
     command: python manage.py export_worker
-    restart: unless-stopped
+    restart: ${WORKER_RESTART_POLICY:?Set WORKER_RESTART_POLICY in .env}
     volumes:
-      - .:/app
-    environment: *app_environment
+      - ${APP_SOURCE_PATH:?Set APP_SOURCE_PATH in .env}:/app
+    env_file: *app_env_file
     depends_on:
       db:
         condition: service_healthy
@@ -60,3 +55,4 @@ services:
 
 volumes:
   postgres_data:
+    name: ${POSTGRES_VOLUME_NAME:?Set POSTGRES_VOLUME_NAME in .env}

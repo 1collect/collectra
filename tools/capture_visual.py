@@ -12,9 +12,9 @@ args = parser.parse_args()
 out = Path('artifacts') / args.stage
 out.mkdir(parents=True, exist_ok=True)
 routes = {
-    'users': '/users/', 'roles': '/users/roles/', 'groups': '/users/groups/',
+    'users': '/users/', 'roles': '/users/roles/',
     'permissions': '/users/permissions/', 'user-edit': '/users/1/edit/',
-    'role-form': '/users/roles/new/', 'group-form': '/users/groups/new/',
+    'role-form': '/users/roles/new/',
     'contracts': '/contracts/', 'payments': '/payments/',
     'expenses': '/expenses/', 'counterparties': '/counterparties/',
     'counterparty-form': '/counterparties/new/',
@@ -25,11 +25,11 @@ routes = {
     'history': '/payments/1/history/', 'empty-contracts': '/contracts/?q=not-found',
     'empty-payments': '/payments/?q=not-found',
     'counterparty-edit': '/counterparties/1/edit/',
-    'role-edit': '/users/roles/1/edit/', 'group-edit': '/users/groups/1/edit/',
+    'role-edit': '/users/roles/1/edit/',
     'empty-history': '/payments/2/history/',
 }
 if args.quick:
-    routes = {key: routes[key] for key in ['users', 'contracts', 'payments', 'imports', 'import-detail', 'refund-form', 'role-form', 'groups']}
+    routes = {key: routes[key] for key in ['users', 'contracts', 'payments', 'imports', 'import-detail', 'refund-form', 'role-form']}
 sizes = {'wide': (1920, 1080), 'laptop': (1366, 900), 'narrow': (900, 900), 'mobile': (390, 844)}
 results = []
 with sync_playwright() as p:

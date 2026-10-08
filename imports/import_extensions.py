@@ -1,6 +1,6 @@
 """Extended project-map columns, retaining support for legacy XLSX files."""
 from decimal import Decimal
-from references.models import CollectionAgency, Creditor, Cession, CompanyAccount
+from references.models import CollectionAgency, Counterparty, Creditor, Cession, CompanyAccount
 from .balances import CATEGORY_LABELS, PURCHASE_FIELDS
 from contract_generator.schema import BORROWER_COLUMNS, CASE_COLUMNS, OPENING_OWN_COLUMNS, CONTRACT_EXTRA_COLUMNS
 
@@ -41,9 +41,9 @@ def extend_contract(data, original):
                 if not value.is_finite() or value < 0: raise ImportValidationError('Сумма кредита должна быть неотрицательной.')
             else: value = str(data[col])
             fields[f] = value
-    for col, model, field in [('Наименование КА', CollectionAgency, 'collection_agency'), ('Первичный кредитор', Creditor, 'original_creditor')]:
+    for col, model, field in [('Наименование КА', CollectionAgency, 'collection_agency'), ('Кредитор', Counterparty, 'counterparty'), ('Первичный кредитор', Creditor, 'original_creditor')]:
         if data.get(col):
-            fields[field] = import_reference(model, {'name': str(data[col])},
+            fields[field] = import_reference(model, {'name': str(data[col]).strip()},
                 f'«{col}»: добавьте однозначную запись в справочник.')
     if data.get('Номер договора цессии'):
         filters = {'number': str(data['Номер договора цессии'])}

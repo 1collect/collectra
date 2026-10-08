@@ -40,6 +40,7 @@ CONTRACT_BASE_COLUMNS = (
 CONTRACT_EXTRA_COLUMNS = (
     *BORROWER_COLUMNS,
     'Наименование КА',
+    'Кредитор',
     'Первичный кредитор',
     'Номер договора цессии',
     'Дата договора цессии',

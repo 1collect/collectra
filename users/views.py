@@ -12,7 +12,7 @@ from .forms import (
     UserAccessForm,
 )
 from .permission_names import group_permissions, permission_display_name
-from .models import PermissionGroup, Role
+from .models import Role
 
 User = get_user_model()
 
@@ -24,7 +24,6 @@ def dashboard(request):
         ('debts.view_debt', 'debts:debts'),
         ('auth.view_user', 'users:list'),
         ('users.view_role', 'users:roles'),
-        ('users.view_permissiongroup', 'users:groups'),
         ('auth.view_permission', 'users:permissions'),
         ('debts.view_debt', 'debts:debts'),
         ('payments.view_payment', 'payments:payments'),
@@ -104,12 +103,6 @@ def role_edit(request, role_id=None):
         return redirect('users:roles')
 
     return render(request, 'users/role_edit.html', {'form': form, 'role': role})
-
-
-@permission_required('users.view_permissiongroup')
-def group_list(request):
-    groups = PermissionGroup.objects.prefetch_related('permissions').order_by('name')
-    return render(request, 'users/group_list.html', {'groups': groups})
 
 
 @permission_required('auth.view_permission')
