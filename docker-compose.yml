@@ -2,7 +2,7 @@ services:
   web:
     build:
       context: ${APP_BUILD_CONTEXT:?Set APP_BUILD_CONTEXT in .env}
-    command: sh -c "python manage.py migrate && python manage.py runserver $${APP_BIND_HOST}:$${APP_CONTAINER_PORT}"
+    command: sh -c "python manage.py migrate && python manage.py runserver $${APP_BIND_HOST}:$${APP_CONTAINER_PORT} --insecure"
     volumes:
       - ${APP_SOURCE_PATH:?Set APP_SOURCE_PATH in .env}:/app
     ports:
