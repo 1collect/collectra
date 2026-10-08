@@ -5,7 +5,8 @@ from threading import Barrier
 
 from django.contrib.auth.models import User
 from django.db import close_old_connections
-from django.test import TransactionTestCase, skipUnlessDBFeature
+from django.test import Client, TransactionTestCase, skipUnlessDBFeature
+from django.urls import reverse
 
 from debts.models import Debt, Debtor
 from imports.models import Import, ImportType
@@ -56,6 +57,35 @@ class FinancialConcurrencyTests(TransactionTestCase):
         self.assertEqual(payment.refunded_amount, Decimal('75'))
         self.debt.refresh_from_db()
         self.assertEqual(self.debt.paid_amount, Decimal('25'))
+
+    @skipUnlessDBFeature('has_select_for_update')
+    def test_concurrent_manual_payments_cannot_exceed_category_balance(self):
+        barrier = Barrier(2)
+        clients = [Client(), Client()]
+        for client in clients:
+            client.force_login(self.user)
+
+        def submit(client):
+            close_old_connections()
+            try:
+                barrier.wait(timeout=10)
+                response = client.post(reverse('payments:payment_new'), {
+                    'debt': self.debt.pk, 'status': 'chsi',
+                    'payment_date': '2026-10-02', 'purchase_principal': '600',
+                })
+                if response.status_code == 200:
+                    self.assertTrue(response.context['form'].errors)
+                return response.status_code
+            finally:
+                close_old_connections()
+
+        with ThreadPoolExecutor(max_workers=2) as pool:
+            results = list(pool.map(submit, clients))
+        self.assertCountEqual(results, [302, 200])
+        self.assertEqual(Payment.objects.count(), 1)
+        self.debt.refresh_from_db()
+        self.assertEqual(self.debt.paid_amount, Decimal('600'))
+        self.assertEqual(self.debt.outstanding_amount, Decimal('400'))
 
     @skipUnlessDBFeature('has_select_for_update')
     def test_concurrent_import_confirmation_cannot_duplicate_writeoffs(self):

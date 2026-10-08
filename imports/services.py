@@ -178,6 +178,14 @@ def contract_values(data):
     return data['ДБЗ'], iin, data['ФИО'], debt_values
 
 
+def validate_money(value, column):
+    if not value.is_finite() or abs(value) >= Decimal('1e18'):
+        raise ImportValidationError(f'Поле «{column}» должно содержать сумму меньше 10¹⁸ по модулю.')
+    if value != value.quantize(Decimal('0.01')):
+        raise ImportValidationError(f'Поле «{column}» должно содержать сумму с точностью до копеек.')
+    return value
+
+
 def decimal_values(data, column_fields):
     values = {}
     for column, field_name in column_fields.items():
@@ -185,7 +193,7 @@ def decimal_values(data, column_fields):
             value = Decimal(data[column] or '0')
             if not value.is_finite():
                 raise InvalidOperation
-            values[field_name] = value
+            values[field_name] = validate_money(value, column)
         except (InvalidOperation, ValueError) as error:
             raise ImportValidationError(
                 f'Поле «{column}» должно содержать число.'

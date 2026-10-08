@@ -10,12 +10,13 @@ WRITEOFF_EXTRAS = ('ИИН', 'Основание списания', *CATEGORY_LA
 
 
 def extend_contract(data, original):
-    from imports.services import ImportValidationError, import_reference, parse_date
+    from imports.services import ImportValidationError, import_reference, parse_date, validate_money
     values = original(data)
     fields = values[3]
     for f in PURCHASE_FIELDS:
         if fields[f] < 0: raise ImportValidationError('Суммы задолженности не могут быть отрицательными.')
     fields['purchase_total_debt'] = sum((fields[f] for f in PURCHASE_FIELDS), Decimal('0'))
+    validate_money(fields['purchase_total_debt'], 'Общая сумма задолженности (выкуп)')
     borrower = {}
     for col, f in BORROWER_COLUMNS.items():
         if data.get(col): borrower[f] = parse_date(data[col], col) if f.endswith('_date') else str(data[col])
@@ -26,7 +27,7 @@ def extend_contract(data, original):
             try: value = Decimal(str(data[col]))
             except ArithmeticError: raise ImportValidationError('Некорректная сумма наших расходов.')
             if not value.is_finite() or value < 0: raise ImportValidationError('Наши расходы должны быть неотрицательными.')
-            own[field] = value
+            own[field] = validate_money(value, col)
     fields['_own_expenses'] = own
     for col, f in CASE_COLUMNS.items():
         if data.get(col):
@@ -39,6 +40,7 @@ def extend_contract(data, original):
                 try: value = Decimal(str(data[col]))
                 except ArithmeticError: raise ImportValidationError('Некорректная сумма кредита.')
                 if not value.is_finite() or value < 0: raise ImportValidationError('Сумма кредита должна быть неотрицательной.')
+                validate_money(value, col)
             else: value = str(data[col])
             fields[f] = value
     for col, model, field in [('Наименование КА', CollectionAgency, 'collection_agency'), ('Кредитор', Counterparty, 'counterparty'), ('Первичный кредитор', Creditor, 'original_creditor')]:

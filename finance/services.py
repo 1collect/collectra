@@ -143,7 +143,7 @@ def _restore_value(record, field, value):
 
 @transaction.atomic
 def review_financial_change(*, change_id, reviewer, approve, comment=''):
-    change = FinancialChangeRequest.objects.select_for_update().select_related(
+    change = FinancialChangeRequest.objects.select_for_update(of=('self',)).select_related(
         'payment', 'expense', 'requested_by',
     ).get(pk=change_id)
     if change.status != FinancialChangeRequest.Status.PENDING:
